@@ -1,0 +1,17 @@
+<div class="auth-layout grid min-h-screen">
+    <section class="auth-brand-panel"><div class="auth-brand-inner"><div class="auth-monogram">CV<span></span></div><h1>La Magia del Cabello</h1><p>Todo lo que necesitas para llevar el control de tu negocio, en un solo lugar.</p><div class="auth-brand-footer">GESTIÓN SIMPLE · CONTROL TOTAL</div></div></section>
+    <section class="auth-form-panel"><div class="auth-card"><div class="auth-mobile-brand"><span class="brand-mark">CV</span> La Magia del Cabello</div>
+      <div class="eyebrow">BIENVENIDO A La Magia del Cabello</div><h2>{{ signup ? 'Crear cuenta' : 'Inicia sesión' }}</h2><p class="auth-intro">{{ signup ? 'Registra un usuario para comenzar a explorar el sistema.' : 'Ingresa para acceder a tu espacio de trabajo.' }}</p>
+      <form (ngSubmit)="submit()">
+        @if (signup) { <label class="field-label">Nombre completo<input class="field-input" name="name" [(ngModel)]="name" placeholder="Tu nombre completo" required /></label> }
+        <label class="field-label">Correo electrónico<input class="field-input" type="email" name="email" [(ngModel)]="email" placeholder="nombre@ejemplo.com" required /></label>
+        <label class="field-label">Contraseña<input class="field-input" type="password" name="password" [(ngModel)]="password" placeholder="Mínimo 8 caracteres" minlength="8" required /></label>
+        @if (!signup) { <div class="auth-options"><label><input type="checkbox" /> Recordarme</label><a href="#" (click)="$event.preventDefault(); showHint.set(true)">¿Olvidaste tu contraseña?</a></div> }
+        @if (showHint()) { <p class="inline-hint">En esta demostración puedes ingresar cualquier correo y contraseña de al menos 8 caracteres.</p> }
+        <button class="btn btn-primary auth-submit" type="submit">{{ signup ? 'Crear cuenta' : 'Ingresar' }}</button>
+      </form>
+      <div class="demo-divider">ACCESO RÁPIDO A LA DEMOSTRACIÓN</div>
+      <div class="demo-login-buttons"><button class="btn btn-outline" (click)="enter('admin')">Entrar como admin</button><button class="btn btn-outline" (click)="enter('user')">Entrar como usuario</button></div>
+      <p class="auth-switch">{{ signup ? '¿Ya tienes una cuenta?' : '¿Aún no tienes una cuenta?' }} <a [routerLink]="signup ? '/ingresar' : '/registro'">{{ signup ? 'Inicia sesión' : 'Crear cuenta' }}</a></p>
+    </div></section>
+  </div>

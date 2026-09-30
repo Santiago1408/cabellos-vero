@@ -1,9 +1,0 @@
-import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { DemoStore, Role } from '../data/demo-store';
-
-@Component({selector:'app-settings',standalone:true,imports:[FormsModule],template:`
-  <div class="page-header"><div><div class="eyebrow">PREFERENCIAS</div><h1>Configuración</h1><p>Opciones para esta demostración.</p></div></div>
-  <div class="settings-grid"><section class="card settings-card"><h2>Perfil</h2><p class="muted">Elige cómo ver la aplicación durante la presentación.</p><label class="field-label">Nombre visible<input class="field-input" [ngModel]="store.displayName()" (ngModelChange)="store.displayName.set($event)" /></label><label class="field-label">Rol<select class="field-input" [ngModel]="store.role()" (ngModelChange)="setRole($event)"><option value="admin">Administrador</option><option value="user">Usuario</option></select></label><p class="inline-hint">Administrador puede crear y editar datos. Usuario puede consultar las pantallas.</p></section><section class="card settings-card"><h2>Apariencia</h2><p class="muted">Tema inicial en escala de grises.</p><div class="theme-preview"><div class="theme-swatches"><span></span><span></span><span></span><span></span></div><strong>Cabellos Vero</strong><small>Los colores del sistema se controlan desde variables globales.</small></div></section></div>
-`})
-export class Settings {readonly store=inject(DemoStore);setRole(value:Role){this.store.role.set(value);}}

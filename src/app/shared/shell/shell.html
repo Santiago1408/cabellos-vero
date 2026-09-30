@@ -1,19 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { FormsModule } from '@angular/forms';
-import { DemoStore, debtStatus } from '../data/demo-store';
-import { Icon } from './icon';
-
-@Component({
-  selector: 'app-shell',
-  standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Icon],
-  template: `
-  <div class="app-frame min-w-0">
+<div class="app-frame min-w-0">
     @if (mobileOpen()) { <button class="mobile-scrim" aria-label="Cerrar menú" (click)="mobileOpen.set(false)"></button> }
     <aside class="sidebar flex flex-col" [class.sidebar-open]="mobileOpen()">
       <a class="brand" routerLink="/dashboard" (click)="mobileOpen.set(false)">
-        <span class="brand-mark">CV<span class="brand-mark-dot"></span></span><span>Cabellos <strong>Vero</strong></span>
+        <span class="brand-mark">CV<span class="brand-mark-dot"></span></span><span>La Magia del <strong>Cabello</strong></span>
       </a>
       <div class="sidebar-caption">MENÚ PRINCIPAL</div>
       <nav class="nav-list flex flex-col" aria-label="Navegación principal">
@@ -44,15 +33,4 @@ import { Icon } from './icon';
       </header>
       <main class="page-content"><router-outlet /></main>
     </div>
-  </div>`,
-})
-export class Shell {
-  readonly store = inject(DemoStore);
-  readonly mobileOpen = signal(false);
-  readonly notifications = signal(false);
-  readonly profileOpen = signal(false);
-  get initials() { return this.store.displayName().split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase(); }
-  get lowStockCount() { return this.store.products().filter(p => p.quantity <= p.threshold).length; }
-  get overdueDebtCount() { return this.store.debts().filter(d => debtStatus(d) === 'Vencida').length; }
-  setRole(role: 'admin' | 'user') { this.store.role.set(role); this.profileOpen.set(false); }
-}
+  </div>

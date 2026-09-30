@@ -100,7 +100,7 @@ export class DemoStore {
   readonly query = signal('');
   readonly role = signal<Role>('admin');
   readonly displayName = signal('Vero');
-  readonly storeName = signal('Cabellos Vero');
+  readonly storeName = signal('La Magia del Cabello');
   readonly storeAddress = signal('Av. Principal 123, La Paz, Bolivia');
   readonly storePhone = signal('70123456');
 

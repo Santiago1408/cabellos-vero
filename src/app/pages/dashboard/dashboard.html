@@ -1,11 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { DemoStore, debtBalance, debtStatus, money, monthlySummaries, stockStatus, weight } from '../data/demo-store';
-import { Icon } from '../shared/icon';
-
-@Component({
-  selector: 'app-dashboard', standalone: true, imports: [RouterLink, Icon],
-  template: `<div class="page-header"><div><div class="eyebrow">RESUMEN GENERAL</div><h1>Hola, {{ firstName }} <span class="greeting-wave">✳</span></h1><p>Esto es lo que ocurre hoy en Cabellos Vero.</p></div><div class="header-date">Septiembre 2026</div></div>
+<div class="page-header"><div><div class="eyebrow">RESUMEN GENERAL</div><h1>Hola, {{ firstName }} <span class="greeting-wave">✳</span></h1><p>Esto es lo que ocurre hoy en La Magia del Cabello.</p></div><div class="header-date">Septiembre 2026</div></div>
     <div class="dashboard-grid grid gap-[18px]">
       <section class="card dash-panel sales-panel"><div class="card-heading"><h2>Resumen de ventas</h2><span class="period-pill">Últimos 30 días</span></div><div class="metric-row four">
         <div class="metric"><span class="metric-icon"><app-icon name="truck"/></span><strong>{{ store.sales().length }}</strong><small>Ventas registradas</small></div>
@@ -21,26 +14,4 @@ import { Icon } from '../shared/icon';
       <section class="card order-chart-card"><div class="card-heading"><h2>Estado de compras</h2><a routerLink="/pedidos" class="text-link">Ver todas <app-icon name="arrow"/></a></div><div class="donut-wrap"><div class="donut"><div><strong>{{ store.orders().length }}</strong><small>Compras</small></div></div></div><div class="order-legend"><span><i class="legend-swatch black"></i> Activas <strong>{{ activeCount() }}</strong></span><span><i class="legend-swatch gray"></i> Finalizadas <strong>{{ store.orders().length - activeCount() }}</strong></span></div></section>
       <section class="card table-card top-products"><div class="card-heading"><h2>Cabellos más vendidos</h2><a routerLink="/inventario" class="text-link">Ver todos <app-icon name="arrow"/></a></div><div class="table-scroll"><table><thead><tr><th>Producto</th><th>Peso vendido</th><th>Disponible</th><th>Precio de venta</th></tr></thead><tbody>@for (p of topProducts(); track p.id) { <tr><td><a [routerLink]="['/inventario', p.id]" class="table-primary">{{ p.name }}</a></td><td>{{ weight(p.sold) }}</td><td>{{ weight(p.quantity) }}</td><td>{{ money(p.salePrice) }}/g</td></tr> }</tbody></table></div></section>
       <section class="card low-stock-card"><div class="card-heading"><h2>Stock bajo</h2><a routerLink="/inventario" class="text-link">Ver todos <app-icon name="arrow"/></a></div><div class="low-stock-list">@for (p of lowProducts(); track p.id) { <a [routerLink]="['/inventario', p.id]" class="low-stock-item"><span class="product-initial">{{ p.length }}</span><span><strong>{{ p.name }}</strong><small>{{ weight(p.quantity) }} disponibles</small></span><span class="badge" [class.badge-danger]="p.quantity === 0">{{ stockStatus(p) }}</span></a> }</div></section>
-    </div>`
-})
-export class Dashboard {
-  readonly store = inject(DemoStore);
-  readonly money = money; readonly weight = weight; readonly stockStatus = stockStatus;
-  readonly revenue = computed(() => this.store.sales().reduce((sum, sale) => sum + sale.value, 0));
-  readonly costs = computed(() => this.store.sales().reduce((sum, sale) => sum + sale.cost, 0));
-  readonly profit = computed(() => this.revenue() - this.costs());
-  readonly stockWeight = computed(() => this.store.products().reduce((sum, p) => sum + p.quantity, 0));
-  readonly lowCount = computed(() => this.store.products().filter(p => p.quantity <= p.threshold).length);
-  readonly categoryCount = computed(() => new Set(this.store.products().map(p => p.category)).size);
-  readonly orderValue = computed(() => this.store.orders().reduce((sum, o) => sum + o.value, 0));
-  readonly receivedCount = computed(() => this.store.orders().filter(o => o.status === 'Recibido').length);
-  readonly activeCount = computed(() => this.store.orders().filter(o => !['Recibido', 'Devuelto'].includes(o.status)).length);
-  readonly topProducts = computed(() => [...this.store.products()].sort((a,b) => b.sold - a.sold).slice(0,3));
-  readonly lowProducts = computed(() => this.store.products().filter(p => p.quantity <= p.threshold).slice(0,3));
-  readonly receivable = computed(() => this.store.debts().filter(d => d.kind === 'Por cobrar').reduce((sum,d) => sum + debtBalance(d), 0));
-  readonly payable = computed(() => this.store.debts().filter(d => d.kind === 'Por pagar').reduce((sum,d) => sum + debtBalance(d), 0));
-  readonly overdueCount = computed(() => this.store.debts().filter(d => debtStatus(d) === 'Vencida').length);
-  readonly paidDebtCount = computed(() => this.store.debts().filter(d => debtStatus(d) === 'Pagada').length);
-  readonly months = monthlySummaries.map(month => ({label: month.label, purchases: month.purchases / 450, sales: month.sales / 450}));
-  get firstName() { return this.store.displayName().split(' ')[0]; }
-}
+    </div>

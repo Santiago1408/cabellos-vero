@@ -1,13 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { DemoStore, Product, categoryLabel, downloadCsv, hairCategories, hairLengths, money, productName, stockStatus, weight } from '../data/demo-store';
-import { Icon } from '../shared/icon';
-
-const blankProduct = (): Product => ({ id: '', name: '', category: 'normal', length: 38, purchasePrice: 0, salePrice: 0, quantity: 0, threshold: 0, unit: 'g', color: '', quality: '', supplier: '', sold: 0 });
-
-@Component({ selector: 'app-inventory', standalone: true, imports: [FormsModule, RouterLink, Icon], template: `
-  <div class="page-header"><div><div class="eyebrow">CATÁLOGO DE CABELLO</div><h1>Inventario</h1><p>Controla el cabello disponible por categoría, longitud y peso.</p></div></div>
+<div class="page-header"><div><div class="eyebrow">CATÁLOGO DE CABELLO</div><h1>Inventario</h1><p>Controla el cabello disponible por categoría, longitud y peso.</p></div></div>
   <section class="card summary-card"><div class="card-heading"><h2>Resumen del inventario</h2><span class="period-pill">En tiempo real · Demo</span></div><div class="summary-grid four">
     <div class="summary-item"><span>Categorías</span><strong>{{ categories.length }}</strong><small>Normal, choco, tinturado, premium y elite</small></div>
     <div class="summary-item"><span>Productos</span><strong>{{ store.products().length }}</strong><small>Combinaciones registradas</small></div>
@@ -28,27 +19,3 @@ const blankProduct = (): Product => ({ id: '', name: '', category: 'normal', len
     <div class="form-grid"><label class="field-label">Código<input class="field-input" name="productId" [(ngModel)]="draft.id" required placeholder="Ej. CAB-013" /></label><label class="field-label">Categoría<select class="field-input" name="category" [(ngModel)]="draft.category" required>@for (c of categories; track c) { <option [ngValue]="c">{{ categoryLabel(c) }}</option> }</select></label><label class="field-label">Longitud<select class="field-input" name="length" [(ngModel)]="draft.length" required>@for (cm of lengths; track cm) { <option [ngValue]="cm">{{ cm }} cm</option> }</select></label><label class="field-label">Color<input class="field-input" name="color" [(ngModel)]="draft.color" required placeholder="Ej. Negro natural" /></label><label class="field-label">Calidad<input class="field-input" name="quality" [(ngModel)]="draft.quality" required placeholder="Ej. Remy" /></label><label class="field-label">Precio de compra por gramo (Bs.)<input class="field-input" type="number" min="0" step="0.01" name="purchasePrice" [(ngModel)]="draft.purchasePrice" required /></label><label class="field-label">Precio de venta por gramo (Bs.)<input class="field-input" type="number" min="0" step="0.01" name="salePrice" [(ngModel)]="draft.salePrice" required /></label><label class="field-label">Peso disponible (g)<input class="field-input" type="number" min="0" name="quantity" [(ngModel)]="draft.quantity" required /></label><label class="field-label">Stock mínimo (g)<input class="field-input" type="number" min="0" name="threshold" [(ngModel)]="draft.threshold" required /></label><label class="field-label">Proveedor<select class="field-input" name="supplier" [(ngModel)]="draft.supplier"><option value="">Sin asignar</option>@for (s of store.suppliers(); track s.id) { <option [value]="s.name">{{ s.name }}</option> }</select></label></div>
     @if (error()) { <p class="form-error">{{ error() }}</p> }<div class="modal-actions"><button type="button" class="btn btn-outline" (click)="close()">Cancelar</button><button type="submit" class="btn btn-primary">Agregar cabello</button></div>
   </form></section></div> }
-` })
-export class Inventory {
-  readonly store = inject(DemoStore); readonly money = money; readonly weight = weight; readonly categoryLabel = categoryLabel; readonly stockStatus = stockStatus;
-  readonly categories = hairCategories; readonly lengths = hairLengths;
-  readonly page = signal(1); readonly modalOpen = signal(false); readonly error = signal('');
-  readonly category = signal(''); readonly length = signal<number | ''>(''); draft = blankProduct();
-  readonly totalWeight = computed(() => this.store.products().reduce((sum,p) => sum+p.quantity,0));
-  readonly stockValue = computed(() => this.store.products().reduce((sum,p) => sum+p.quantity*p.purchasePrice,0));
-  readonly lowCount = computed(() => this.store.products().filter(p => p.quantity<=p.threshold).length);
-  readonly filtered = computed(() => this.store.products().filter(p => (!this.category() || p.category === this.category()) && (!this.length() || p.length === Number(this.length())) && `${p.name} ${p.id} ${p.category} ${p.length} ${p.color} ${p.quality} ${p.supplier}`.toLowerCase().includes(this.store.query().toLowerCase())));
-  readonly pageCount = computed(() => Math.max(1, Math.ceil(this.filtered().length / 7)));
-  readonly pageItems = computed(() => this.filtered().slice((Math.min(this.page(),this.pageCount())-1)*7, Math.min(this.page(),this.pageCount())*7));
-  get generatedName() { return productName(this.draft.category, this.draft.length); }
-  openCreate() { this.draft = blankProduct(); this.error.set(''); this.modalOpen.set(true); }
-  close() { this.modalOpen.set(false); }
-  save() {
-    if (!this.draft.id.trim() || !this.draft.color.trim() || !this.draft.quality.trim()) { this.error.set('Completa código, color y calidad.'); return; }
-    if (this.store.products().some(p => p.id.toLowerCase() === this.draft.id.toLowerCase())) { this.error.set('Ese código de producto ya existe.'); return; }
-    if (this.store.products().some(p => p.category === this.draft.category && p.length === this.draft.length)) { this.error.set('Ya existe un producto con esa categoría y longitud.'); return; }
-    if (this.draft.salePrice < this.draft.purchasePrice) { this.error.set('El precio de venta no puede ser menor al precio de compra.'); return; }
-    this.store.addProduct({...this.draft, name: this.generatedName}); this.page.set(1); this.close();
-  }
-  export() { downloadCsv('inventario-cabellos-vero.csv',['Código','Producto','Categoría','Longitud cm','Color','Calidad','Compra Bs/g','Venta Bs/g','Peso g','Stock mínimo g','Estado'],this.filtered().map(p=>[p.id,p.name,categoryLabel(p.category),p.length,p.color,p.quality,p.purchasePrice,p.salePrice,p.quantity,p.threshold,stockStatus(p)])); }
-}
