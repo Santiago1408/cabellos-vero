@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+.debt-panel{grid-column:1/-1}.field-input.field-textarea{height:82px;padding-block:10px;resize:vertical}.row-actions{display:flex;gap:6px}.row-actions .btn{min-height:31px;padding-inline:9px}
+
 /* Paleta global: modifica estas variables para cambiar los colores de toda la interfaz. */
 :root{--color-primary:#171717;--color-primary-hover:#343434;--color-primary-soft:#f0f0f0;--color-chart-secondary:#a3a3a3;--color-page:#f6f6f6;--color-surface:#fff;--color-text:#272727;--color-muted:#777;--color-border:#e9e9e9;--color-subtle:#fafafa;--sidebar-width:256px}
 @theme inline{--color-brand:var(--color-primary);--color-canvas:var(--color-page)}

@@ -11,6 +11,7 @@ export const routes: Routes = [
     { path: 'inventario/:id', loadComponent: () => import('./pages/product-detail').then(m => m.ProductDetail) },
     { path: 'proveedores', loadComponent: () => import('./pages/suppliers').then(m => m.Suppliers) },
     { path: 'pedidos', loadComponent: () => import('./pages/orders').then(m => m.Orders) },
+    { path: 'deudas', loadComponent: () => import('./pages/debts').then(m => m.Debts) },
     { path: 'reportes', loadComponent: () => import('./pages/reports').then(m => m.Reports) },
     { path: 'tienda', loadComponent: () => import('./pages/store-page').then(m => m.StorePage) },
     { path: 'configuracion', loadComponent: () => import('./pages/settings').then(m => m.Settings) },

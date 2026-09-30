@@ -1,6 +1,6 @@
-# Cabellos Vero · Prototipo de inventario
+# Cabellos Vero · Prototipo de compra y venta de cabello
 
-Prototipo navegable en Angular con componentes standalone, TypeScript y Tailwind CSS. Reproduce y adapta las pantallas de `references/` para un negocio de una sola tienda.
+Prototipo navegable en Angular con componentes standalone, TypeScript y Tailwind CSS. Administra un catálogo de cabello por categoría, longitud y peso para un negocio de una sola tienda.
 
 ## Ejecutar
 
@@ -13,9 +13,11 @@ Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el 
 
 ## Pantallas
 
-- Inicio, inventario, detalle de producto, proveedores, pedidos, reportes, mi tienda y configuración.
+- Inicio, inventario, detalle de cabello, proveedores, compras, deudas, reportes, mi tienda y configuración.
 - Ingreso y registro de demostración.
-- Formularios modales para productos, proveedores y pedidos; búsqueda, filtros, paginación y exportación CSV.
+- Catálogo de combinaciones de categoría y longitud con precios de compra/venta, color, calidad y existencias en gramos.
+- Manejo de cuentas por cobrar y por pagar, edición de deudas, abonos, filtros y exportación CSV.
+- Formularios modales para productos, proveedores y compras; búsqueda, filtros, paginación y exportación CSV.
 - Vistas adaptadas para escritorio, tableta y móvil.
 
 ## Arquitectura

@@ -26,6 +26,7 @@ import { Component, input } from '@angular/core';
       @case ('package') { <path d="M4 4h16v16H4zM8 4v5h8V4"/> }
       @case ('alert') { <path d="m12 3 10 18H2zM12 9v5m0 3h.01"/> }
       @case ('check') { <path d="m4 12 5 5L20 6"/> }
+      @case ('wallet') { <path d="M3 6h15a2 2 0 0 1 2 2v11H5a2 2 0 0 1-2-2zM3 8V5a2 2 0 0 1 2-2h12v3M15 11h6v5h-6a2.5 2.5 0 0 1 0-5z"/> }
     }
   </svg>`,
   styles: [':host{display:inline-flex;width:20px;height:20px;flex:none}svg{width:100%;height:100%}']
