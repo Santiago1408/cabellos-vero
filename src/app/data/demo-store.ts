@@ -22,8 +22,11 @@ export type Product = {
   sold: number;
 };
 export type Supplier = { id: string; name: string; product: string; phone: string; email: string; returns: boolean; pending: number };
-export type Order = { id: string; product: string; supplier: string; quantity: number; unit: 'g'; value: number; delivery: string; status: 'Pendiente' | 'Confirmado' | 'Recibido' | 'Retrasado' | 'Devuelto' };
-export type Sale = { id: string; product: string; customer: string; quantity: number; value: number; cost: number; date: string };
+export type OperationStatus = 'Pendiente' | 'Confirmado';
+export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number; costPrice: number };
+export type Order = { id: string; supplier: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
+export type Sale = { id: string; customer: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
+export type SaleResult = { kind: 'saved'; status: OperationStatus } | { kind: 'needs-pending'; product: Product; available: number; pending: number } | { kind: 'insufficient'; product: Product; available: number; pending: number };
 export type DebtKind = 'Por cobrar' | 'Por pagar';
 export type Debt = { id: string; party: string; phone: string; kind: DebtKind; total: number; paid: number; date: string; dueDate: string; notes: string };
 export type DebtStatus = 'Pendiente' | 'Parcial' | 'Pagada' | 'Vencida';
@@ -52,23 +55,26 @@ const initialSuppliers: Supplier[] = [
   { id: 'PROV-005', name: 'Mujeres del Altiplano', product: 'Cabello elite', phone: '76543210', email: 'altiplano@ejemplo.bo', returns: true, pending: 700 },
 ];
 
+const demoLine = (productId: string, quantity: number, unitPrice: number): HairLine => {
+  const product = initialProducts.find(item => item.id === productId)!;
+  return { productId, category: product.category, length: product.length, quantity, unitPrice, costPrice: product.purchasePrice };
+};
+
 const initialOrders: Order[] = [
-  { id: 'COMP-1046', product: 'Cabello normal 38 cm', supplier: 'Acopio Cochabamba', quantity: 1800, unit: 'g', value: 3960, delivery: '2026-09-25', status: 'Confirmado' },
-  { id: 'COMP-1045', product: 'Cabello premium 60 cm', supplier: 'Select Hair Bolivia', quantity: 1200, unit: 'g', value: 8160, delivery: '2026-09-24', status: 'Pendiente' },
-  { id: 'COMP-1044', product: 'Cabello choco 55 cm', supplier: 'Cabellos del Valle', quantity: 950, unit: 'g', value: 4370, delivery: '2026-09-20', status: 'Retrasado' },
-  { id: 'COMP-1043', product: 'Cabello elite 55 cm', supplier: 'Mujeres del Altiplano', quantity: 700, unit: 'g', value: 5180, delivery: '2026-09-18', status: 'Recibido' },
-  { id: 'COMP-1042', product: 'Cabello tinturado 45 cm', supplier: 'Acopio Oriental', quantity: 1200, unit: 'g', value: 4320, delivery: '2026-09-15', status: 'Recibido' },
-  { id: 'COMP-1041', product: 'Cabello elite 80 cm', supplier: 'Mujeres del Altiplano', quantity: 450, unit: 'g', value: 4770, delivery: '2026-09-12', status: 'Devuelto' },
+  { id: 'COMP-1046', supplier: 'Acopio Cochabamba', date: '2026-09-25', status: 'Confirmado', items: [demoLine('CAB-001', 1800, 2.2), demoLine('CAB-002', 250, 2.8)] },
+  { id: 'COMP-1045', supplier: 'Select Hair Bolivia', date: '2026-09-24', status: 'Pendiente', items: [demoLine('CAB-008', 1200, 6.8)] },
+  { id: 'COMP-1044', supplier: 'Cabellos del Valle', date: '2026-09-20', status: 'Pendiente', items: [demoLine('CAB-004', 950, 4.6)] },
+  { id: 'COMP-1043', supplier: 'Mujeres del Altiplano', date: '2026-09-18', status: 'Confirmado', items: [demoLine('CAB-010', 700, 7.4)] },
+  { id: 'COMP-1042', supplier: 'Acopio Oriental', date: '2026-09-15', status: 'Confirmado', items: [demoLine('CAB-005', 1200, 3.6)] },
 ];
 
 const initialSales: Sale[] = [
-  { id: 'VTA-2088', product: 'Cabello premium 50 cm', customer: 'Valentina Rojas', quantity: 420, value: 3276, cost: 2268, date: '2026-09-21' },
-  { id: 'VTA-2087', product: 'Cabello normal 38 cm', customer: 'Salón Renueva', quantity: 600, value: 1920, cost: 1320, date: '2026-09-19' },
-  { id: 'VTA-2086', product: 'Cabello elite 55 cm', customer: 'Extensiones Mía', quantity: 350, value: 3780, cost: 2590, date: '2026-09-17' },
-  { id: 'VTA-2085', product: 'Cabello choco 40 cm', customer: 'Mariela Flores', quantity: 300, value: 1350, cost: 930, date: '2026-09-14' },
-  { id: 'VTA-2084', product: 'Cabello premium 60 cm', customer: 'Studio Ambar', quantity: 500, value: 4850, cost: 3400, date: '2026-09-11' },
-  { id: 'VTA-2083', product: 'Cabello tinturado 45 cm', customer: 'Camila Vargas', quantity: 250, value: 1300, cost: 900, date: '2026-09-08' },
-  { id: 'VTA-2082', product: 'Cabello normal 45 cm', customer: 'Salón Renueva', quantity: 280, value: 1148, cost: 784, date: '2026-09-03' },
+  { id: 'VTA-2088', customer: 'Valentina Rojas', date: '2026-09-21', status: 'Confirmado', items: [demoLine('CAB-007', 420, 7.8)] },
+  { id: 'VTA-2087', customer: 'Salón Renueva', date: '2026-09-19', status: 'Confirmado', items: [demoLine('CAB-001', 600, 3.2), demoLine('CAB-002', 280, 4.1)] },
+  { id: 'VTA-2086', customer: 'Extensiones Mía', date: '2026-09-17', status: 'Confirmado', items: [demoLine('CAB-010', 350, 10.8)] },
+  { id: 'VTA-2085', customer: 'Mariela Flores', date: '2026-09-14', status: 'Confirmado', items: [demoLine('CAB-003', 300, 4.5)] },
+  { id: 'VTA-2084', customer: 'Studio Ambar', date: '2026-09-11', status: 'Confirmado', items: [demoLine('CAB-008', 500, 9.7)] },
+  { id: 'VTA-2083', customer: 'Camila Vargas', date: '2026-09-08', status: 'Confirmado', items: [demoLine('CAB-005', 250, 5.2)] },
 ];
 
 const initialDebts: Debt[] = [
@@ -107,7 +113,117 @@ export class DemoStore {
   addProduct(item: Product) { this.products.update(items => [item, ...items]); }
   updateProduct(item: Product) { this.products.update(items => items.map(p => p.id === item.id ? item : p)); }
   addSupplier(item: Supplier) { this.suppliers.update(items => [item, ...items]); }
-  addOrder(item: Order) { this.orders.update(items => [item, ...items]); }
+  addOrder(item: Order) {
+    if (item.status === 'Confirmado') this.applyPurchase(item.items);
+    this.orders.update(items => [item, ...items]);
+  }
+  addSale(item: Sale, usePending = false): SaleResult {
+    const assessment = this.assessSale(item.items);
+    if (assessment.kind === 'insufficient') return assessment;
+    if (assessment.kind === 'needs-pending' && !usePending) return assessment;
+    const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
+    const saved = { ...item, status };
+    if (status === 'Confirmado') this.applySale(saved.items);
+    this.sales.update(items => [saved, ...items]);
+    return { kind: 'saved', status };
+  }
+  updateOrder(item: Order) {
+    const previous = this.orders().find(order => order.id === item.id);
+    if (!previous) return 'No encontramos la compra que deseas editar.';
+    for (const product of this.products()) {
+      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
+      const newQuantity = item.status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      const physical = product.quantity + newQuantity - oldQuantity;
+      const oldPending = previous.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0;
+      const newPending = item.status === 'Pendiente' ? this.lineWeight(item.items, product.id) : 0;
+      const incoming = this.pendingPurchaseWeight(product.id) + newPending - oldPending;
+      if (physical < 0) return `No puedes reducir esta compra: faltaría stock físico de ${product.name}.`;
+      if (physical + incoming < this.pendingSaleWeight(product.id)) return `Este cambio dejaría sin respaldo reservas de ${product.name}.`;
+    }
+    this.products.update(products => products.map(product => {
+      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
+      const newQuantity = item.status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      return { ...product, quantity: product.quantity + newQuantity - oldQuantity };
+    }));
+    this.orders.update(orders => orders.map(order => order.id === item.id ? { ...item, modifiedAt: new Date().toISOString() } : order));
+    return '';
+  }
+  confirmOrder(id: string) {
+    const order = this.orders().find(item => item.id === id);
+    if (!order || order.status !== 'Pendiente') return 'La compra ya no está pendiente.';
+    return this.updateOrder({ ...order, status: 'Confirmado' });
+  }
+  updateSale(item: Sale, usePending = false): SaleResult | { kind: 'error'; message: string } {
+    const previous = this.sales().find(sale => sale.id === item.id);
+    if (!previous) return { kind: 'error', message: 'No encontramos la venta que deseas editar.' };
+    const assessment = this.assessSale(item.items, previous);
+    if (assessment.kind === 'insufficient') return assessment;
+    if (assessment.kind === 'needs-pending' && !usePending) return assessment;
+    const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
+    this.products.update(products => products.map(product => {
+      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
+      const newQuantity = status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      return { ...product, quantity: product.quantity + oldQuantity - newQuantity, sold: product.sold - oldQuantity + newQuantity };
+    }));
+    this.sales.update(sales => sales.map(sale => sale.id === item.id ? { ...item, status, modifiedAt: new Date().toISOString() } : sale));
+    return { kind: 'saved', status };
+  }
+  pendingPurchaseWeight(productId: string) {
+    return this.orders().filter(order => order.status === 'Pendiente')
+      .flatMap(order => order.items).filter(item => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }
+  pendingSaleWeight(productId: string) {
+    return this.sales().filter(sale => sale.status === 'Pendiente')
+      .flatMap(sale => sale.items).filter(item => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  }
+  sellableWeight(productId: string) {
+    const product = this.products().find(item => item.id === productId);
+    if (!product) return 0;
+    return Math.max(0, Math.min(product.quantity, product.quantity + this.pendingPurchaseWeight(productId) - this.pendingSaleWeight(productId)));
+  }
+  availabilityStatus(product: Product) {
+    return stockStatus({ ...product, quantity: this.sellableWeight(product.id) });
+  }
+  confirmSale(id: string) {
+    const sale = this.sales().find(item => item.id === id);
+    if (!sale || sale.status !== 'Pendiente') return 'La venta ya no está pendiente.';
+    for (const item of sale.items) {
+      const product = this.products().find(entry => entry.id === item.productId);
+      if (!product || product.quantity < item.quantity) return `Aún no hay stock físico suficiente de ${productName(item.category, item.length)} para confirmar esta venta.`;
+    }
+    const result = this.updateSale({ ...sale, status: 'Confirmado' });
+    return result.kind === 'saved' ? '' : 'Esta venta aún depende de stock pendiente.';
+  }
+  private assessSale(items: HairLine[], previous?: Sale): SaleResult | { kind: 'ready' } {
+    for (const item of items) {
+      const product = this.products().find(entry => entry.id === item.productId);
+      if (!product) continue;
+      const pending = this.pendingPurchaseWeight(product.id);
+      const reserved = this.pendingSaleWeight(product.id) - (previous?.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0);
+      const physical = product.quantity + (previous?.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0);
+      const available = Math.max(0, Math.min(physical, physical + pending - reserved));
+      if (item.quantity > physical + pending - reserved) return { kind: 'insufficient', product, available, pending };
+      if (item.quantity > available) return { kind: 'needs-pending', product, available, pending };
+    }
+    return { kind: 'ready' };
+  }
+  private lineWeight(items: HairLine[], productId: string) {
+    return items.filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0);
+  }
+  private applyPurchase(items: HairLine[]) {
+    this.products.update(products => products.map(product => {
+      const quantity = items.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
+      return quantity ? { ...product, quantity: product.quantity + quantity } : product;
+    }));
+  }
+  private applySale(items: HairLine[]) {
+    this.products.update(products => products.map(product => {
+      const quantity = items.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
+      return quantity ? { ...product, quantity: product.quantity - quantity, sold: product.sold + quantity } : product;
+    }));
+  }
   addDebt(item: Debt) { this.debts.update(items => [item, ...items]); }
   updateDebt(item: Debt) { this.debts.update(items => items.map(d => d.id === item.id ? item : d)); }
 }
@@ -116,7 +232,16 @@ export const money = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { 
 export const weight = (grams: number) => grams >= 1000 ? `${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(grams / 1000)} kg` : `${new Intl.NumberFormat('es-BO').format(grams)} g`;
 export const categoryLabel = (value: HairCategory) => value.charAt(0).toUpperCase() + value.slice(1);
 export const productName = (category: HairCategory, length: HairLength) => `Cabello ${category} ${length} cm`;
+export const operationName = (date: string, party: string) => `${dateLabel(date)} · ${party}`;
+export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity, 0);
+export const operationValue = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+export const saleCost = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.costPrice, 0);
+export const todayLocal = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
 export const dateLabel = (value: string) => value ? new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—';
+export const modifiedLabel = (value: string) => new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 export const stockStatus = (product: Product) => product.quantity === 0 ? 'Agotado' : product.quantity <= product.threshold ? 'Stock bajo' : 'Disponible';
 export const debtBalance = (debt: Debt) => Math.max(0, debt.total - debt.paid);
 export const debtStatus = (debt: Debt): DebtStatus => {

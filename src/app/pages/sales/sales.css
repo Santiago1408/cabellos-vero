@@ -1,0 +1,4 @@
+:host { display: block; }
+.pending-question { border: 1px solid var(--color-border); border-radius: 9px; padding: 14px; background: #fafafa; }
+.pending-question strong { font-size: 12px; }
+.pending-question p { margin: 7px 0 10px; color: #666; font-size: 11px; line-height: 1.5; }

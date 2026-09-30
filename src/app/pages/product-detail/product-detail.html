@@ -1,9 +1,322 @@
-<div class="page-header"><div><a routerLink="/inventario" class="back-link">‹ Volver al inventario</a><h1>{{ product()?.name || 'Producto no encontrado' }}</h1><p>{{ product()?.id }} · {{ product() ? categoryLabel(product()!.category) : '' }}</p></div></div>
-  @if (product(); as p) { <section class="card detail-card"><div class="detail-heading"><div><h2>{{ p.name }}</h2><span class="status" [class.status-good]="stockStatus(p)==='Disponible'" [class.status-warn]="stockStatus(p)==='Stock bajo'" [class.status-bad]="stockStatus(p)==='Agotado'">{{ stockStatus(p) }}</span></div><div class="card-actions">@if (store.role()==='admin') { <button class="btn btn-outline" (click)="openEdit(p)"><app-icon name="edit"/> Editar</button> }<button class="btn btn-outline" (click)="download(p)"><app-icon name="download"/> Descargar</button></div></div>
-    <div class="tabs"><button [class.selected]="tab()==='general'" (click)="tab.set('general')">Información general</button><button [class.selected]="tab()==='compras'" (click)="tab.set('compras')">Compras</button><button [class.selected]="tab()==='ajustes'" (click)="tab.set('ajustes')">Ajustes</button><button [class.selected]="tab()==='historial'" (click)="tab.set('historial')">Historial</button></div>
-    @if (tab()==='general') { <div class="detail-grid"><div><h3>Características del cabello</h3><dl class="detail-list"><div><dt>Nombre</dt><dd>{{ p.name }}</dd></div><div><dt>Código</dt><dd>{{ p.id }}</dd></div><div><dt>Categoría</dt><dd>{{ categoryLabel(p.category) }}</dd></div><div><dt>Longitud</dt><dd>{{ p.length }} cm</dd></div><div><dt>Color</dt><dd>{{ p.color }}</dd></div><div><dt>Calidad</dt><dd>{{ p.quality }}</dd></div><div><dt>Precio de compra</dt><dd>{{ money(p.purchasePrice) }} por gramo</dd></div><div><dt>Precio de venta</dt><dd>{{ money(p.salePrice) }} por gramo</dd></div><div><dt>Stock mínimo</dt><dd>{{ weight(p.threshold) }}</dd></div></dl><h3>Proveedor</h3><dl class="detail-list"><div><dt>Nombre</dt><dd>{{ p.supplier || 'Sin asignar' }}</dd></div><div><dt>Contacto</dt><dd>{{ supplierPhone(p.supplier) }}</dd></div></dl></div><div class="detail-side"><div class="product-visual"><span>{{ p.length }}</span><small>centímetros · {{ categoryLabel(p.category) }}</small></div><div class="stock-facts"><div><span>Peso disponible</span><strong>{{ weight(p.quantity) }}</strong></div><div><span>Stock mínimo</span><strong>{{ weight(p.threshold) }}</strong></div><div><span>Peso vendido</span><strong>{{ weight(p.sold) }}</strong></div><div><span>Valor a costo</span><strong>{{ money(p.quantity*p.purchasePrice) }}</strong></div><div><span>Valor potencial de venta</span><strong>{{ money(p.quantity*p.salePrice) }}</strong></div></div></div></div> }
-    @if (tab()==='compras') { <div class="tab-content"><h3>Compras relacionadas</h3><div class="table-scroll"><table><thead><tr><th>Compra</th><th>Proveedor</th><th>Peso</th><th>Fecha esperada</th><th>Estado</th></tr></thead><tbody>@for (o of relatedOrders(); track o.id) { <tr><td>{{ o.id }}</td><td>{{ o.supplier }}</td><td>{{ weight(o.quantity) }}</td><td>{{ dateLabel(o.delivery) }}</td><td><span class="status">{{ o.status }}</span></td></tr> } @empty { <tr><td colspan="5" class="empty-table">No hay compras registradas para este cabello.</td></tr> }</tbody></table></div></div> }
-    @if (tab()==='ajustes') { <div class="tab-content"><h3>Control de existencias</h3><p class="muted">Ajusta el peso disponible para representar una compra, venta o corrección.</p>@if (store.role()==='admin') { <div class="adjust-form"><label class="field-label">Nuevo peso (g)<input class="field-input" type="number" min="0" [(ngModel)]="newQuantity" /></label><button class="btn btn-primary" (click)="adjust(p)">Guardar ajuste</button></div> } @else { <p class="inline-hint">Solo un administrador puede modificar las existencias.</p> }</div> }
-    @if (tab()==='historial') { <div class="tab-content"><h3>Actividad del producto</h3><div class="activity-row"><span class="activity-dot"></span><div><strong>Combinación disponible en el catálogo</strong><small>{{ categoryLabel(p.category) }} · {{ p.length }} cm</small></div></div><div class="activity-row"><span class="activity-dot"></span><div><strong>Peso vendido: {{ weight(p.sold) }}</strong><small>Resumen acumulado de demostración</small></div></div></div> }
-  </section> } @else { <div class="card empty-state">No encontramos este producto. <a routerLink="/inventario">Volver al inventario</a></div> }
-  @if (editing()) { <div class="modal-backdrop" (click)="editing.set(false)"><section class="modal-card" role="dialog" aria-modal="true" aria-label="Editar cabello" (click)="$event.stopPropagation()"><div class="modal-header"><h2>Editar cabello</h2><button class="icon-button" (click)="editing.set(false)" aria-label="Cerrar"><app-icon name="close"/></button></div><form class="modal-form" (ngSubmit)="saveEdit()"><p class="inline-hint">Nombre generado: <strong>{{ editName }}</strong></p><div class="form-grid"><label class="field-label">Categoría<select class="field-input" name="category" [(ngModel)]="draft.category">@for(c of categories;track c){<option [ngValue]="c">{{categoryLabel(c)}}</option>}</select></label><label class="field-label">Longitud<select class="field-input" name="length" [(ngModel)]="draft.length">@for(cm of lengths;track cm){<option [ngValue]="cm">{{cm}} cm</option>}</select></label><label class="field-label">Color<input class="field-input" name="color" [(ngModel)]="draft.color" required /></label><label class="field-label">Calidad<input class="field-input" name="quality" [(ngModel)]="draft.quality" required /></label><label class="field-label">Compra por gramo (Bs.)<input class="field-input" type="number" min="0" step="0.01" name="purchasePrice" [(ngModel)]="draft.purchasePrice" required /></label><label class="field-label">Venta por gramo (Bs.)<input class="field-input" type="number" min="0" step="0.01" name="salePrice" [(ngModel)]="draft.salePrice" required /></label><label class="field-label">Stock mínimo (g)<input class="field-input" type="number" min="0" name="threshold" [(ngModel)]="draft.threshold" required /></label><label class="field-label">Proveedor<select class="field-input" name="supplier" [(ngModel)]="draft.supplier"><option value="">Sin asignar</option>@for(s of store.suppliers();track s.id){<option [value]="s.name">{{s.name}}</option>}</select></label></div>@if(error()){<p class="form-error">{{error()}}</p>}<div class="modal-actions"><button type="button" class="btn btn-outline" (click)="editing.set(false)">Cancelar</button><button class="btn btn-primary" type="submit">Guardar cambios</button></div></form></section></div> }
+<div class="page-header">
+  <div>
+    <a routerLink="/inventario" class="back-link">‹ Volver al inventario</a>
+    <h1>{{ product()?.name || 'Producto no encontrado' }}</h1>
+    <p>{{ product()?.id }} · {{ product() ? categoryLabel(product()!.category) : '' }}</p>
+  </div>
+</div>
+@if (product(); as p) {
+  <section class="card detail-card">
+    <div class="detail-heading">
+      <div>
+        <h2>{{ p.name }}</h2>
+        <span
+          class="status"
+          [class.status-good]="store.availabilityStatus(p) === 'Disponible'"
+          [class.status-warn]="store.availabilityStatus(p) === 'Stock bajo'"
+          [class.status-bad]="store.availabilityStatus(p) === 'Agotado'"
+          >{{ store.availabilityStatus(p) }}</span
+        >
+      </div>
+      <div class="card-actions">
+        @if (store.role() === 'admin') {
+          <button class="btn btn-outline" (click)="openEdit(p)">
+            <app-icon name="edit" /> Editar
+          </button>
+        }
+        <button class="btn btn-outline" (click)="download(p)">
+          <app-icon name="download" /> Descargar
+        </button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button [class.selected]="tab() === 'general'" (click)="tab.set('general')">
+        Información general</button
+      ><button [class.selected]="tab() === 'compras'" (click)="tab.set('compras')">Compras</button
+      ><button [class.selected]="tab() === 'ventas'" (click)="tab.set('ventas')">Ventas</button
+      ><button [class.selected]="tab() === 'ajustes'" (click)="tab.set('ajustes')">Ajustes</button
+      ><button [class.selected]="tab() === 'historial'" (click)="tab.set('historial')">
+        Historial
+      </button>
+    </div>
+    @if (tab() === 'general') {
+      <div class="detail-grid">
+        <div>
+          <h3>Características del cabello</h3>
+          <dl class="detail-list">
+            <div>
+              <dt>Nombre</dt>
+              <dd>{{ p.name }}</dd>
+            </div>
+            <div>
+              <dt>Código</dt>
+              <dd>{{ p.id }}</dd>
+            </div>
+            <div>
+              <dt>Categoría</dt>
+              <dd>{{ categoryLabel(p.category) }}</dd>
+            </div>
+            <div>
+              <dt>Longitud</dt>
+              <dd>{{ p.length }} cm</dd>
+            </div>
+            <div>
+              <dt>Color</dt>
+              <dd>{{ p.color }}</dd>
+            </div>
+            <div>
+              <dt>Calidad</dt>
+              <dd>{{ p.quality }}</dd>
+            </div>
+            <div>
+              <dt>Precio de compra</dt>
+              <dd>{{ money(p.purchasePrice) }} por gramo</dd>
+            </div>
+            <div>
+              <dt>Precio de venta</dt>
+              <dd>{{ money(p.salePrice) }} por gramo</dd>
+            </div>
+            <div>
+              <dt>Stock mínimo</dt>
+              <dd>{{ weight(p.threshold) }}</dd>
+            </div>
+          </dl>
+          <h3>Proveedor</h3>
+          <dl class="detail-list">
+            <div>
+              <dt>Nombre</dt>
+              <dd>{{ p.supplier || 'Sin asignar' }}</dd>
+            </div>
+            <div>
+              <dt>Contacto</dt>
+              <dd>{{ supplierPhone(p.supplier) }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="detail-side">
+          <div class="product-visual">
+            <span>{{ p.length }}</span
+            ><small>centímetros · {{ categoryLabel(p.category) }}</small>
+          </div>
+          <div class="stock-facts">
+            <div>
+              <span>En stock físico</span><strong>{{ weight(p.quantity) }}</strong>
+            </div>
+            <div>
+              <span>Disponible para venta</span><strong>{{ weight(store.sellableWeight(p.id)) }}</strong>
+            </div>
+            <div>
+              <span>Stock mínimo</span><strong>{{ weight(p.threshold) }}</strong>
+            </div>
+            <div>
+              <span>Peso vendido</span><strong>{{ weight(p.sold) }}</strong>
+            </div>
+            <div>
+              <span>Valor a costo</span><strong>{{ money(p.quantity * p.purchasePrice) }}</strong>
+            </div>
+            <div>
+              <span>Valor potencial de venta</span
+              ><strong>{{ money(p.quantity * p.salePrice) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+    @if (tab() === 'compras') {
+      <div class="tab-content">
+        <h3>Compras relacionadas</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Compra</th>
+                <th>Proveedor</th>
+                <th>Peso</th>
+                <th>Fecha de compra</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of relatedOrders(); track entry.order.id) {
+                <tr>
+                  <td>{{ dateLabel(entry.order.date) }} · {{ entry.order.supplier }}</td>
+                  <td>{{ entry.order.supplier }}</td>
+                  <td>{{ weight(entry.item.quantity) }}</td>
+                  <td>{{ dateLabel(entry.order.date) }}</td>
+                  <td>
+                    <span class="status">{{ entry.order.status }}</span>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty-table">
+                    No hay compras registradas para este cabello.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+    @if (tab() === 'ventas') {
+      <div class="tab-content">
+        <h3>Ventas relacionadas</h3>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Venta</th><th>Cliente</th><th>Peso</th><th>Fecha de venta</th><th>Estado</th></tr></thead>
+            <tbody>
+              @for (entry of relatedSales(); track entry.sale.id) {
+                <tr>
+                  <td>{{ dateLabel(entry.sale.date) }} · {{ entry.sale.customer }}</td>
+                  <td>{{ entry.sale.customer }}</td>
+                  <td>{{ weight(entry.item.quantity) }}</td>
+                  <td>{{ dateLabel(entry.sale.date) }}</td>
+                  <td><span class="status">{{ entry.sale.status }}</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="empty-table">No hay ventas registradas para este cabello.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+    @if (tab() === 'ajustes') {
+      <div class="tab-content">
+        <h3>Control de existencias</h3>
+        <p class="muted">
+          Ajusta el peso disponible para representar una compra, venta o corrección.
+        </p>
+        @if (store.role() === 'admin') {
+          <div class="adjust-form">
+            <label class="field-label"
+              >Nuevo peso (g)<input
+                class="field-input"
+                type="number"
+                min="0"
+                [(ngModel)]="newQuantity" /></label
+            ><button class="btn btn-primary" (click)="adjust(p)">Guardar ajuste</button>
+          </div>
+          @if (error()) { <p class="form-error">{{ error() }}</p> }
+        } @else {
+          <p class="inline-hint">Solo un administrador puede modificar las existencias.</p>
+        }
+      </div>
+    }
+    @if (tab() === 'historial') {
+      <div class="tab-content">
+        <h3>Actividad del producto</h3>
+        <div class="activity-row">
+          <span class="activity-dot"></span>
+          <div>
+            <strong>Combinación disponible en el catálogo</strong
+            ><small>{{ categoryLabel(p.category) }} · {{ p.length }} cm</small>
+          </div>
+        </div>
+        <div class="activity-row">
+          <span class="activity-dot"></span>
+          <div>
+            <strong>Peso vendido: {{ weight(p.sold) }}</strong
+            ><small>Resumen acumulado de demostración</small>
+          </div>
+        </div>
+      </div>
+    }
+  </section>
+} @else {
+  <div class="card empty-state">
+    No encontramos este producto. <a routerLink="/inventario">Volver al inventario</a>
+  </div>
+}
+@if (editing()) {
+  <div class="modal-backdrop" (click)="editing.set(false)">
+    <section
+      class="modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Editar cabello"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <h2>Editar cabello</h2>
+        <button class="icon-button" (click)="editing.set(false)" aria-label="Cerrar">
+          <app-icon name="close" />
+        </button>
+      </div>
+      <form class="modal-form" (ngSubmit)="saveEdit()">
+        <p class="inline-hint">
+          Nombre generado: <strong>{{ editName }}</strong>
+        </p>
+        <div class="form-grid">
+          <label class="field-label"
+            >Categoría<select class="field-input" name="category" [(ngModel)]="draft.category">
+              @for (c of categories; track c) {
+                <option [ngValue]="c">{{ categoryLabel(c) }}</option>
+              }
+            </select></label
+          ><label class="field-label"
+            >Longitud<select class="field-input" name="length" [(ngModel)]="draft.length">
+              @for (cm of lengths; track cm) {
+                <option [ngValue]="cm">{{ cm }} cm</option>
+              }
+            </select></label
+          ><label class="field-label"
+            >Color<input
+              class="field-input"
+              name="color"
+              [(ngModel)]="draft.color"
+              required /></label
+          ><label class="field-label"
+            >Calidad<input
+              class="field-input"
+              name="quality"
+              [(ngModel)]="draft.quality"
+              required /></label
+          ><label class="field-label"
+            >Compra por gramo (Bs.)<input
+              class="field-input"
+              type="number"
+              min="0"
+              step="0.01"
+              name="purchasePrice"
+              [(ngModel)]="draft.purchasePrice"
+              required /></label
+          ><label class="field-label"
+            >Venta por gramo (Bs.)<input
+              class="field-input"
+              type="number"
+              min="0"
+              step="0.01"
+              name="salePrice"
+              [(ngModel)]="draft.salePrice"
+              required /></label
+          ><label class="field-label"
+            >Stock mínimo (g)<input
+              class="field-input"
+              type="number"
+              min="0"
+              name="threshold"
+              [(ngModel)]="draft.threshold"
+              required /></label
+          ><label class="field-label"
+            >Proveedor<select class="field-input" name="supplier" [(ngModel)]="draft.supplier">
+              <option value="">Sin asignar</option>
+              @for (s of store.suppliers(); track s.id) {
+                <option [value]="s.name">{{ s.name }}</option>
+              }
+            </select></label
+          >
+        </div>
+        @if (error()) {
+          <p class="form-error">{{ error() }}</p>
+        }
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" (click)="editing.set(false)">
+            Cancelar</button
+          ><button class="btn btn-primary" type="submit">Guardar cambios</button>
+        </div>
+      </form>
+    </section>
+  </div>
+}

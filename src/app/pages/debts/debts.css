@@ -1,1 +1,18 @@
-:host { display: block; }
+:host {
+  display: block;
+}
+
+/* Rules for this component view. */
+.field-input.field-textarea {
+  height: 82px;
+  padding-block: 10px;
+  resize: vertical;
+}
+.row-actions {
+  display: flex;
+  gap: 6px;
+}
+.row-actions .btn {
+  min-height: 31px;
+  padding-inline: 9px;
+}

@@ -1,4 +1,4 @@
-# Cabellos Vero · Prototipo de compra y venta de cabello
+# La Magia del Cabello · Prototipo de compra y venta de cabello
 
 Prototipo navegable en Angular con componentes standalone, TypeScript y Tailwind CSS. Administra un catálogo de cabello por categoría, longitud y peso para un negocio de una sola tienda.
 
@@ -13,11 +13,12 @@ Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el 
 
 ## Pantallas
 
-- Inicio, inventario, detalle de cabello, proveedores, compras, deudas, reportes, mi tienda y configuración.
+- Inicio, inventario, detalle de cabello, proveedores, compras, ventas, deudas, reportes y configuración.
 - Ingreso y registro de demostración.
 - Catálogo de combinaciones de categoría y longitud con precios de compra/venta, color, calidad y existencias en gramos.
 - Manejo de cuentas por cobrar y por pagar, edición de deudas, abonos, filtros y exportación CSV.
-- Formularios modales para productos, proveedores y compras; búsqueda, filtros, paginación y exportación CSV.
+- Formularios modales para productos, proveedores, compras y ventas; edición de movimientos, filtros, ordenación, paginación y exportación CSV.
+- Compras y ventas con varios cabellos por operación, precio por gramo, confirmación desde el detalle y movimientos pendientes separados en inventario.
 - Vistas adaptadas para escritorio, tableta y móvil.
 
 ## Arquitectura
@@ -28,5 +29,7 @@ Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el 
 - `src/styles.css`: estilos compartidos y paleta global.
 
 Los cambios de datos viven solo en memoria y se reinician al recargar. Los roles permiten mostrar las diferencias de interfaz, sin autenticación ni autorización de servidor. Las cifras y los gráficos son datos ilustrativos para la presentación.
+
+Las compras confirmadas suman stock físico y las ventas confirmadas lo descuentan. Las compras pendientes permanecen como stock por recibir; las ventas pendientes reservan capacidad. Cuando una venta requiere cabello por recibir, el sistema pide confirmación y la registra como pendiente hasta que la compra se confirme.
 
 Para cambiar el color principal, editar `--color-primary`, `--color-primary-hover` y `--color-primary-soft` al inicio de `src/styles.css`. El resto de componentes consume esas variables.

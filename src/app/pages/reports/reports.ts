@@ -1,14 +1,14 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DemoStore, categoryLabel, debtBalance, money, monthlySummaries, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, debtBalance, money, monthlySummaries, operationValue, saleCost, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 
 @Component({selector:'app-reports',standalone:true,imports:[RouterLink,Icon],templateUrl: './reports.html',
   styleUrl: './reports.css'})
 export class Reports {
   readonly store=inject(DemoStore);readonly money=money;readonly weight=weight;readonly categoryLabel=categoryLabel;readonly months=monthlySummaries;
-  readonly revenue=computed(()=>this.store.sales().reduce((sum,s)=>sum+s.value,0));
-  readonly costs=computed(()=>this.store.sales().reduce((sum,s)=>sum+s.cost,0));
+  readonly revenue=computed(()=>this.store.sales().filter(s=>s.status==='Confirmado').reduce((sum,s)=>sum+operationValue(s.items),0));
+  readonly costs=computed(()=>this.store.sales().filter(s=>s.status==='Confirmado').reduce((sum,s)=>sum+saleCost(s.items),0));
   readonly profit=computed(()=>this.revenue()-this.costs());
   readonly stockValue=computed(()=>this.store.products().reduce((n,p)=>n+p.quantity*p.purchasePrice,0));
   readonly receivable=computed(()=>this.store.debts().filter(d=>d.kind==='Por cobrar').reduce((sum,d)=>sum+debtBalance(d),0));

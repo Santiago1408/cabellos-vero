@@ -1,15 +1,15 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, hairCategories, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, weight, money } from '../../data/demo-store';
+import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Sale, categoryLabel, dateLabel, downloadCsv, hairCategories, modifiedLabel, money, operationName, operationValue, operationWeight, productName, todayLocal, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 
 type LineDraft = { category: HairCategory | ''; length: HairLength | ''; quantity: number; unitPrice: number };
-type SortKey = 'supplier' | 'value' | 'weight' | 'date' | 'status';
+type SortKey = 'customer' | 'value' | 'weight' | 'date' | 'status';
 const blankLine = (): LineDraft => ({ category: '', length: '', quantity: 0, unitPrice: 0 });
 
-@Component({ selector: 'app-orders', standalone: true, imports: [FormsModule, Icon], templateUrl: './orders.html', styleUrls: ['./orders.css', '../../shared/operation.css'] })
-export class Orders {
+@Component({ selector: 'app-sales', standalone: true, imports: [FormsModule, Icon], templateUrl: './sales.html', styleUrls: ['./sales.css', '../../shared/operation.css'] })
+export class Sales {
   readonly store = inject(DemoStore);
   readonly categories = hairCategories;
   readonly money = money;
@@ -19,7 +19,6 @@ export class Orders {
   readonly operationName = operationName;
   readonly operationValue = operationValue;
   readonly operationWeight = operationWeight;
-  readonly productName = productName;
   readonly categoryLabel = categoryLabel;
   readonly page = signal(1);
   readonly modalOpen = signal(false);
@@ -27,27 +26,28 @@ export class Orders {
   readonly detailId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('detalle'));
   readonly error = signal('');
   readonly detailError = signal('');
+  readonly pendingPrompt = signal(false);
   readonly statusFilter = signal('');
   readonly sortKey = signal<SortKey>('date');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
-  draft = { supplier: '', date: todayLocal(), status: 'Confirmado' as OperationStatus };
+  draft = { customer: '', date: todayLocal(), status: 'Confirmado' as OperationStatus };
   lines: LineDraft[] = [blankLine()];
 
-  readonly filtered = computed(() => this.store.orders().filter(order => {
+  readonly filtered = computed(() => this.store.sales().filter(sale => {
     const query = this.store.query().toLowerCase();
-    const content = `${order.supplier} ${order.date} ${order.items.map(item => productName(item.category, item.length)).join(' ')}`.toLowerCase();
-    return content.includes(query) && (!this.statusFilter() || order.status === this.statusFilter());
+    const content = `${sale.customer} ${sale.date} ${sale.items.map(item => productName(item.category, item.length)).join(' ')}`.toLowerCase();
+    return content.includes(query) && (!this.statusFilter() || sale.status === this.statusFilter());
   }));
   readonly sorted = computed(() => {
     const key = this.sortKey();
     const direction = this.sortDirection() === 'asc' ? 1 : -1;
-    const value = (order: Order): string | number => {
+    const value = (sale: Sale): string | number => {
       switch (key) {
-        case 'supplier': return order.supplier;
-        case 'value': return operationValue(order.items);
-        case 'weight': return operationWeight(order.items);
-        case 'date': return order.date;
-        case 'status': return order.status;
+        case 'customer': return sale.customer;
+        case 'value': return operationValue(sale.items);
+        case 'weight': return operationWeight(sale.items);
+        case 'date': return sale.date;
+        case 'status': return sale.status;
       }
     };
     return [...this.filtered()].sort((left, right) => {
@@ -60,7 +60,7 @@ export class Orders {
   });
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.filtered().length / 7)));
   readonly pageItems = computed(() => this.sorted().slice((Math.min(this.page(), this.pageCount()) - 1) * 7, Math.min(this.page(), this.pageCount()) * 7));
-  readonly detail = computed(() => this.store.orders().find(order => order.id === this.detailId()));
+  readonly detail = computed(() => this.store.sales().find(sale => sale.id === this.detailId()));
   sortBy(key: SortKey) {
     if (this.sortKey() === key) this.sortDirection.update(direction => direction === 'asc' ? 'desc' : 'asc');
     else { this.sortKey.set(key); this.sortDirection.set('asc'); }
@@ -74,34 +74,37 @@ export class Orders {
   }
   open() {
     this.editingId.set(null);
-    this.draft = { supplier: '', date: todayLocal(), status: 'Confirmado' };
+    this.draft = { customer: '', date: todayLocal(), status: 'Confirmado' };
     this.lines = [blankLine()];
     this.error.set('');
+    this.pendingPrompt.set(false);
     this.modalOpen.set(true);
   }
-  openEdit(order: Order) {
+  openEdit(sale: Sale) {
     this.detailId.set(null);
-    this.editingId.set(order.id);
-    this.draft = { supplier: order.supplier, date: order.date, status: order.status };
-    this.lines = order.items.map(item => ({ category: item.category, length: item.length, quantity: item.quantity, unitPrice: item.unitPrice }));
+    this.editingId.set(sale.id);
+    this.draft = { customer: sale.customer, date: sale.date, status: sale.status };
+    this.lines = sale.items.map(item => ({ category: item.category, length: item.length, quantity: item.quantity, unitPrice: item.unitPrice }));
     this.error.set('');
+    this.pendingPrompt.set(false);
     this.modalOpen.set(true);
   }
   openDetail(id: string) { this.detailError.set(''); this.detailId.set(id); }
+  confirm(id: string) { this.detailError.set(this.store.confirmSale(id)); }
   addLine() { this.lines.push(blankLine()); }
   removeLine(index: number) { if (this.lines.length > 1) this.lines.splice(index, 1); }
   selectCategory(line: LineDraft) { line.length = ''; line.unitPrice = 0; }
   selectLength(line: LineDraft) {
     const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
-    line.unitPrice = product?.purchasePrice ?? 0;
+    line.unitPrice = product?.salePrice ?? 0;
   }
   get draftValue() { return this.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0); }
-  confirm(id: string) { this.detailError.set(this.store.confirmOrder(id)); }
-  save() {
-    const supplier = this.draft.supplier.trim();
-    if (!supplier || !this.draft.date) { this.error.set('Completa el proveedor y la fecha de compra.'); return; }
+  save(usePending = false) {
+    const customer = this.draft.customer.trim();
+    if (!customer || !this.draft.date) { this.error.set('Completa el cliente y la fecha de venta.'); return; }
     const items: HairLine[] = [];
     const used = new Set<string>();
+    const previous = this.store.sales().find(sale => sale.id === this.editingId());
     for (const line of this.lines) {
       const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
       const quantity = Number(line.quantity);
@@ -111,20 +114,30 @@ export class Orders {
       }
       if (used.has(product.id)) { this.error.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return; }
       used.add(product.id);
-      items.push({ productId: product.id, category: product.category, length: product.length, quantity, unitPrice, costPrice: unitPrice });
+      const costPrice = previous?.items.find(item => item.productId === product.id)?.costPrice ?? product.purchasePrice;
+      items.push({ productId: product.id, category: product.category, length: product.length, quantity, unitPrice, costPrice });
     }
-    if (this.editingId()) {
-      const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, status: this.draft.status, items });
-      if (message) { this.error.set(message); return; }
-    } else {
-      const next = Math.max(1046, ...this.store.orders().map(order => Number(order.id.replace('COMP-', '')) || 0)) + 1;
-      this.store.addOrder({ id: `COMP-${next}`, supplier, date: this.draft.date, status: this.draft.status, items });
+    const editing = this.editingId();
+    const next = Math.max(2088, ...this.store.sales().map(sale => Number(sale.id.replace('VTA-', '')) || 0)) + 1;
+    const sale = { id: editing ?? `VTA-${next}`, customer, date: this.draft.date, status: this.draft.status, items };
+    const result = editing ? this.store.updateSale(sale, usePending) : this.store.addSale(sale, usePending);
+    if (result.kind === 'error') { this.pendingPrompt.set(false); this.error.set(result.message); return; }
+    if (result.kind === 'insufficient') {
+      this.pendingPrompt.set(false);
+      this.error.set(`No hay suficiente ${productName(result.product.category, result.product.length)}. Disponible para venta: ${weight(result.available)}; en compras pendientes: ${weight(result.pending)}.`);
+      return;
     }
+    if (result.kind === 'needs-pending') {
+      this.error.set('');
+      this.pendingPrompt.set(true);
+      return;
+    }
+    this.pendingPrompt.set(false);
     this.page.set(1);
     this.modalOpen.set(false);
   }
   export() {
-    downloadCsv('compras-cabello.csv', ['Compra', 'Fecha', 'Proveedor', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, order.status])));
+    downloadCsv('ventas-cabello.csv', ['Venta', 'Fecha', 'Cliente', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
+      this.sorted().flatMap(sale => sale.items.map(item => [operationName(sale.date, sale.customer), sale.date, sale.customer, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, sale.status])));
   }
 }

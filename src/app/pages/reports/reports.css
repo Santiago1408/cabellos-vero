@@ -1,1 +1,124 @@
-:host { display: block; }
+.reports-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.report-primary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 3px 24px 24px;
+}
+.report-primary-metrics > div,
+.report-secondary-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.report-primary-metrics strong {
+  font-size: 20px;
+}
+.report-primary-metrics span,
+.report-secondary-metrics span {
+  font-size: 10px;
+  color: #888;
+}
+.report-secondary-metrics {
+  border-top: 1px solid var(--color-border);
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.report-secondary-metrics strong {
+  font-size: 13px;
+}
+.category-card table {
+  min-width: 0;
+}
+.category-card td,
+.category-card th {
+  padding-left: 20px;
+}
+.revenue-chart-card,
+.best-products {
+  grid-column: 1/-1;
+}
+.line-chart {
+  display: flex;
+  height: 285px;
+  padding: 13px 26px 0;
+}
+.line-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 45px;
+  height: 245px;
+  color: #aaa;
+  font-size: 10px;
+  padding-right: 7px;
+  text-align: right;
+}
+.line-plot {
+  flex: 1;
+  position: relative;
+  height: 245px;
+}
+.line-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.line-grid span {
+  border-top: 1px solid #ebebeb;
+}
+.line-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.line-x-axis {
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  color: #aaa;
+  font-size: 10px;
+}
+.revenue-chart-card .chart-legend {
+  margin: 13px 0 23px;
+}
+
+/* Rules for this component view. */
+@media (max-width: 960px) {
+  .reports-grid {
+    grid-template-columns: 1fr;
+  }
+  .revenue-chart-card {
+    grid-column: auto;
+  }
+  .best-products {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .page-period {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .report-primary-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .report-secondary-metrics {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 20px;
+  }
+}

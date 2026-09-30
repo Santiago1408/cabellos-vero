@@ -1,0 +1,138 @@
+<div class="page-header">
+  <div>
+    <h1>Ventas</h1>
+    <p>Registra ventas y reservas con varios tipos de cabello.</p>
+  </div>
+</div>
+<section class="card table-card">
+  <div class="card-heading table-heading">
+    <div><h2>Ventas recientes</h2><p>{{ filtered().length }} resultados</p></div>
+    <div class="card-actions">
+      @if (store.role() === 'admin') {
+        <button class="btn btn-primary" (click)="open()"><app-icon name="plus" /> Nueva venta</button>
+      }
+      <select class="btn btn-outline filter-select" aria-label="Filtrar por estado" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); page.set(1)">
+        <option value="">Todos los estados</option>
+        <option>Pendiente</option>
+        <option>Confirmado</option>
+      </select>
+      <button class="btn btn-outline" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table class="operation-list">
+      <thead><tr>
+        <th [attr.aria-sort]="sortAria('customer')"><button type="button" class="sort-heading" (click)="sortBy('customer')">Cliente <span aria-hidden="true">{{ sortIndicator('customer') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('value')"><button type="button" class="sort-heading" (click)="sortBy('value')">Valor de venta <span aria-hidden="true">{{ sortIndicator('value') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('weight')"><button type="button" class="sort-heading" (click)="sortBy('weight')">Peso <span aria-hidden="true">{{ sortIndicator('weight') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('date')"><button type="button" class="sort-heading" (click)="sortBy('date')">Fecha de venta <span aria-hidden="true">{{ sortIndicator('date') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('status')"><button type="button" class="sort-heading" (click)="sortBy('status')">Estado <span aria-hidden="true">{{ sortIndicator('status') }}</span></button></th>
+        <th class="operation-actions-heading">Acciones</th>
+      </tr></thead>
+      <tbody>
+        @for (sale of pageItems(); track sale.id) {
+          <tr [class.operation-pending]="sale.status === 'Pendiente'" [class.operation-confirmed]="sale.status === 'Confirmado'">
+            <td><span class="table-primary">{{ sale.customer }}</span><small class="table-sub">{{ sale.items.length }} tipo(s) de cabello</small></td>
+            <td>{{ money(operationValue(sale.items)) }}</td>
+            <td>{{ weight(operationWeight(sale.items)) }}</td>
+            <td>{{ dateLabel(sale.date) }}</td>
+            <td><span class="status" [class.status-good]="sale.status === 'Confirmado'" [class.status-warn]="sale.status === 'Pendiente'">{{ sale.status }}</span></td>
+            <td class="operation-actions-cell"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la venta a ' + sale.customer" title="Ver detalle" (click)="openDetail(sale.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar venta a ' + sale.customer" title="Editar venta" (click)="openEdit(sale)"><app-icon name="edit" /></button> }</div></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="empty-table">No encontramos ventas con ese criterio.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer">
+    <button class="btn btn-outline" [disabled]="page() === 1" (click)="page.update(n => n - 1)">Anterior</button>
+    <span>Página {{ page() }} de {{ pageCount() }}</span>
+    <button class="btn btn-outline" [disabled]="page() >= pageCount()" (click)="page.update(n => n + 1)">Siguiente</button>
+  </div>
+</section>
+@if (modalOpen()) {
+  <div class="modal-backdrop" (click)="modalOpen.set(false)">
+    <section class="modal-card operation-modal" role="dialog" aria-modal="true" [attr.aria-label]="editingId() ? 'Editar venta' : 'Nueva venta'" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div><h2>{{ editingId() ? 'Editar venta' : 'Nueva venta' }}</h2></div>
+        <button class="icon-button" aria-label="Cerrar" (click)="modalOpen.set(false)"><app-icon name="close" /></button>
+      </div>
+      <form class="modal-form" (ngSubmit)="save()" novalidate>
+        <div class="form-grid">
+          <label class="field-label">Cliente
+            <input class="field-input" name="customer" [(ngModel)]="draft.customer" placeholder="Nombre del cliente" />
+          </label>
+          <label class="field-label">Fecha de venta<input class="field-input" type="date" name="date" [(ngModel)]="draft.date" /></label>
+          <label class="field-label">Estado
+            <select class="field-input" name="status" [(ngModel)]="draft.status"><option value="Confirmado">Confirmado · venta de hoy</option><option value="Pendiente">Pendiente · reserva</option></select>
+          </label>
+        </div>
+        <div class="line-heading"><h3>Cabellos de la venta</h3><button type="button" class="btn btn-outline" (click)="addLine()"><app-icon name="plus" /> Agregar cabello</button></div>
+        @for (line of lines; track line; let i = $index) {
+          <div class="operation-line">
+            <div class="line-title"><strong>Cabello {{ i + 1 }}</strong>@if (lines.length > 1) { <button type="button" class="line-remove" [attr.aria-label]="'Quitar cabello ' + (i + 1)" title="Quitar cabello" (click)="removeLine(i)"><app-icon name="trash" /></button> }</div>
+            <div class="form-grid">
+              <label class="field-label">Calidad
+                <select class="field-input" [name]="'category-' + i" [(ngModel)]="line.category" (ngModelChange)="selectCategory(line)">
+                  <option value="">Seleccionar calidad</option>
+                  @for (category of categories; track category) { <option [value]="category">{{ categoryLabel(category) }}</option> }
+                </select>
+              </label>
+              <label class="field-label">Longitud
+                <select class="field-input" [name]="'length-' + i" [(ngModel)]="line.length" (ngModelChange)="selectLength(line)" [disabled]="!line.category">
+                  <option value="">Seleccionar longitud</option>
+                  @for (length of lengthsFor(line.category); track length) { <option [ngValue]="length">{{ length }} cm</option> }
+                </select>
+              </label>
+              <label class="field-label">Peso (g)<input class="field-input" type="number" min="0.01" step="any" [name]="'quantity-' + i" [(ngModel)]="line.quantity" /></label>
+              <label class="field-label">Precio de venta (Bs./g)<input class="field-input" type="number" min="0" step="any" [name]="'price-' + i" [(ngModel)]="line.unitPrice" /></label>
+            </div>
+            <span class="line-subtotal">Importe: {{ money(line.quantity * line.unitPrice) }}</span>
+          </div>
+        }
+        <div class="operation-total"><span>Total de la venta</span><strong>{{ money(draftValue) }}</strong></div>
+        @if (pendingPrompt()) {
+          <div class="pending-question">
+            <strong>¿Usar cabello de compras pendientes?</strong>
+            <p>El stock disponible no cubre toda esta venta. Si continúas, se guardará como reserva pendiente y podrás confirmarla cuando se reciba el cabello.</p>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" (click)="pendingPrompt.set(false)">Volver</button>
+              <button type="button" class="btn btn-primary" (click)="save(true)">Usar stock pendiente</button>
+            </div>
+          </div>
+        }
+        @if (error()) { <p class="form-error">{{ error() }}</p> }
+        @if (!pendingPrompt()) {
+          <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="modalOpen.set(false)">Cancelar</button><button type="submit" class="btn btn-primary">{{ editingId() ? 'Guardar cambios' : 'Crear venta' }}</button></div>
+        }
+      </form>
+    </section>
+  </div>
+}
+@if (detail(); as sale) {
+  <div class="modal-backdrop" (click)="detailId.set(null)">
+    <section class="modal-card operation-modal" role="dialog" aria-modal="true" aria-label="Detalle de venta" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div><h2>{{ operationName(sale.date, sale.customer) }}</h2></div>
+        <button class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
+      </div>
+      <div class="detail-content">
+        <div class="detail-meta"><span>Cliente: <strong>{{ sale.customer }}</strong></span><span>Fecha: <strong>{{ dateLabel(sale.date) }}</strong></span><span class="status" [class.status-good]="sale.status === 'Confirmado'">{{ sale.status }}</span></div>
+        @if (sale.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(sale.modifiedAt) }}</p> }
+        <div class="table-scroll">
+          <table><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
+            <tbody>@for (item of sale.items; track item.productId) {
+              <tr><td>{{ categoryLabel(item.category) }}</td><td>{{ item.length }} cm</td><td>{{ weight(item.quantity) }}</td><td>{{ money(item.unitPrice) }}</td><td>{{ money(item.quantity * item.unitPrice) }}</td></tr>
+            }</tbody>
+          </table>
+        </div>
+        <div class="operation-total"><span>Total · {{ weight(operationWeight(sale.items)) }}</span><strong>{{ money(operationValue(sale.items)) }}</strong></div>
+        @if (detailError()) { <p class="form-error">{{ detailError() }}</p> }
+        @if (sale.status === 'Pendiente' && store.role() === 'admin') {
+          <div class="modal-actions"><button class="btn btn-primary" (click)="confirm(sale.id)">Confirmar venta</button></div>
+        }
+      </div>
+    </section>
+  </div>
+}
