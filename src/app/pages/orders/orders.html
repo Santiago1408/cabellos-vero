@@ -79,7 +79,7 @@
               <label class="field-label">Calidad
                 <select class="field-input" [name]="'category-' + i" [(ngModel)]="line.category" (ngModelChange)="selectCategory(line)">
                   <option value="">Seleccionar calidad</option>
-                  @for (category of categories; track category) { <option [value]="category">{{ categoryLabel(category) }}</option> }
+                  @for (category of categories(); track category) { <option [value]="category">{{ categoryLabel(category) }}</option> }
                 </select>
               </label>
               <label class="field-label">Longitud

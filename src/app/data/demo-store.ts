@@ -3,8 +3,8 @@ import { Injectable, signal } from '@angular/core';
 export type Role = 'admin' | 'user';
 export const hairCategories = ['normal', 'choco', 'tinturado', 'premium', 'elite'] as const;
 export const hairLengths = [38, 40, 45, 50, 55, 60, 70, 80, 90, 100] as const;
-export type HairCategory = typeof hairCategories[number];
-export type HairLength = typeof hairLengths[number];
+export type HairCategory = string;
+export type HairLength = number;
 
 export type Product = {
   id: string;
@@ -21,7 +21,7 @@ export type Product = {
   supplier: string;
   sold: number;
 };
-export type Supplier = { id: string; name: string; product: string; phone: string; email: string; returns: boolean; pending: number };
+export type Supplier = { id: string; name: string; phone: string; city: string; address: string; mapsUrl: string; modifiedAt?: string };
 export type OperationStatus = 'Pendiente' | 'Confirmado';
 export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number; costPrice: number };
 export type Order = { id: string; supplier: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
@@ -48,11 +48,11 @@ const initialProducts: Product[] = [
 ];
 
 const initialSuppliers: Supplier[] = [
-  { id: 'PROV-001', name: 'Acopio Cochabamba', product: 'Cabello normal', phone: '70321456', email: 'acopio.cbba@ejemplo.bo', returns: true, pending: 1800 },
-  { id: 'PROV-002', name: 'Cabellos del Valle', product: 'Cabello choco', phone: '71245890', email: 'valle@ejemplo.bo', returns: true, pending: 950 },
-  { id: 'PROV-003', name: 'Acopio Oriental', product: 'Cabello tinturado', phone: '72134678', email: 'oriental@ejemplo.bo', returns: false, pending: 1200 },
-  { id: 'PROV-004', name: 'Select Hair Bolivia', product: 'Cabello premium', phone: '73456712', email: 'select@ejemplo.bo', returns: true, pending: 2100 },
-  { id: 'PROV-005', name: 'Mujeres del Altiplano', product: 'Cabello elite', phone: '76543210', email: 'altiplano@ejemplo.bo', returns: true, pending: 700 },
+  { id: 'PROV-001', name: 'Acopio Cochabamba', phone: '70321456', city: 'Cochabamba', address: '', mapsUrl: '' },
+  { id: 'PROV-002', name: 'Cabellos del Valle', phone: '71245890', city: '', address: '', mapsUrl: '' },
+  { id: 'PROV-003', name: 'Acopio Oriental', phone: '72134678', city: '', address: '', mapsUrl: '' },
+  { id: 'PROV-004', name: 'Select Hair Bolivia', phone: '73456712', city: '', address: '', mapsUrl: '' },
+  { id: 'PROV-005', name: 'Mujeres del Altiplano', phone: '76543210', city: '', address: '', mapsUrl: '' },
 ];
 
 const demoLine = (productId: string, quantity: number, unitPrice: number): HairLine => {
@@ -99,6 +99,8 @@ export const monthlySummaries: MonthlySummary[] = [
 @Injectable({ providedIn: 'root' })
 export class DemoStore {
   readonly products = signal<Product[]>(initialProducts);
+  readonly categories = signal<HairCategory[]>([...hairCategories]);
+  readonly lengths = signal<HairLength[]>([...hairLengths]);
   readonly suppliers = signal<Supplier[]>(initialSuppliers);
   readonly orders = signal<Order[]>(initialOrders);
   readonly sales = signal<Sale[]>(initialSales);
@@ -110,9 +112,66 @@ export class DemoStore {
   readonly storeAddress = signal('Av. Principal 123, La Paz, Bolivia');
   readonly storePhone = signal('70123456');
 
-  addProduct(item: Product) { this.products.update(items => [item, ...items]); }
-  updateProduct(item: Product) { this.products.update(items => items.map(p => p.id === item.id ? item : p)); }
+  addCategory(value: string) {
+    const category = value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-BO');
+    if (!category) return 'Ingresa el nombre de la categoría.';
+    if (this.categories().some(item => item.toLocaleLowerCase('es-BO') === category)) return 'Esa categoría ya existe.';
+    this.categories.update(items => [...items, category]);
+    this.addCombinations([category], this.lengths());
+    return '';
+  }
+  addLength(value: number) {
+    const length = Number(value);
+    if (!Number.isInteger(length) || length <= 0) return 'Ingresa una longitud válida en centímetros.';
+    if (this.lengths().includes(length)) return 'Esa longitud ya existe.';
+    this.lengths.update(items => [...items, length].sort((a, b) => a - b));
+    this.addCombinations(this.categories(), [length]);
+    return '';
+  }
+  removeCategory(category: HairCategory) {
+    if (this.categories().length <= 1) return 'Debe quedar al menos una categoría.';
+    const products = this.products().filter(item => item.category === category);
+    if (products.some(item => item.quantity !== 0 || item.sold !== 0 || this.hasMovements(item.id))) return 'No se puede quitar una categoría con stock o movimientos registrados.';
+    this.products.update(items => items.filter(item => item.category !== category));
+    this.categories.update(items => items.filter(item => item !== category));
+    return '';
+  }
+  removeLength(length: HairLength) {
+    if (this.lengths().length <= 1) return 'Debe quedar al menos una longitud.';
+    const products = this.products().filter(item => item.length === length);
+    if (products.some(item => item.quantity !== 0 || item.sold !== 0 || this.hasMovements(item.id))) return 'No se puede quitar una longitud con stock o movimientos registrados.';
+    this.products.update(items => items.filter(item => item.length !== length));
+    this.lengths.update(items => items.filter(item => item !== length));
+    return '';
+  }
+  private hasMovements(productId: string) {
+    return this.orders().some(order => order.items.some(item => item.productId === productId))
+      || this.sales().some(sale => sale.items.some(item => item.productId === productId));
+  }
+  private addCombinations(categories: HairCategory[], lengths: HairLength[]) {
+    let next = Math.max(0, ...this.products().map(item => Number(item.id.replace('CAB-', '')) || 0));
+    const added: Product[] = [];
+    for (const category of categories) for (const length of lengths) {
+      if (this.products().some(item => item.category === category && item.length === length)) continue;
+      added.push({ id: `CAB-${String(++next).padStart(3, '0')}`, name: productName(category, length), category, length,
+        purchasePrice: 0, salePrice: 0, quantity: 0, threshold: 0, unit: 'g', color: '', quality: '', supplier: '', sold: 0 });
+    }
+    if (added.length) this.products.update(items => [...items, ...added]);
+  }
   addSupplier(item: Supplier) { this.suppliers.update(items => [item, ...items]); }
+  updateSupplier(item: Supplier) {
+    const previous = this.suppliers().find(supplier => supplier.id === item.id);
+    if (!previous) return false;
+    const modifiedAt = new Date().toISOString();
+    const updated = { ...item, modifiedAt };
+    this.suppliers.update(items => items.map(supplier => supplier.id === item.id ? updated : supplier));
+    if (previous.name !== updated.name) {
+      this.products.update(items => items.map(product => product.supplier === previous.name ? { ...product, supplier: updated.name } : product));
+      this.orders.update(items => items.map(order => order.supplier === previous.name ? { ...order, supplier: updated.name, modifiedAt } : order));
+      this.debts.update(items => items.map(debt => debt.kind === 'Por pagar' && debt.party === previous.name ? { ...debt, party: updated.name } : debt));
+    }
+    return true;
+  }
   addOrder(item: Order) {
     if (item.status === 'Confirmado') this.applyPurchase(item.items);
     this.orders.update(items => [item, ...items]);

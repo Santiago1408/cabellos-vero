@@ -1,164 +1,110 @@
 <div class="page-header">
   <div>
-    <div class="eyebrow">DIRECTORIO</div>
     <h1>Proveedores</h1>
     <p>Organiza los contactos de compra y acopio de cabello.</p>
   </div>
 </div>
 <section class="card table-card">
   <div class="card-heading table-heading">
-    <div>
-      <h2>Todos los proveedores</h2>
-      <p>{{ filtered().length }} contactos registrados</p>
-    </div>
+    <div><h2>Todos los proveedores</h2><p>{{ filtered().length }} contactos registrados</p></div>
     <div class="card-actions">
       @if (store.role() === 'admin') {
-        <button class="btn btn-primary" (click)="open()">
-          <app-icon name="plus" /> Agregar proveedor
-        </button>
+        <button class="btn btn-primary" (click)="open()"><app-icon name="plus" /> Agregar proveedor</button>
       }
-      <select
-        class="btn btn-outline filter-select"
-        aria-label="Filtrar por devoluciones"
-        [ngModel]="returnFilter()"
-        (ngModelChange)="returnFilter.set($event)"
-      >
-        <option value="">Todos</option>
-        <option value="si">Acepta devoluciones</option>
-        <option value="no">No acepta devoluciones</option></select
-      ><button class="btn btn-outline" (click)="export()">
-        <app-icon name="download" /><span class="hide-small">Descargar</span>
-      </button>
+      <button class="btn btn-outline" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
     </div>
   </div>
   <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>Proveedor</th>
-          <th>Categoría principal</th>
-          <th>Teléfono</th>
-          <th>Correo electrónico</th>
-          <th>Devoluciones</th>
-          <th>Peso en camino</th>
-        </tr>
-      </thead>
+    <table class="operation-list">
+      <thead><tr>
+        <th [attr.aria-sort]="sortAria('name')"><button type="button" class="sort-heading" (click)="sortBy('name')">Proveedor <span aria-hidden="true">{{ sortIndicator('name') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('phone')"><button type="button" class="sort-heading" (click)="sortBy('phone')">Teléfono <span aria-hidden="true">{{ sortIndicator('phone') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('city')"><button type="button" class="sort-heading" (click)="sortBy('city')">Ciudad <span aria-hidden="true">{{ sortIndicator('city') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('address')"><button type="button" class="sort-heading" (click)="sortBy('address')">Dirección <span aria-hidden="true">{{ sortIndicator('address') }}</span></button></th>
+        <th class="operation-actions-heading">Acciones</th>
+      </tr></thead>
       <tbody>
-        @for (s of pageItems(); track s.id) {
+        @for (supplier of pageItems(); track supplier.id) {
           <tr>
+            <td><span class="table-primary">{{ supplier.name }}</span><small class="table-sub">{{ supplier.id }}</small></td>
+            <td>{{ supplier.phone }}</td>
+            <td>{{ supplier.city || '—' }}</td>
             <td>
-              <span class="table-primary">{{ s.name }}</span
-              ><small class="table-sub">{{ s.id }}</small>
+              {{ supplier.address || '—' }}
+              @if (supplier.mapsUrl) { <a class="table-sub map-link" [href]="supplier.mapsUrl" target="_blank" rel="noopener noreferrer">Abrir mapa ↗</a> }
             </td>
-            <td>{{ s.product }}</td>
-            <td>{{ s.phone }}</td>
-            <td>{{ s.email }}</td>
-            <td>
-              <span
-                class="status"
-                [class.status-good]="s.returns"
-                [class.status-bad]="!s.returns"
-                >{{ s.returns ? 'Acepta' : 'No acepta' }}</span
-              >
-            </td>
-            <td>{{ s.pending ? weight(s.pending) : '—' }}</td>
+            <td class="operation-actions-cell"><div class="operation-actions">
+              <button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de ' + supplier.name" title="Ver detalle" (click)="detailId.set(supplier.id)"><app-icon name="eye" /></button>
+              @if (store.role() === 'admin') {
+                <button type="button" class="row-edit-button" [attr.aria-label]="'Editar ' + supplier.name" title="Editar proveedor" (click)="openEdit(supplier)"><app-icon name="edit" /></button>
+              }
+            </div></td>
           </tr>
         } @empty {
-          <tr>
-            <td colspan="6" class="empty-table">No encontramos proveedores con ese criterio.</td>
-          </tr>
+          <tr><td colspan="5" class="empty-table">No hay proveedores registrados.</td></tr>
         }
       </tbody>
     </table>
   </div>
   <div class="table-footer">
-    <button class="btn btn-outline" [disabled]="page() === 1" (click)="page.update((n) => n - 1)">
-      Anterior</button
-    ><span>Página {{ page() }} de {{ pageCount() }}</span
-    ><button
-      class="btn btn-outline"
-      [disabled]="page() >= pageCount()"
-      (click)="page.update((n) => n + 1)"
-    >
-      Siguiente
-    </button>
+    <button class="btn btn-outline" [disabled]="page() === 1" (click)="page.update(n => n - 1)">Anterior</button>
+    <span>Página {{ page() }} de {{ pageCount() }}</span>
+    <button class="btn btn-outline" [disabled]="page() >= pageCount()" (click)="page.update(n => n + 1)">Siguiente</button>
   </div>
 </section>
 @if (modalOpen()) {
   <div class="modal-backdrop" (click)="modalOpen.set(false)">
-    <section
-      class="modal-card"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Nuevo proveedor"
-      (click)="$event.stopPropagation()"
-    >
+    <section class="modal-card" role="dialog" aria-modal="true" [attr.aria-label]="editingId() ? 'Editar proveedor' : 'Nuevo proveedor'" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <div>
-          <div class="eyebrow">DIRECTORIO</div>
-          <h2>Nuevo proveedor</h2>
-        </div>
-        <button class="icon-button" aria-label="Cerrar" (click)="modalOpen.set(false)">
-          <app-icon name="close" />
-        </button>
+        <h2>{{ editingId() ? 'Editar proveedor' : 'Nuevo proveedor' }}</h2>
+        <button class="icon-button" aria-label="Cerrar" (click)="modalOpen.set(false)"><app-icon name="close" /></button>
       </div>
-      <form class="modal-form" (ngSubmit)="save()">
+      <form class="modal-form" (ngSubmit)="save()" novalidate>
         <div class="form-grid">
-          <label class="field-label"
-            >Nombre del proveedor<input
-              class="field-input"
-              name="name"
-              [(ngModel)]="draft.name"
-              required
-              placeholder="Ej. Acopio Cochabamba" /></label
-          ><label class="field-label"
-            >Categoría principal<input
-              class="field-input"
-              name="product"
-              [(ngModel)]="draft.product"
-              required
-              placeholder="Ej. Cabello premium" /></label
-          ><label class="field-label"
-            >Teléfono<input
-              class="field-input"
-              name="phone"
-              [(ngModel)]="draft.phone"
-              required
-              placeholder="Ej. 70123456" /></label
-          ><label class="field-label"
-            >Correo electrónico<input
-              class="field-input"
-              type="email"
-              name="email"
-              [(ngModel)]="draft.email"
-              placeholder="contacto@ejemplo.bo" /></label
-          ><label class="field-label"
-            >¿Acepta devoluciones?<select
-              class="field-input"
-              name="returns"
-              [(ngModel)]="draft.returns"
-            >
-              <option [ngValue]="true">Sí</option>
-              <option [ngValue]="false">No</option>
-            </select></label
-          ><label class="field-label"
-            >Peso en camino (g)<input
-              class="field-input"
-              type="number"
-              min="0"
-              name="pending"
-              [(ngModel)]="draft.pending"
-          /></label>
+          <label class="field-label">Nombre del proveedor
+            <input class="field-input" name="name" [(ngModel)]="draft.name" required placeholder="Ej. Acopio Cochabamba" />
+          </label>
+          <label class="field-label">Teléfono
+            <input class="field-input" type="tel" name="phone" [(ngModel)]="draft.phone" required placeholder="Ej. 70123456" />
+          </label>
+          <label class="field-label">Ciudad
+            <input class="field-input" name="city" [(ngModel)]="draft.city" placeholder="Ej. Cochabamba" />
+          </label>
+          <label class="field-label">Dirección
+            <input class="field-input" name="address" [(ngModel)]="draft.address" placeholder="Calle, número o referencia" />
+          </label>
+          <label class="field-label form-wide">Enlace de la dirección en Google Maps
+            <input class="field-input" type="url" name="mapsUrl" [(ngModel)]="draft.mapsUrl" placeholder="https://maps.app.goo.gl/..." />
+          </label>
         </div>
-        @if (error()) {
-          <p class="form-error">{{ error() }}</p>
-        }
+        @if (error()) { <p class="form-error">{{ error() }}</p> }
         <div class="modal-actions">
-          <button type="button" class="btn btn-outline" (click)="modalOpen.set(false)">
-            Cancelar</button
-          ><button type="submit" class="btn btn-primary">Agregar proveedor</button>
+          <button type="button" class="btn btn-outline" (click)="modalOpen.set(false)">Cancelar</button>
+          <button type="submit" class="btn btn-primary">{{ editingId() ? 'Guardar cambios' : 'Agregar proveedor' }}</button>
         </div>
       </form>
+    </section>
+  </div>
+}
+@if (detail(); as supplier) {
+  <div class="modal-backdrop" (click)="detailId.set(null)">
+    <section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Detalle del proveedor" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ supplier.name }}</h2>
+        <button class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
+      </div>
+      <div class="supplier-detail">
+        <dl>
+          <div><dt>Teléfono</dt><dd>{{ supplier.phone }}</dd></div>
+          <div><dt>Ciudad</dt><dd>{{ supplier.city || '—' }}</dd></div>
+          <div><dt>Dirección</dt><dd>{{ supplier.address || '—' }}</dd></div>
+          <div><dt>Google Maps</dt><dd>@if (supplier.mapsUrl) { <a [href]="supplier.mapsUrl" target="_blank" rel="noopener noreferrer">Abrir ubicación ↗</a> } @else { — }</dd></div>
+        </dl>
+        @if (supplier.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(supplier.modifiedAt) }}</p> }
+        @if (store.role() === 'admin') {
+          <div class="modal-actions"><button class="btn btn-primary" (click)="openEdit(supplier)"><app-icon name="edit" /> Editar proveedor</button></div>
+        }
+      </div>
     </section>
   </div>
 }

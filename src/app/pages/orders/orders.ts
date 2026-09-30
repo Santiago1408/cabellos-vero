@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, hairCategories, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, weight, money } from '../../data/demo-store';
+import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, weight, money } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 
 type LineDraft = { category: HairCategory | ''; length: HairLength | ''; quantity: number; unitPrice: number };
@@ -11,7 +11,7 @@ const blankLine = (): LineDraft => ({ category: '', length: '', quantity: 0, uni
 @Component({ selector: 'app-orders', standalone: true, imports: [FormsModule, Icon], templateUrl: './orders.html', styleUrls: ['./orders.css', '../../shared/operation.css'] })
 export class Orders {
   readonly store = inject(DemoStore);
-  readonly categories = hairCategories;
+  readonly categories = this.store.categories;
   readonly money = money;
   readonly weight = weight;
   readonly dateLabel = dateLabel;
