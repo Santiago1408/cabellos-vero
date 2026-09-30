@@ -1,220 +1,76 @@
 <div class="page-header">
-  <div>
-    <div class="eyebrow">RESUMEN GENERAL</div>
-    <h1>Hola, {{ firstName }} <span class="greeting-wave">✳</span></h1>
-    <p>Esto es lo que ocurre hoy en La Magia del Cabello.</p>
-  </div>
-  <div class="header-date">Septiembre 2026</div>
+  <div><h1>Hola, {{ firstName }}</h1><p>Movimientos y resultados de La Magia del Cabello.</p></div>
+  <div class="header-date">{{ todayLabel }}</div>
 </div>
 <div class="dashboard-grid">
   <section class="card dash-panel sales-panel">
-    <div class="card-heading">
-      <h2>Resumen de ventas</h2>
-      <span class="period-pill">Últimos 30 días</span>
-    </div>
+    <div class="card-heading"><h2>Resultados del mes</h2><a routerLink="/reportes" class="text-link">Ver reportes <app-icon name="arrow" /></a></div>
     <div class="metric-row four">
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="truck" /></span
-        ><strong>{{ store.sales().length }}</strong
-        ><small>Ventas registradas</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="chart" /></span
-        ><strong>{{ money(revenue()) }}</strong
-        ><small>Ingresos</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="arrow" /></span
-        ><strong>{{ money(profit()) }}</strong
-        ><small>Ganancia</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="package" /></span
-        ><strong>{{ money(costs()) }}</strong
-        ><small>Costos</small>
-      </div>
+      <div class="metric"><span class="metric-icon"><app-icon name="chart" /></span><strong>{{ money(revenue()) }}</strong><small>Ingresos por ventas confirmadas</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="package" /></span><strong>{{ money(costs()) }}</strong><small>Costo FIFO vendido</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="arrow" /></span><strong>{{ money(profit()) }}</strong><small>Margen bruto</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="truck" /></span><strong>{{ money(purchaseValue()) }}</strong><small>Compras confirmadas</small></div>
     </div>
   </section>
   <section class="card dash-panel inventory-panel">
-    <div class="card-heading"><h2>Resumen de inventario</h2></div>
+    <div class="card-heading"><h2>Stock y pendientes</h2><a routerLink="/inventario" class="text-link">Ver inventario <app-icon name="arrow" /></a></div>
     <div class="metric-row two">
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="box" /></span
-        ><strong>{{ weight(stockWeight()) }}</strong
-        ><small>Peso disponible</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="alert" /></span><strong>{{ lowCount() }}</strong
-        ><small>Productos por reponer</small>
-      </div>
+      <div class="metric"><span class="metric-icon"><app-icon name="box" /></span><strong>{{ weight(stockWeight()) }}</strong><small>Stock físico</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="alert" /></span><strong>{{ lowCount() }}</strong><small>Tipos por reponer</small></div>
     </div>
-  </section>
-  <section class="card dash-panel purchase-panel">
-    <div class="card-heading">
-      <h2>Resumen de compras</h2>
-      <span class="period-pill">Datos demo</span>
-    </div>
-    <div class="metric-row four">
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="truck" /></span
-        ><strong>{{ store.orders().length }}</strong
-        ><small>Compras</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="package" /></span
-        ><strong>{{ money(orderValue()) }}</strong
-        ><small>Valor total</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="check" /></span
-        ><strong>{{ receivedCount() }}</strong
-        ><small>Confirmadas</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="users" /></span
-        ><strong>{{ store.suppliers().length }}</strong
-        ><small>Proveedores</small>
-      </div>
-    </div>
-  </section>
-  <section class="card dash-panel product-panel">
-    <div class="card-heading"><h2>Resumen del catálogo</h2></div>
-    <div class="metric-row two">
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="box" /></span
-        ><strong>{{ store.products().length }}</strong
-        ><small>Combinaciones registradas</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="chart" /></span
-        ><strong>{{ categoryCount() }}</strong
-        ><small>Categorías</small>
-      </div>
-    </div>
-  </section>
-  <section class="card dash-panel debt-panel">
-    <div class="card-heading">
-      <h2>Resumen de deudas</h2>
-      <a routerLink="/deudas" class="text-link">Administrar deudas <app-icon name="arrow" /></a>
-    </div>
-    <div class="metric-row four">
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="wallet" /></span
-        ><strong>{{ money(receivable()) }}</strong
-        ><small>Saldo por cobrar</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="wallet" /></span
-        ><strong>{{ money(payable()) }}</strong
-        ><small>Saldo por pagar</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="alert" /></span
-        ><strong>{{ overdueCount() }}</strong
-        ><small>Deudas vencidas</small>
-      </div>
-      <div class="metric">
-        <span class="metric-icon"><app-icon name="check" /></span
-        ><strong>{{ paidDebtCount() }}</strong
-        ><small>Deudas pagadas</small>
-      </div>
-    </div>
+    <div class="quick-counts"><a routerLink="/pedidos">{{ pendingOrdersCount() }} compras pendientes</a><a routerLink="/ventas">{{ pendingSalesCount() }} ventas reservadas</a></div>
   </section>
   <section class="card chart-card">
-    <div class="card-heading">
-      <h2>Ventas y compras</h2>
-      <span class="period-pill">Mensual</span>
-    </div>
+    <div class="card-heading"><h2>Compras y ventas confirmadas</h2><span class="period-pill">Últimos 6 meses</span></div>
     <div class="bar-chart">
-      <div class="chart-gridlines">
-        <span>45 mil</span><span>34 mil</span><span>23 mil</span><span>11 mil</span><span>0</span>
-      </div>
+      <div class="chart-gridlines">@for (label of chartLabels(); track $index) { <span>{{ label }}</span> }</div>
       <div class="bar-columns">
-        @for (month of months; track month.label) {
+        @for (month of months(); track month.key) {
           <div class="bar-group">
             <div class="bar-pair">
-              <span class="bar purchases" [style.height.%]="month.purchases"></span
-              ><span class="bar sales" [style.height.%]="month.sales"></span>
+              <span class="bar purchases" [style.height.%]="month.purchases / chartMaximum() * 100" [attr.title]="'Compras: ' + money(month.purchases)"></span>
+              <span class="bar sales" [style.height.%]="month.sales / chartMaximum() * 100" [attr.title]="'Ventas: ' + money(month.sales)"></span>
             </div>
             <small>{{ month.label }}</small>
           </div>
         }
       </div>
     </div>
-    <div class="chart-legend">
-      <span><i class="legend-swatch black"></i> Compras</span
-      ><span><i class="legend-swatch gray"></i> Ventas</span>
+    <div class="chart-legend"><span><i class="legend-swatch black"></i> Compras</span><span><i class="legend-swatch gray"></i> Ventas</span></div>
+  </section>
+  <section class="card pending-panel">
+    <div class="card-heading"><h2>Movimientos por confirmar</h2></div>
+    <div class="pending-group"><h3>Compras pendientes</h3>
+      @for (order of pendingOrders(); track order.id) {
+        <a routerLink="/pedidos" [queryParams]="{ detalle: order.id }" class="pending-link"><span>{{ order.supplier }}<small>{{ dateLabel(order.date) }}</small></span><strong>{{ money(operationValue(order.items)) }}</strong></a>
+      } @empty { <p class="empty-pending">No hay compras pendientes.</p> }
+    </div>
+    <div class="pending-group"><h3>Ventas reservadas</h3>
+      @for (sale of pendingSales(); track sale.id) {
+        <a routerLink="/ventas" [queryParams]="{ detalle: sale.id }" class="pending-link"><span>{{ sale.customer }}<small>{{ dateLabel(sale.date) }}</small></span><strong>{{ money(operationValue(sale.items)) }}</strong></a>
+      } @empty { <p class="empty-pending">No hay ventas reservadas.</p> }
     </div>
   </section>
-  <section class="card order-chart-card">
-    <div class="card-heading">
-      <h2>Estado de compras</h2>
-      <a routerLink="/pedidos" class="text-link">Ver todas <app-icon name="arrow" /></a>
-    </div>
-    <div class="donut-wrap">
-      <div class="donut">
-        <div>
-          <strong>{{ store.orders().length }}</strong
-          ><small>Compras</small>
-        </div>
-      </div>
-    </div>
-    <div class="order-legend">
-      <span
-        ><i class="legend-swatch black"></i> Pendientes <strong>{{ activeCount() }}</strong></span
-      ><span
-        ><i class="legend-swatch gray"></i> Confirmadas
-        <strong>{{ store.orders().length - activeCount() }}</strong></span
-      >
+  <section class="card debt-panel">
+    <div class="card-heading"><h2>Saldos pendientes</h2><a routerLink="/deudas" class="text-link">Ver deudas <app-icon name="arrow" /></a></div>
+    <div class="metric-row two">
+      <div class="metric"><span class="metric-icon"><app-icon name="wallet" /></span><strong>{{ money(receivable()) }}</strong><small>Por cobrar</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="wallet" /></span><strong>{{ money(payable()) }}</strong><small>Por pagar</small></div>
     </div>
   </section>
   <section class="card table-card top-products">
-    <div class="card-heading">
-      <h2>Cabellos más vendidos</h2>
-      <a routerLink="/inventario" class="text-link">Ver todos <app-icon name="arrow" /></a>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Producto</th>
-            <th>Peso vendido</th>
-            <th>Disponible</th>
-            <th>Precio de venta</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (p of topProducts(); track p.id) {
-            <tr>
-              <td>
-                <a [routerLink]="['/inventario', p.id]" class="table-primary">{{ p.name }}</a>
-              </td>
-              <td>{{ weight(p.sold) }}</td>
-              <td>{{ weight(p.quantity) }}</td>
-              <td>{{ money(p.salePrice) }}/g</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <div class="card-heading"><h2>Cabellos más vendidos</h2><a routerLink="/reportes" class="text-link">Ver reportes <app-icon name="arrow" /></a></div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Cabello</th><th>Peso vendido</th><th>En stock</th><th>Ingresos reales</th></tr></thead>
+      <tbody>@for (product of topProducts(); track product.id) {
+        <tr><td><a [routerLink]="['/inventario', product.id]" class="table-primary">{{ product.name }}</a></td><td>{{ weight(product.soldWeight) }}</td><td>{{ weight(product.quantity) }}</td><td>{{ money(product.revenue) }}</td></tr>
+      } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }</tbody>
+    </table></div>
   </section>
   <section class="card low-stock-card">
-    <div class="card-heading">
-      <h2>Stock bajo</h2>
-      <a routerLink="/inventario" class="text-link">Ver todos <app-icon name="arrow" /></a>
-    </div>
-    <div class="low-stock-list">
-      @for (p of lowProducts(); track p.id) {
-        <a [routerLink]="['/inventario', p.id]" class="low-stock-item"
-          ><span class="product-initial">{{ p.length }}</span
-          ><span
-            ><strong>{{ p.name }}</strong
-            ><small>{{ weight(p.quantity) }} disponibles</small></span
-          ><span class="badge" [class.badge-danger]="p.quantity === 0">{{
-            store.availabilityStatus(p)
-          }}</span></a
-        >
-      }
-    </div>
+    <div class="card-heading"><h2>Stock bajo</h2><a routerLink="/inventario" class="text-link">Ver inventario <app-icon name="arrow" /></a></div>
+    <div class="low-stock-list">@for (product of lowProducts(); track product.id) {
+      <a [routerLink]="['/inventario', product.id]" class="low-stock-item"><span class="product-initial">{{ product.length }}</span><span><strong>{{ product.name }}</strong><small>{{ weight(product.quantity) }} en stock</small></span><span class="badge" [class.badge-danger]="product.quantity === 0">{{ store.availabilityStatus(product) }}</span></a>
+    } @empty { <p class="empty-pending">No hay alertas de stock bajo.</p> }</div>
   </section>
 </div>

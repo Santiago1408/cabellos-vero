@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
+import { calculateFifo, openingLots } from './fifo';
 
 export type Role = 'admin' | 'user';
 export const hairCategories = ['normal', 'choco', 'tinturado', 'premium', 'elite'] as const;
@@ -23,14 +24,18 @@ export type Product = {
 };
 export type Supplier = { id: string; name: string; phone: string; city: string; address: string; mapsUrl: string; modifiedAt?: string };
 export type OperationStatus = 'Pendiente' | 'Confirmado';
-export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number; costPrice: number };
+export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number };
 export type Order = { id: string; supplier: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
 export type Sale = { id: string; customer: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
-export type SaleResult = { kind: 'saved'; status: OperationStatus } | { kind: 'needs-pending'; product: Product; available: number; pending: number } | { kind: 'insufficient'; product: Product; available: number; pending: number };
+export type SaleShortage = { product: Product; requested: number; physical: number; pending: number; missing: number };
+export type SaleResult = { kind: 'saved'; status: OperationStatus }
+  | { kind: 'needs-pending'; product: Product; available: number; pending: number }
+  | { kind: 'insufficient'; shortages: SaleShortage[] }
+  | { kind: 'error'; message: string };
 export type DebtKind = 'Por cobrar' | 'Por pagar';
 export type Debt = { id: string; party: string; phone: string; kind: DebtKind; total: number; paid: number; date: string; dueDate: string; notes: string };
 export type DebtStatus = 'Pendiente' | 'Parcial' | 'Pagada' | 'Vencida';
-export type MonthlySummary = { label: string; purchases: number; sales: number; profit: number };
+export type MonthlySummary = { key: string; label: string; purchases: number; sales: number; costs: number; profit: number };
 
 const initialProducts: Product[] = [
   { id: 'CAB-001', name: 'Cabello normal 38 cm', category: 'normal', length: 38, purchasePrice: 2.2, salePrice: 3.2, quantity: 2450, threshold: 500, unit: 'g', color: 'Castaño oscuro', quality: 'Natural seleccionado', supplier: 'Acopio Cochabamba', sold: 1850 },
@@ -57,7 +62,7 @@ const initialSuppliers: Supplier[] = [
 
 const demoLine = (productId: string, quantity: number, unitPrice: number): HairLine => {
   const product = initialProducts.find(item => item.id === productId)!;
-  return { productId, category: product.category, length: product.length, quantity, unitPrice, costPrice: product.purchasePrice };
+  return { productId, category: product.category, length: product.length, quantity, unitPrice };
 };
 
 const initialOrders: Order[] = [
@@ -74,7 +79,7 @@ const initialSales: Sale[] = [
   { id: 'VTA-2086', customer: 'Extensiones Mía', date: '2026-09-17', status: 'Confirmado', items: [demoLine('CAB-010', 350, 10.8)] },
   { id: 'VTA-2085', customer: 'Mariela Flores', date: '2026-09-14', status: 'Confirmado', items: [demoLine('CAB-003', 300, 4.5)] },
   { id: 'VTA-2084', customer: 'Studio Ambar', date: '2026-09-11', status: 'Confirmado', items: [demoLine('CAB-008', 500, 9.7)] },
-  { id: 'VTA-2083', customer: 'Camila Vargas', date: '2026-09-08', status: 'Confirmado', items: [demoLine('CAB-005', 250, 5.2)] },
+  { id: 'VTA-2083', customer: 'Camila Vargas', date: '2026-09-16', status: 'Confirmado', items: [demoLine('CAB-005', 250, 5.2)] },
 ];
 
 const initialDebts: Debt[] = [
@@ -85,15 +90,6 @@ const initialDebts: Debt[] = [
   { id: 'DEU-005', party: 'Select Hair Bolivia', phone: '73456712', kind: 'Por pagar', total: 8160, paid: 3000, date: '2026-09-05', dueDate: '2026-09-26', notes: 'Compra de cabello premium 60 cm.' },
   { id: 'DEU-006', party: 'Cabellos del Valle', phone: '71245890', kind: 'Por pagar', total: 4370, paid: 1000, date: '2026-09-02', dueDate: '2026-09-18', notes: 'Saldo de lote choco.' },
   { id: 'DEU-007', party: 'Mujeres del Altiplano', phone: '76543210', kind: 'Por pagar', total: 5180, paid: 5180, date: '2026-08-30', dueDate: '2026-09-15', notes: 'Compra liquidada.' },
-];
-
-export const monthlySummaries: MonthlySummary[] = [
-  { label: 'Abr', purchases: 18400, sales: 25700, profit: 7300 },
-  { label: 'May', purchases: 22600, sales: 31800, profit: 9200 },
-  { label: 'Jun', purchases: 19700, sales: 28600, profit: 8900 },
-  { label: 'Jul', purchases: 25300, sales: 36100, profit: 10800 },
-  { label: 'Ago', purchases: 29100, sales: 42400, profit: 13300 },
-  { label: 'Sep', purchases: 26760, sales: 35850, profit: 9090 },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -111,6 +107,31 @@ export class DemoStore {
   readonly storeName = signal('La Magia del Cabello');
   readonly storeAddress = signal('Av. Principal 123, La Paz, Bolivia');
   readonly storePhone = signal('70123456');
+  readonly initialLots = openingLots(initialProducts, initialOrders, initialSales);
+  readonly confirmedSales = computed(() => this.sales().filter(sale => sale.status === 'Confirmado'));
+  readonly managedProducts = computed(() => this.products().filter(product => product.quantity > 0
+    || this.orders().some(order => order.status === 'Confirmado' && order.items.some(item => item.productId === product.id))));
+  readonly fifo = computed(() => calculateFifo(this.initialLots, this.orders(), this.sales()));
+  readonly monthlySummaries = computed<MonthlySummary[]>(() => {
+    const now = new Date();
+    const costsBySale = new Map<string, number>();
+    for (const allocation of this.fifo().allocations) costsBySale.set(allocation.saleId,
+      (costsBySale.get(allocation.saleId) ?? 0) + allocation.quantity * allocation.unitCost);
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const purchases = this.orders().filter(order => order.status === 'Confirmado' && order.date.startsWith(key))
+        .reduce((sum, order) => sum + operationValue(order.items), 0);
+      const sales = this.confirmedSales().filter(sale => sale.date.startsWith(key))
+        .reduce((sum, sale) => sum + operationValue(sale.items), 0);
+      const costs = this.confirmedSales().filter(sale => sale.date.startsWith(key))
+        .reduce((sum, sale) => sum + (costsBySale.get(sale.id) ?? 0), 0);
+      return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short' }).format(date), purchases, sales, costs, profit: sales - costs };
+    });
+  });
+  saleCost(saleId: string) { return this.fifo().allocations.filter(item => item.saleId === saleId).reduce((sum, item) => sum + item.quantity * item.unitCost, 0); }
+  productSold(productId: string) { return this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0); }
+  productRevenue(productId: string) { return this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0); }
 
   addCategory(value: string) {
     const category = value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-BO');
@@ -158,6 +179,21 @@ export class DemoStore {
     }
     if (added.length) this.products.update(items => [...items, ...added]);
   }
+  private prepareOrder(order: Order) {
+    const added: Product[] = [];
+    let next = Math.max(0, ...this.products().map(item => Number(item.id.replace('CAB-', '')) || 0));
+    const items = order.items.map(line => {
+      let product = [...this.products(), ...added].find(item => item.category === line.category && item.length === line.length);
+      if (!product) {
+        product = { id: `CAB-${String(++next).padStart(3, '0')}`, name: productName(line.category, line.length),
+          category: line.category, length: line.length, purchasePrice: 0, salePrice: 0, quantity: 0,
+          threshold: 0, unit: 'g', color: '', quality: '', supplier: '', sold: 0 };
+        added.push(product);
+      }
+      return { ...line, productId: product.id };
+    });
+    return { order: { ...order, items }, added };
+  }
   addSupplier(item: Supplier) { this.suppliers.update(items => [item, ...items]); }
   updateSupplier(item: Supplier) {
     const previous = this.suppliers().find(supplier => supplier.id === item.id);
@@ -173,15 +209,22 @@ export class DemoStore {
     return true;
   }
   addOrder(item: Order) {
-    if (item.status === 'Confirmado') this.applyPurchase(item.items);
-    this.orders.update(items => [item, ...items]);
+    const prepared = this.prepareOrder(item);
+    if (prepared.added.length) this.products.update(items => [...items, ...prepared.added]);
+    if (prepared.order.status === 'Confirmado') this.applyPurchase(prepared.order.items);
+    this.orders.update(items => [prepared.order, ...items]);
   }
   addSale(item: Sale, usePending = false): SaleResult {
     const assessment = this.assessSale(item.items);
+    if (assessment.kind === 'error') return assessment;
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
     const saved = { ...item, status };
+    if (status === 'Confirmado') {
+      const shortage = calculateFifo(this.initialLots, this.orders(), [...this.sales(), saved]).shortages[0];
+      if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
+    }
     if (status === 'Confirmado') this.applySale(saved.items);
     this.sales.update(items => [saved, ...items]);
     return { kind: 'saved', status };
@@ -189,22 +232,27 @@ export class DemoStore {
   updateOrder(item: Order) {
     const previous = this.orders().find(order => order.id === item.id);
     if (!previous) return 'No encontramos la compra que deseas editar.';
-    for (const product of this.products()) {
+    const prepared = this.prepareOrder(item);
+    const updated = prepared.order;
+    for (const product of [...this.products(), ...prepared.added]) {
       const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
-      const newQuantity = item.status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
       const physical = product.quantity + newQuantity - oldQuantity;
       const oldPending = previous.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0;
-      const newPending = item.status === 'Pendiente' ? this.lineWeight(item.items, product.id) : 0;
+      const newPending = updated.status === 'Pendiente' ? this.lineWeight(updated.items, product.id) : 0;
       const incoming = this.pendingPurchaseWeight(product.id) + newPending - oldPending;
       if (physical < 0) return `No puedes reducir esta compra: faltaría stock físico de ${product.name}.`;
       if (physical + incoming < this.pendingSaleWeight(product.id)) return `Este cambio dejaría sin respaldo reservas de ${product.name}.`;
     }
-    this.products.update(products => products.map(product => {
+    const candidateOrders = this.orders().map(order => order.id === item.id ? updated : order);
+    const shortage = calculateFifo(this.initialLots, candidateOrders, this.sales()).shortages[0];
+    if (shortage) return this.fifoShortageMessage(shortage.productId, shortage.quantity);
+    this.products.update(products => [...products, ...prepared.added].map(product => {
       const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
-      const newQuantity = item.status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
       return { ...product, quantity: product.quantity + newQuantity - oldQuantity };
     }));
-    this.orders.update(orders => orders.map(order => order.id === item.id ? { ...item, modifiedAt: new Date().toISOString() } : order));
+    this.orders.update(orders => orders.map(order => order.id === item.id ? { ...updated, modifiedAt: new Date().toISOString() } : order));
     return '';
   }
   confirmOrder(id: string) {
@@ -216,9 +264,15 @@ export class DemoStore {
     const previous = this.sales().find(sale => sale.id === item.id);
     if (!previous) return { kind: 'error', message: 'No encontramos la venta que deseas editar.' };
     const assessment = this.assessSale(item.items, previous);
+    if (assessment.kind === 'error') return assessment;
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
+    if (status === 'Confirmado') {
+      const candidateSales = this.sales().map(sale => sale.id === item.id ? { ...item, status } : sale);
+      const shortage = calculateFifo(this.initialLots, this.orders(), candidateSales).shortages[0];
+      if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
+    }
     this.products.update(products => products.map(product => {
       const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
       const newQuantity = status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
@@ -253,20 +307,34 @@ export class DemoStore {
       if (!product || product.quantity < item.quantity) return `Aún no hay stock físico suficiente de ${productName(item.category, item.length)} para confirmar esta venta.`;
     }
     const result = this.updateSale({ ...sale, status: 'Confirmado' });
-    return result.kind === 'saved' ? '' : 'Esta venta aún depende de stock pendiente.';
+    return result.kind === 'saved' ? '' : result.kind === 'error' ? result.message : 'Esta venta aún depende de stock pendiente.';
+  }
+  private fifoShortageMessage(productId: string, missing: number) {
+    const product = this.products().find(item => item.id === productId);
+    return `La fecha de la venta requiere ${weight(missing)} de ${product?.name ?? 'cabello'} antes de que ingrese el lote correspondiente. Revisa las fechas de compra y venta.`;
   }
   private assessSale(items: HairLine[], previous?: Sale): SaleResult | { kind: 'ready' } {
+    if (!items.length) return { kind: 'error', message: 'Agrega al menos un tipo de cabello a la venta.' };
+    const shortages: SaleShortage[] = [];
+    let pendingRequired: { kind: 'needs-pending'; product: Product; available: number; pending: number } | null = null;
+    const used = new Set<string>();
     for (const item of items) {
       const product = this.products().find(entry => entry.id === item.productId);
-      if (!product) continue;
+      if (!product || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice <= 0) {
+        return { kind: 'error', message: 'Hay un tipo de cabello, peso o precio inválido en la venta.' };
+      }
+      if (used.has(product.id)) return { kind: 'error', message: 'Cada tipo de cabello debe aparecer una sola vez en la venta.' };
+      used.add(product.id);
       const pending = this.pendingPurchaseWeight(product.id);
       const reserved = this.pendingSaleWeight(product.id) - (previous?.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0);
       const physical = product.quantity + (previous?.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0);
       const available = Math.max(0, Math.min(physical, physical + pending - reserved));
-      if (item.quantity > physical + pending - reserved) return { kind: 'insufficient', product, available, pending };
-      if (item.quantity > available) return { kind: 'needs-pending', product, available, pending };
+      const backed = Math.max(0, physical + pending - reserved);
+      if (item.quantity > backed) shortages.push({ product, requested: item.quantity, physical: available, pending: Math.max(0, backed - available), missing: item.quantity - backed });
+      else if (item.quantity > available && !pendingRequired) pendingRequired = { kind: 'needs-pending', product, available, pending };
     }
-    return { kind: 'ready' };
+    if (shortages.length) return { kind: 'insufficient', shortages };
+    return pendingRequired ?? { kind: 'ready' };
   }
   private lineWeight(items: HairLine[], productId: string) {
     return items.filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0);
@@ -294,7 +362,6 @@ export const productName = (category: HairCategory, length: HairLength) => `Cabe
 export const operationName = (date: string, party: string) => `${dateLabel(date)} · ${party}`;
 export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity, 0);
 export const operationValue = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-export const saleCost = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.costPrice, 0);
 export const todayLocal = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;

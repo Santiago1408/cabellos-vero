@@ -104,7 +104,6 @@ export class Sales {
     if (!customer || !this.draft.date) { this.error.set('Completa el cliente y la fecha de venta.'); return; }
     const items: HairLine[] = [];
     const used = new Set<string>();
-    const previous = this.store.sales().find(sale => sale.id === this.editingId());
     for (const line of this.lines) {
       const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
       const quantity = Number(line.quantity);
@@ -114,8 +113,7 @@ export class Sales {
       }
       if (used.has(product.id)) { this.error.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return; }
       used.add(product.id);
-      const costPrice = previous?.items.find(item => item.productId === product.id)?.costPrice ?? product.purchasePrice;
-      items.push({ productId: product.id, category: product.category, length: product.length, quantity, unitPrice, costPrice });
+      items.push({ productId: product.id, category: product.category, length: product.length, quantity, unitPrice });
     }
     const editing = this.editingId();
     const next = Math.max(2088, ...this.store.sales().map(sale => Number(sale.id.replace('VTA-', '')) || 0)) + 1;
@@ -124,7 +122,7 @@ export class Sales {
     if (result.kind === 'error') { this.pendingPrompt.set(false); this.error.set(result.message); return; }
     if (result.kind === 'insufficient') {
       this.pendingPrompt.set(false);
-      this.error.set(`No hay suficiente ${productName(result.product.category, result.product.length)}. Disponible para venta: ${weight(result.available)}; en compras pendientes: ${weight(result.pending)}.`);
+      this.error.set(`Venta rechazada. ${result.shortages.map(item => `${productName(item.product.category, item.product.length)}: solicitados ${item.requested} g, con respaldo ${item.physical + item.pending} g (${item.physical} g físicos y ${item.pending} g por recibir); faltan ${item.missing} g.`).join(' ')}`);
       return;
     }
     if (result.kind === 'needs-pending') {

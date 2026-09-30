@@ -70,7 +70,7 @@ export class Orders {
   sortIndicator(key: SortKey) { return this.sortKey() === key ? this.sortDirection() === 'asc' ? '↑' : '↓' : '↕'; }
 
   lengthsFor(category: HairCategory | '') {
-    return [...new Set(this.store.products().filter(product => product.category === category).map(product => product.length))].sort((a, b) => a - b);
+    return category ? this.store.lengths() : [];
   }
   open() {
     this.editingId.set(null);
@@ -106,12 +106,13 @@ export class Orders {
       const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
       const quantity = Number(line.quantity);
       const unitPrice = Number(line.unitPrice);
-      if (!product || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      if (!this.store.categories().includes(line.category) || !this.store.lengths().includes(Number(line.length)) || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
         this.error.set('Cada cabello necesita calidad, longitud, peso mayor que cero y precio válido.'); return;
       }
-      if (used.has(product.id)) { this.error.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return; }
-      used.add(product.id);
-      items.push({ productId: product.id, category: product.category, length: product.length, quantity, unitPrice, costPrice: unitPrice });
+      const key = `${line.category}:${Number(line.length)}`;
+      if (used.has(key)) { this.error.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return; }
+      used.add(key);
+      items.push({ productId: product?.id ?? '', category: line.category, length: Number(line.length), quantity, unitPrice });
     }
     if (this.editingId()) {
       const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, status: this.draft.status, items });

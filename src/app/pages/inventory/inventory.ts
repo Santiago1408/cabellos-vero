@@ -15,9 +15,8 @@ export class Inventory {
   readonly pendingPurchases = computed(() => this.store.orders().filter(order => order.status === 'Pendiente').flatMap(order => order.items.map(item => ({ order, item }))));
   readonly pendingSales = computed(() => this.store.sales().filter(sale => sale.status === 'Pendiente').flatMap(sale => sale.items.map(item => ({ sale, item }))));
   readonly category = signal(''); readonly length = signal<number | ''>('');
-  readonly filtered = computed(() => this.store.products().filter(p =>
-    (p.quantity > 0 || this.store.orders().some(order => order.status === 'Confirmado' && order.items.some(item => item.productId === p.id)))
-    && (!this.category() || p.category === this.category())
+  readonly filtered = computed(() => this.store.managedProducts().filter(p =>
+    (!this.category() || p.category === this.category())
     && (!this.length() || p.length === Number(this.length()))
     && `${p.category} ${p.length}`.toLocaleLowerCase('es-BO').includes(this.store.query().toLocaleLowerCase('es-BO'))));
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.filtered().length / 7)));

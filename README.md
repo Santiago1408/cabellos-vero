@@ -28,7 +28,7 @@ Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el 
 - `src/app/data/demo-store.ts`: modelos, datos iniciales y estado en memoria.
 - `src/styles.css`: estilos compartidos y paleta global.
 
-Los cambios de datos viven solo en memoria y se reinician al recargar. Los roles permiten mostrar las diferencias de interfaz, sin autenticación ni autorización de servidor. Las cifras y los gráficos son datos ilustrativos para la presentación.
+Los cambios de datos viven solo en memoria y se reinician al recargar. Los roles permiten mostrar las diferencias de interfaz, sin autenticación ni autorización de servidor. Los gráficos de Inicio y Reportes se calculan a partir de compras y ventas confirmadas; los meses sin movimientos muestran cero. El stock inicial de demostración se trata como lotes iniciales con los costos ficticios existentes. El costo de cada venta y el valor del inventario se calculan por FIFO.
 
 Las compras confirmadas suman stock físico y las ventas confirmadas lo descuentan. Las compras pendientes permanecen como stock por recibir; las ventas pendientes reservan capacidad. Cuando una venta requiere cabello por recibir, el sistema pide confirmación y la registra como pendiente hasta que la compra se confirme.
 
