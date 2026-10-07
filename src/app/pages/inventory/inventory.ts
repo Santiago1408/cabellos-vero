@@ -4,13 +4,17 @@ import { RouterLink } from '@angular/router';
 import { DemoStore, HairCategory, HairLength, HairLine, categoryLabel, downloadCsv, money, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 
-type StockSortKey = 'category' | 'length' | 'quantity';
+type StockSortKey = 'category' | 'length' | 'quantity' | 'pendingPurchase' | 'reserved' | 'immediate' | 'additional';
 type PendingSortKey = 'party' | 'category' | 'length' | 'quantity' | 'unitPrice' | 'value';
 
 @Component({ selector: 'app-inventory', standalone: true, imports: [FormsModule, RouterLink, Icon], templateUrl: './inventory.html',
   styleUrl: './inventory.css' })
 export class Inventory {
   readonly store = inject(DemoStore); readonly money = money; readonly weight = weight; readonly categoryLabel = categoryLabel;
+  pendingPurchase(productId: string) { return this.store.pendingPurchaseWeight(productId); }
+  reserved(productId: string) { return this.store.pendingSaleWeight(productId); }
+  immediate(productId: string) { return this.store.sellableWeight(productId); }
+  additional(productId: string) { return this.store.reservableWeight(productId) - this.immediate(productId); }
   readonly page = signal(1); readonly typesOpen = signal(false); readonly error = signal('');
   readonly pendingTab = signal<'purchases' | 'sales'>('purchases');
   readonly sortKey = signal<StockSortKey>('category');
@@ -32,9 +36,14 @@ export class Inventory {
     const key = this.sortKey();
     const direction = this.sortDirection() === 'asc' ? 1 : -1;
     return [...this.filtered()].sort((left, right) => {
+      const stockValue = (product: typeof left) => key === 'pendingPurchase' ? this.pendingPurchase(product.id)
+        : key === 'reserved' ? this.reserved(product.id)
+        : key === 'immediate' ? this.immediate(product.id)
+        : key === 'additional' ? this.additional(product.id)
+        : product[key];
       const comparison = key === 'category'
         ? left.category.localeCompare(right.category, 'es-BO', { sensitivity: 'base' })
-        : left[key] - right[key];
+        : Number(stockValue(left)) - Number(stockValue(right));
       return direction * comparison || left.category.localeCompare(right.category, 'es-BO') || left.length - right.length;
     });
   });
@@ -97,6 +106,6 @@ export class Inventory {
     this.error.set(message);
     if (!message) { if (this.length() === length) this.length.set(''); this.page.set(1); }
   }
-  export() { downloadCsv('inventario-cabellos.csv', ['Categoría', 'Longitud cm', 'Stock g'],
-    this.filtered().map(p => [categoryLabel(p.category), p.length, p.quantity])); }
+  export() { downloadCsv('inventario-cabellos.csv', ['Categoría', 'Longitud cm', 'Stock g', 'Por recibir g', 'Reservado g', 'Disponible hoy g', 'Reserva adicional g'],
+    this.filtered().map(p => [categoryLabel(p.category), p.length, p.quantity, this.pendingPurchase(p.id), this.reserved(p.id), this.immediate(p.id), this.additional(p.id)])); }
 }

@@ -23,8 +23,8 @@ export function calculateFifo(opening: OpeningLot[], orders: Order[], sales: Sal
     date: '', remaining: item.quantity, unitCost: item.unitCost,
   }));
   const events = [
-    ...orders.filter(order => order.status === 'Confirmado').map(order => ({ kind: 'purchase' as const, date: order.date, id: order.id, order })),
-    ...sales.filter(sale => sale.status === 'Confirmado').map(sale => ({ kind: 'sale' as const, date: sale.date, id: sale.id, sale })),
+    ...orders.filter(order => order.status === 'Confirmado').map(order => ({ kind: 'purchase' as const, date: order.effectiveDate ?? order.date, id: order.id, order })),
+    ...sales.filter(sale => sale.status === 'Confirmado').map(sale => ({ kind: 'sale' as const, date: sale.effectiveDate ?? sale.date, id: sale.id, sale })),
   ].sort((a, b) => byDate(a, b) || (a.kind === 'purchase' ? -1 : 1));
   const allocations: FifoAllocation[] = [];
   const shortages: FifoShortage[] = [];
@@ -32,7 +32,7 @@ export function calculateFifo(opening: OpeningLot[], orders: Order[], sales: Sal
     if (event.kind === 'purchase') {
       for (const item of event.order.items) lots.push({
         id: event.order.id, productId: item.productId, supplier: event.order.supplier,
-        date: event.order.date, remaining: item.quantity, unitCost: item.unitPrice,
+        date: event.date, remaining: item.quantity, unitCost: item.unitPrice,
       });
       continue;
     }

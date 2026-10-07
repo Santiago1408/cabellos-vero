@@ -27,10 +27,12 @@ export class Orders {
   readonly detailId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('detalle'));
   readonly error = signal('');
   readonly detailError = signal('');
+  readonly cancelPrompt = signal(false);
+  confirmationDate = todayLocal();
   readonly statusFilter = signal('');
   readonly sortKey = signal<SortKey>('date');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
-  draft = { supplier: '', date: todayLocal(), status: 'Confirmado' as OperationStatus };
+  draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' as OperationStatus };
   lines: LineDraft[] = [blankLine()];
 
   readonly filtered = computed(() => this.store.orders().filter(order => {
@@ -78,7 +80,7 @@ export class Orders {
   }
   open() {
     this.editingId.set(null);
-    this.draft = { supplier: '', date: todayLocal(), status: 'Confirmado' };
+    this.draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' };
     this.lines = [blankLine()];
     this.error.set('');
     this.modalOpen.set(true);
@@ -86,12 +88,12 @@ export class Orders {
   openEdit(order: Order) {
     this.detailId.set(null);
     this.editingId.set(order.id);
-    this.draft = { supplier: order.supplier, date: order.date, status: order.status };
+    this.draft = { supplier: order.supplier, date: order.date, effectiveDate: order.effectiveDate ?? (order.status === 'Pendiente' ? todayLocal() : order.date), status: order.status };
     this.lines = order.items.map(item => ({ category: item.category, length: item.length, quantity: item.quantity, unitPrice: item.unitPrice }));
     this.error.set('');
     this.modalOpen.set(true);
   }
-  openDetail(id: string) { this.detailError.set(''); this.detailId.set(id); }
+  openDetail(id: string) { this.detailError.set(''); this.cancelPrompt.set(false); this.confirmationDate = todayLocal(); this.detailId.set(id); }
   addLine() { this.lines.push(blankLine()); }
   removeLine(index: number) { if (this.lines.length > 1) this.lines.splice(index, 1); }
   selectCategory(line: LineDraft) { line.length = ''; line.unitPrice = 0; }
@@ -100,7 +102,8 @@ export class Orders {
     line.unitPrice = product?.purchasePrice ?? 0;
   }
   get draftValue() { return this.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0); }
-  confirm(id: string) { this.detailError.set(this.store.confirmOrder(id)); }
+  confirm(id: string) { this.detailError.set(this.store.confirmOrder(id, this.confirmationDate)); }
+  cancel(id: string) { const message = this.store.cancelOrder(id); this.detailError.set(message); if (!message) this.cancelPrompt.set(false); }
   save() {
     const supplier = this.draft.supplier.trim();
     if (!supplier || !this.draft.date) { this.error.set('Completa el proveedor y la fecha de compra.'); return; }
@@ -119,17 +122,18 @@ export class Orders {
       items.push({ productId: product?.id ?? '', category: line.category, length: Number(line.length), quantity, unitPrice });
     }
     if (this.editingId()) {
-      const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, status: this.draft.status, items });
+      const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined, status: this.draft.status, items });
       if (message) { this.error.set(message); return; }
     } else {
       const next = Math.max(1046, ...this.store.orders().map(order => Number(order.id.replace('COMP-', '')) || 0)) + 1;
-      this.store.addOrder({ id: `COMP-${next}`, supplier, date: this.draft.date, status: this.draft.status, items });
+      const message = this.store.addOrder({ id: `COMP-${next}`, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined, status: this.draft.status, items });
+      if (message) { this.error.set(message); return; }
     }
     this.page.set(1);
     this.modalOpen.set(false);
   }
   export() {
-    downloadCsv('compras-cabello.csv', ['Compra', 'Fecha', 'Proveedor', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, order.status])));
+    downloadCsv('compras-cabello.csv', ['Compra', 'Fecha de compra', 'Fecha de recepción', 'Proveedor', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
+      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.status === 'Confirmado' ? order.effectiveDate ?? order.date : '', order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, order.status])));
   }
 }

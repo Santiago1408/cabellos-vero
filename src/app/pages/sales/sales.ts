@@ -26,11 +26,13 @@ export class Sales {
   readonly detailId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('detalle'));
   readonly error = signal('');
   readonly detailError = signal('');
+  readonly cancelPrompt = signal(false);
+  confirmationDate = todayLocal();
   readonly pendingPrompt = signal(false);
   readonly statusFilter = signal('');
   readonly sortKey = signal<SortKey>('date');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
-  draft = { customer: '', date: todayLocal(), status: 'Confirmado' as OperationStatus };
+  draft = { customer: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' as OperationStatus };
   lines: LineDraft[] = [blankLine()];
 
   readonly filtered = computed(() => this.store.sales().filter(sale => {
@@ -78,7 +80,7 @@ export class Sales {
   }
   open() {
     this.editingId.set(null);
-    this.draft = { customer: '', date: todayLocal(), status: 'Confirmado' };
+    this.draft = { customer: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' };
     this.lines = [blankLine()];
     this.error.set('');
     this.pendingPrompt.set(false);
@@ -87,14 +89,15 @@ export class Sales {
   openEdit(sale: Sale) {
     this.detailId.set(null);
     this.editingId.set(sale.id);
-    this.draft = { customer: sale.customer, date: sale.date, status: sale.status };
+    this.draft = { customer: sale.customer, date: sale.date, effectiveDate: sale.effectiveDate ?? (sale.status === 'Pendiente' ? todayLocal() : sale.date), status: sale.status };
     this.lines = sale.items.map(item => ({ category: item.category, length: item.length, quantity: item.quantity, unitPrice: item.unitPrice }));
     this.error.set('');
     this.pendingPrompt.set(false);
     this.modalOpen.set(true);
   }
-  openDetail(id: string) { this.detailError.set(''); this.detailId.set(id); }
-  confirm(id: string) { this.detailError.set(this.store.confirmSale(id)); }
+  openDetail(id: string) { this.detailError.set(''); this.cancelPrompt.set(false); this.confirmationDate = todayLocal(); this.detailId.set(id); }
+  confirm(id: string) { this.detailError.set(this.store.confirmSale(id, this.confirmationDate)); }
+  cancel(id: string) { const message = this.store.cancelSale(id); this.detailError.set(message); if (!message) this.cancelPrompt.set(false); }
   addLine() { this.lines.push(blankLine()); }
   removeLine(index: number) { if (this.lines.length > 1) this.lines.splice(index, 1); }
   selectCategory(line: LineDraft) { line.length = ''; line.unitPrice = 0; }
@@ -121,7 +124,7 @@ export class Sales {
     }
     const editing = this.editingId();
     const next = Math.max(2088, ...this.store.sales().map(sale => Number(sale.id.replace('VTA-', '')) || 0)) + 1;
-    const sale = { id: editing ?? `VTA-${next}`, customer, date: this.draft.date, status: this.draft.status, items };
+    const sale = { id: editing ?? `VTA-${next}`, customer, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined, status: this.draft.status, items };
     const result = editing ? this.store.updateSale(sale, usePending) : this.store.addSale(sale, usePending);
     if (result.kind === 'error') { this.pendingPrompt.set(false); this.error.set(result.message); return; }
     if (result.kind === 'insufficient') {
@@ -139,7 +142,7 @@ export class Sales {
     this.modalOpen.set(false);
   }
   export() {
-    downloadCsv('ventas-cabello.csv', ['Venta', 'Fecha', 'Cliente', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(sale => sale.items.map(item => [operationName(sale.date, sale.customer), sale.date, sale.customer, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, sale.status])));
+    downloadCsv('ventas-cabello.csv', ['Venta', 'Fecha de venta o reserva', 'Fecha de entrega', 'Cliente', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
+      this.sorted().flatMap(sale => sale.items.map(item => [operationName(sale.date, sale.customer), sale.date, sale.status === 'Confirmado' ? sale.effectiveDate ?? sale.date : '', sale.customer, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, sale.status])));
   }
 }

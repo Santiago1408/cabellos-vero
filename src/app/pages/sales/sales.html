@@ -15,6 +15,7 @@
         <option value="">Todos los estados</option>
         <option>Pendiente</option>
         <option>Confirmado</option>
+        <option>Anulada</option>
       </select>
       <button class="btn btn-outline download-button" aria-label="Descargar ventas" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
     </div>
@@ -31,19 +32,19 @@
         <th [attr.aria-sort]="sortAria('customer')"><button type="button" class="sort-heading" (click)="sortBy('customer')">Cliente <span aria-hidden="true">{{ sortIndicator('customer') }}</span></button></th>
         <th [attr.aria-sort]="sortAria('value')"><button type="button" class="sort-heading" (click)="sortBy('value')">Valor de venta <span aria-hidden="true">{{ sortIndicator('value') }}</span></button></th>
         <th [attr.aria-sort]="sortAria('weight')"><button type="button" class="sort-heading" (click)="sortBy('weight')">Peso <span aria-hidden="true">{{ sortIndicator('weight') }}</span></button></th>
-        <th [attr.aria-sort]="sortAria('date')"><button type="button" class="sort-heading" (click)="sortBy('date')">Fecha de venta <span aria-hidden="true">{{ sortIndicator('date') }}</span></button></th>
+        <th [attr.aria-sort]="sortAria('date')"><button type="button" class="sort-heading" (click)="sortBy('date')">Fecha de venta o reserva <span aria-hidden="true">{{ sortIndicator('date') }}</span></button></th>
         <th [attr.aria-sort]="sortAria('status')"><button type="button" class="sort-heading" (click)="sortBy('status')">Estado <span aria-hidden="true">{{ sortIndicator('status') }}</span></button></th>
         <th class="operation-actions-heading">Acciones</th>
       </tr></thead>
       <tbody>
         @for (sale of pageItems(); track sale.id) {
-          <tr [class.operation-pending]="sale.status === 'Pendiente'" [class.operation-confirmed]="sale.status === 'Confirmado'">
+          <tr [class.operation-pending]="sale.status === 'Pendiente'" [class.operation-confirmed]="sale.status === 'Confirmado'" [class.operation-cancelled]="sale.status === 'Anulada'">
             <td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la venta a ' + sale.customer" (click)="openDetail(sale.id)"></button><span class="table-primary">{{ sale.customer }}</span><small class="table-sub">{{ sale.items.length }} tipo(s) de cabello</small></td>
             <td class="mobile-value" data-label="Total">{{ money(operationValue(sale.items)) }}</td>
             <td class="mobile-hide">{{ weight(operationWeight(sale.items)) }}</td>
             <td class="mobile-meta" data-label="Fecha">{{ dateLabel(sale.date) }}</td>
-            <td class="mobile-status"><span class="status" [class.status-good]="sale.status === 'Confirmado'" [class.status-warn]="sale.status === 'Pendiente'">{{ sale.status }}</span></td>
-            <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la venta a ' + sale.customer" title="Ver detalle" (click)="openDetail(sale.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar venta a ' + sale.customer" title="Editar venta" (click)="openEdit(sale)"><app-icon name="edit" /></button> }</div></td>
+            <td class="mobile-status"><span class="status" [class.status-good]="sale.status === 'Confirmado'" [class.status-warn]="sale.status === 'Pendiente'" [class.status-cancelled]="sale.status === 'Anulada'">{{ sale.status }}</span></td>
+            <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la venta a ' + sale.customer" title="Ver detalle" (click)="openDetail(sale.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin' && sale.status !== 'Anulada') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar venta a ' + sale.customer" title="Editar venta" (click)="openEdit(sale)"><app-icon name="edit" /></button> }</div></td>
           </tr>
         } @empty {
           <tr><td colspan="6" class="empty-table">No encontramos ventas con ese criterio.</td></tr>
@@ -69,10 +70,11 @@
           <label class="field-label">Cliente
             <input class="field-input" name="customer" [(ngModel)]="draft.customer" placeholder="Nombre del cliente" />
           </label>
-          <label class="field-label">Fecha de venta<input class="field-input" type="date" name="date" [(ngModel)]="draft.date" /></label>
+          <label class="field-label">Fecha de venta o reserva<input class="field-input" type="date" name="date" [(ngModel)]="draft.date" /></label>
           <label class="field-label">Estado
-            <select class="field-input" name="status" [(ngModel)]="draft.status"><option value="Confirmado">Confirmado · venta de hoy</option><option value="Pendiente">Pendiente · reserva</option></select>
+            <select class="field-input" name="status" [(ngModel)]="draft.status"><option value="Confirmado">Confirmado · cabello entregado</option><option value="Pendiente">Pendiente · reserva</option></select>
           </label>
+          @if (draft.status === 'Confirmado') { <label class="field-label">Fecha de entrega<input class="field-input" type="date" name="effectiveDate" [(ngModel)]="draft.effectiveDate" /></label> }
         </div>
         <div class="line-heading"><h3>Cabellos de la venta</h3><button type="button" class="btn btn-outline" (click)="addLine()"><app-icon name="plus" /> Agregar cabello</button></div>
         @for (line of lines; track line; let i = $index) {
@@ -124,8 +126,9 @@
         <button class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
       </div>
       <div class="detail-content">
-        <div class="detail-meta"><span>Cliente: <strong>{{ sale.customer }}</strong></span><span>Fecha: <strong>{{ dateLabel(sale.date) }}</strong></span><span class="status" [class.status-good]="sale.status === 'Confirmado'">{{ sale.status }}</span></div>
+        <div class="detail-meta"><span>Cliente: <strong>{{ sale.customer }}</strong></span><span>Venta o reserva: <strong>{{ dateLabel(sale.date) }}</strong></span>@if (sale.status === 'Confirmado') { <span>Entrega: <strong>{{ dateLabel(sale.effectiveDate ?? sale.date) }}</strong></span> }<span class="status" [class.status-good]="sale.status === 'Confirmado'" [class.status-cancelled]="sale.status === 'Anulada'">{{ sale.status }}</span></div>
         @if (sale.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(sale.modifiedAt) }}</p> }
+        @if (sale.cancelledAt) { <p class="modified-note">Anulada: {{ modifiedLabel(sale.cancelledAt) }}</p> }
         <div class="table-scroll">
           <table class="mobile-detail-table"><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
             <tbody>@for (item of sale.items; track item.productId) {
@@ -134,12 +137,14 @@
           </table>
         </div>
         <div class="operation-total"><span>Total · {{ weight(operationWeight(sale.items)) }}</span><strong>{{ money(operationValue(sale.items)) }}</strong></div>
-        @if (store.role() === 'admin') {
+        @if (store.role() === 'admin' && sale.status !== 'Anulada') {
           <div class="detail-actions"><button type="button" class="btn btn-outline" (click)="openEdit(sale)"><app-icon name="edit" /> Editar venta</button></div>
         }
         @if (detailError()) { <p class="form-error">{{ detailError() }}</p> }
         @if (sale.status === 'Pendiente' && store.role() === 'admin') {
-          <div class="modal-actions"><button class="btn btn-primary" (click)="confirm(sale.id)">Confirmar venta</button></div>
+          <label class="field-label">Fecha de entrega<input class="field-input" type="date" [(ngModel)]="confirmationDate" /></label>
+          @if (cancelPrompt()) { <p class="cancel-warning">¿Anular esta reserva? El cabello apartado volverá a estar disponible.</p> }
+          <div class="modal-actions"><button type="button" class="btn btn-delete" (click)="cancelPrompt() ? cancel(sale.id) : cancelPrompt.set(true)">{{ cancelPrompt() ? 'Sí, anular venta' : 'Anular venta' }}</button><button type="button" class="btn btn-primary" (click)="confirm(sale.id)">Confirmar venta</button></div>
         }
       </div>
     </section>

@@ -12,6 +12,13 @@
 @if (product(); as p) {
   <section class="card stock-card">
     <div class="stock-primary"><span>En stock</span><strong>{{ weight(p.quantity) }}</strong></div>
+    <div class="availability-breakdown" aria-label="Disponibilidad del cabello">
+      <div><span>Stock físico</span><strong>{{ weight(p.quantity) }}</strong></div>
+      <div><span>Por recibir</span><strong>{{ weight(pendingWeight()) }}</strong></div>
+      <div><span>Reservado</span><strong>{{ weight(reservedWeight()) }}</strong></div>
+      <div><span>Disponible para venta hoy</span><strong>{{ weight(immediateWeight()) }}</strong></div>
+      <div><span>Reserva adicional posible</span><strong>{{ weight(additionalReserveWeight()) }}</strong></div>
+    </div>
     <div class="stock-equation" aria-label="Cálculo del stock">
       <div><span>Saldo inicial</span><strong>+{{ weight(openingWeight()) }}</strong></div>
       <div><span>Compras</span><strong>+{{ weight(purchasedWeight()) }}</strong></div>

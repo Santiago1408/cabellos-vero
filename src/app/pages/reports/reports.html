@@ -1,7 +1,7 @@
 <div class="page-header">
   <div>
     <h1>Reportes</h1>
-    <p>Resultados calculados a partir de compras y ventas confirmadas.</p>
+    <p>Resultados calculados según la fecha de recepción o entrega de compras y ventas confirmadas.</p>
   </div>
   <span class="period-pill page-period">Últimos 6 meses en los gráficos</span>
 </div>
@@ -15,8 +15,6 @@
     </div>
     <div class="report-secondary-metrics">
       <div><strong>{{ money(stockValue()) }}</strong><span>Valor del stock al costo</span></div>
-      <div><strong>{{ money(receivable()) }}</strong><span>Saldo por cobrar</span></div>
-      <div><strong>{{ money(payable()) }}</strong><span>Saldo por pagar</span></div>
       <div><strong>{{ store.confirmedSales().length }}</strong><span>Ventas confirmadas</span></div>
     </div>
     <p class="report-note">El margen bruto resta el costo del cabello; no incluye otros gastos. El saldo inicial usa costos ficticios del prototipo.</p>

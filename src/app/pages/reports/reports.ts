@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DemoStore, categoryLabel, debtBalance, money, operationValue, productName, todayLocal, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, money, operationValue, productName, todayLocal, weight } from '../../data/demo-store';
 import { ReportPeriod, summarizePeriods } from '../../data/report-periods';
 import { Icon } from '../../shared/icon/icon';
 
@@ -24,8 +24,6 @@ export class Reports {
   readonly costs = computed(() => this.store.fifo().allocations.reduce((sum, item) => sum + item.quantity * item.unitCost, 0));
   readonly profit = computed(() => this.revenue() - this.costs());
   readonly stockValue = computed(() => this.store.fifo().remainingValue);
-  readonly receivable = computed(() => this.store.debts().filter(debt => debt.kind === 'Por cobrar').reduce((sum, debt) => sum + debtBalance(debt), 0));
-  readonly payable = computed(() => this.store.debts().filter(debt => debt.kind === 'Por pagar').reduce((sum, debt) => sum + debtBalance(debt), 0));
   readonly topProducts = computed(() => this.store.products().map(product => ({
     ...product, soldWeight: this.store.productSold(product.id), revenue: this.store.productRevenue(product.id),
   })).filter(product => product.soldWeight > 0).sort((a, b) => b.soldWeight - a.soldWeight).slice(0, 5));

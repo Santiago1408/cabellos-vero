@@ -2,7 +2,7 @@
   <div>
     <div class="eyebrow">CUENTAS PENDIENTES</div>
     <h1>Deudas</h1>
-    <p>Administra las cuentas por cobrar de clientes y por pagar a proveedores.</p>
+    <p>Controla préstamos y otros movimientos de efectivo independientes del negocio de cabello.</p>
   </div>
 </div>
 <section class="card summary-card">
@@ -13,11 +13,11 @@
   <div class="summary-grid four">
     <div class="summary-item">
       <span>Por cobrar</span><strong>{{ money(receivable()) }}</strong
-      ><small>Saldo de clientes</small>
+      ><small>Dinero prestado pendiente</small>
     </div>
     <div class="summary-item">
       <span>Por pagar</span><strong>{{ money(payable()) }}</strong
-      ><small>Saldo a proveedores</small>
+      ><small>Préstamos recibidos pendientes</small>
     </div>
     <div class="summary-item">
       <span>Vencidas</span><strong>{{ overdueCount() }}</strong
@@ -94,7 +94,7 @@
             </td>
             <td class="mobile-hide">{{ d.kind }}</td>
             <td class="mobile-hide">{{ money(d.total) }}</td>
-            <td class="mobile-hide">{{ money(d.paid) }}</td>
+            <td class="mobile-hide">{{ money(paid(d)) }}</td>
             <td class="mobile-value" data-label="Saldo">
               <strong>{{ money(balance(d)) }}</strong>
             </td>
@@ -159,12 +159,22 @@
           <div><dt>Tipo</dt><dd>{{ debt.kind }}</dd></div>
           <div><dt>Teléfono</dt><dd>{{ debt.phone }}</dd></div>
           <div><dt>Monto original</dt><dd>{{ money(debt.total) }}</dd></div>
-          <div><dt>Pagado</dt><dd>{{ money(debt.paid) }}</dd></div>
+          <div><dt>Pagado</dt><dd>{{ money(paid(debt)) }}</dd></div>
           <div><dt>Saldo</dt><dd><strong>{{ money(balance(debt)) }}</strong></dd></div>
           <div><dt>Fecha de registro</dt><dd>{{ dateLabel(debt.date) }}</dd></div>
           <div><dt>Vencimiento</dt><dd>{{ dateLabel(debt.dueDate) }}</dd></div>
           @if (debt.notes) { <div><dt>Notas</dt><dd>{{ debt.notes }}</dd></div> }
         </dl>
+        <section class="payment-history" aria-label="Historial de pagos">
+          <h3>Historial de abonos</h3>
+          @if (paymentHistory().length) {
+            <ol>
+              @for (payment of paymentHistory(); track payment.id) {
+                <li><div><time [attr.datetime]="payment.date">{{ dateLabel(payment.date) }}</time><strong>{{ money(payment.amount) }}</strong></div>@if (payment.note) { <p>{{ payment.note }}</p> }</li>
+              }
+            </ol>
+          } @else { <p class="payment-empty">Aún no hay abonos registrados.</p> }
+        </section>
         @if (store.role() === 'admin') {
           <div class="modal-actions">
             <button type="button" class="btn btn-outline" (click)="openEdit(debt)"><app-icon name="edit" /> Editar deuda</button>
@@ -207,9 +217,7 @@
               name="party"
               [(ngModel)]="draft.party"
               required
-              [placeholder]="
-                draft.kind === 'Por cobrar' ? 'Ej. Salón Renueva' : 'Ej. Select Hair Bolivia'
-              " /></label
+              placeholder="Ej. Ana Quispe" /></label
           ><label class="field-label"
             >Teléfono<input
               class="field-input"
@@ -225,15 +233,6 @@
               step="0.01"
               name="total"
               [(ngModel)]="draft.total"
-              required /></label
-          ><label class="field-label"
-            >Monto pagado (Bs.)<input
-              class="field-input"
-              type="number"
-              min="0"
-              step="0.01"
-              name="paid"
-              [(ngModel)]="draft.paid"
               required /></label
           ><label class="field-label"
             >Fecha de registro<input
@@ -254,10 +253,11 @@
               class="field-input field-textarea"
               name="notes"
               [(ngModel)]="draft.notes"
-              placeholder="Detalle de la compra, venta o acuerdo de pago"
+              placeholder="Motivo del préstamo o acuerdo de pago"
             ></textarea>
           </label>
         </div>
+        <p class="inline-hint">Los abonos se registran desde el detalle de la deuda y se suman automáticamente.</p>
         @if (error()) {
           <p class="form-error">{{ error() }}</p>
         }
@@ -306,6 +306,8 @@
             [(ngModel)]="paymentAmount"
             required
         /></label>
+        <label class="field-label">Fecha del pago<input class="field-input" type="date" name="paymentDate" [min]="d.date" [max]="today" [(ngModel)]="paymentDate" required /></label>
+        <label class="field-label">Nota (opcional)<textarea class="field-input field-textarea" name="paymentNote" [(ngModel)]="paymentNote" placeholder="Ej. Abono en efectivo"></textarea></label>
         @if (paymentError()) {
           <p class="form-error">{{ paymentError() }}</p>
         }

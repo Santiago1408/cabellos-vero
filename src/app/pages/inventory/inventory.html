@@ -56,6 +56,10 @@
           <th [attr.aria-sort]="sortAria('category')"><button type="button" class="sort-heading" (click)="sortBy('category')">Categoría <span aria-hidden="true">{{ sortIndicator('category') }}</span></button></th>
           <th [attr.aria-sort]="sortAria('length')"><button type="button" class="sort-heading" (click)="sortBy('length')">Longitud <span aria-hidden="true">{{ sortIndicator('length') }}</span></button></th>
           <th [attr.aria-sort]="sortAria('quantity')"><button type="button" class="sort-heading" (click)="sortBy('quantity')">En stock <span aria-hidden="true">{{ sortIndicator('quantity') }}</span></button></th>
+          <th class="mobile-hide" [attr.aria-sort]="sortAria('pendingPurchase')"><button type="button" class="sort-heading" (click)="sortBy('pendingPurchase')">Por recibir <span aria-hidden="true">{{ sortIndicator('pendingPurchase') }}</span></button></th>
+          <th class="mobile-hide" [attr.aria-sort]="sortAria('reserved')"><button type="button" class="sort-heading" (click)="sortBy('reserved')">Reservado <span aria-hidden="true">{{ sortIndicator('reserved') }}</span></button></th>
+          <th class="mobile-hide" [attr.aria-sort]="sortAria('immediate')"><button type="button" class="sort-heading" (click)="sortBy('immediate')">Disponible hoy <span aria-hidden="true">{{ sortIndicator('immediate') }}</span></button></th>
+          <th class="mobile-hide" [attr.aria-sort]="sortAria('additional')"><button type="button" class="sort-heading" (click)="sortBy('additional')">Reserva adicional <span aria-hidden="true">{{ sortIndicator('additional') }}</span></button></th>
           <th class="inventory-actions-heading">Acciones</th>
         </tr>
       </thead>
@@ -65,11 +69,15 @@
             <td class="mobile-title"><a class="mobile-card-open" [routerLink]="['/inventario', p.id]" [attr.aria-label]="'Ver movimientos de ' + categoryLabel(p.category) + ' de ' + p.length + ' cm'"></a>{{ categoryLabel(p.category) }}</td>
             <td class="mobile-meta" data-label="Longitud">{{ p.length }} cm</td>
             <td class="mobile-value" data-label="En stock">{{ weight(p.quantity) }}</td>
+            <td class="mobile-hide">{{ weight(pendingPurchase(p.id)) }}</td>
+            <td class="mobile-hide">{{ weight(reserved(p.id)) }}</td>
+            <td class="mobile-hide">{{ weight(immediate(p.id)) }}</td>
+            <td class="mobile-hide">{{ weight(additional(p.id)) }}</td>
             <td class="inventory-actions-cell mobile-actions"><a class="row-detail-button" [routerLink]="['/inventario', p.id]" [attr.aria-label]="'Ver detalle de ' + categoryLabel(p.category) + ' de ' + p.length + ' cm'" title="Ver detalle"><app-icon name="eye" /></a></td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="4" class="empty-table">No encontramos cabello con ese criterio.</td>
+            <td colspan="8" class="empty-table">No encontramos cabello con ese criterio.</td>
           </tr>
         }
       </tbody>

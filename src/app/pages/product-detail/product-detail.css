@@ -5,6 +5,7 @@
 .stock-primary { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
 .stock-primary span { color: #777; font-size: 13px; }
 .stock-primary strong { color: #333; font-size: 28px; }
+.availability-breakdown { display: none; }
 .stock-equation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 19px; padding-top: 18px; border-top: 1px solid var(--color-border); }
 .stock-equation div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .stock-equation span { color: #777; font-size: 12px; }
@@ -31,6 +32,12 @@
 .empty-state { padding: 40px; color: #777; }
 .empty-state a { text-decoration: underline; }
 @media (max-width: 720px) {
+  .availability-breakdown { display: grid; gap: 0; margin-top: 18px; border-top: 1px solid var(--color-border); }
+  .availability-breakdown div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+  .availability-breakdown span { color: #666; }
+  .availability-breakdown strong { text-align: right; color: #333; font-size: 17px; }
+  .availability-breakdown div:nth-child(4) strong { color: #247344; }
+  .availability-breakdown div:nth-child(5) strong { color: var(--color-primary); }
   .back-link, .stock-primary span, .stock-equation span, .balance-note { font-size: 14px; }
   .stock-card { padding: 18px; }
   .stock-primary strong { font-size: 28px; }

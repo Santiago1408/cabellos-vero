@@ -1,4 +1,4 @@
-import { operationValue, type Order, type Sale } from './demo-store';
+import { operationEffectiveDate, operationValue, type Order, type Sale } from './demo-store';
 import type { FifoAllocation } from './fifo';
 
 export type ReportPeriod = 'days' | 'weeks' | 'months';
@@ -37,9 +37,9 @@ export function summarizePeriods(period: ReportPeriod, today: string, orders: Or
     }
     const startKey = dateKey(start);
     const endKey = dateKey(end);
-    const purchases = orders.filter(order => order.status === 'Confirmado' && order.date >= startKey && order.date < endKey)
+    const purchases = orders.filter(order => order.status === 'Confirmado' && operationEffectiveDate(order) >= startKey && operationEffectiveDate(order) < endKey)
       .reduce((sum, order) => sum + operationValue(order.items), 0);
-    const includedSales = sales.filter(sale => sale.status === 'Confirmado' && sale.date >= startKey && sale.date < endKey);
+    const includedSales = sales.filter(sale => sale.status === 'Confirmado' && operationEffectiveDate(sale) >= startKey && operationEffectiveDate(sale) < endKey);
     const income = includedSales.reduce((sum, sale) => sum + operationValue(sale.items), 0);
     const costs = includedSales.reduce((sum, sale) => sum + (costsBySale.get(sale.id) ?? 0), 0);
     return { key: startKey, label, purchases, sales: income, costs, profit: income - costs };

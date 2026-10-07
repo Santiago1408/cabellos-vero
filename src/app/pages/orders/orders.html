@@ -15,6 +15,7 @@
         <option value="">Todos los estados</option>
         <option>Pendiente</option>
         <option>Confirmado</option>
+        <option>Anulada</option>
       </select>
       <button class="btn btn-outline download-button" aria-label="Descargar compras" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
     </div>
@@ -37,13 +38,13 @@
       </tr></thead>
       <tbody>
         @for (order of pageItems(); track order.id) {
-          <tr [class.operation-pending]="order.status === 'Pendiente'" [class.operation-confirmed]="order.status === 'Confirmado'">
+          <tr [class.operation-pending]="order.status === 'Pendiente'" [class.operation-confirmed]="order.status === 'Confirmado'" [class.operation-cancelled]="order.status === 'Anulada'">
             <td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" (click)="openDetail(order.id)"></button><span class="table-primary">{{ order.supplier }}</span><small class="table-sub">{{ order.items.length }} tipo(s) de cabello</small></td>
             <td class="mobile-value" data-label="Total">{{ money(operationValue(order.items)) }}</td>
             <td class="mobile-hide">{{ weight(operationWeight(order.items)) }}</td>
             <td class="mobile-meta" data-label="Fecha">{{ dateLabel(order.date) }}</td>
-            <td class="mobile-status"><span class="status" [class.status-good]="order.status === 'Confirmado'" [class.status-warn]="order.status === 'Pendiente'">{{ order.status }}</span></td>
-            <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" title="Ver detalle" (click)="openDetail(order.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar compra a ' + order.supplier" title="Editar compra" (click)="openEdit(order)"><app-icon name="edit" /></button> }</div></td>
+            <td class="mobile-status"><span class="status" [class.status-good]="order.status === 'Confirmado'" [class.status-warn]="order.status === 'Pendiente'" [class.status-cancelled]="order.status === 'Anulada'">{{ order.status }}</span></td>
+            <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" title="Ver detalle" (click)="openDetail(order.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin' && order.status !== 'Anulada') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar compra a ' + order.supplier" title="Editar compra" (click)="openEdit(order)"><app-icon name="edit" /></button> }</div></td>
           </tr>
         } @empty {
           <tr><td colspan="6" class="empty-table">No encontramos compras con ese criterio.</td></tr>
@@ -74,8 +75,9 @@
           </label>
           <label class="field-label">Fecha de compra<input class="field-input" type="date" name="date" [(ngModel)]="draft.date" /></label>
           <label class="field-label">Estado
-            <select class="field-input" name="status" [(ngModel)]="draft.status"><option>Confirmado</option><option>Pendiente</option></select>
+            <select class="field-input" name="status" [(ngModel)]="draft.status"><option value="Confirmado">Confirmado · cabello recibido</option><option value="Pendiente">Pendiente · por recibir</option></select>
           </label>
+          @if (draft.status === 'Confirmado') { <label class="field-label">Fecha de recepción<input class="field-input" type="date" name="effectiveDate" [(ngModel)]="draft.effectiveDate" /></label> }
         </div>
         <div class="line-heading"><h3>Cabellos de la compra</h3><button type="button" class="btn btn-outline" (click)="addLine()"><app-icon name="plus" /> Agregar cabello</button></div>
         @for (line of lines; track line; let i = $index) {
@@ -115,8 +117,9 @@
         <button class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
       </div>
       <div class="detail-content">
-        <div class="detail-meta"><span>Proveedor: <strong>{{ order.supplier }}</strong></span><span>Fecha: <strong>{{ dateLabel(order.date) }}</strong></span><span class="status" [class.status-good]="order.status === 'Confirmado'">{{ order.status }}</span></div>
+        <div class="detail-meta"><span>Proveedor: <strong>{{ order.supplier }}</strong></span><span>Compra: <strong>{{ dateLabel(order.date) }}</strong></span>@if (order.status === 'Confirmado') { <span>Recepción: <strong>{{ dateLabel(order.effectiveDate ?? order.date) }}</strong></span> }<span class="status" [class.status-good]="order.status === 'Confirmado'" [class.status-cancelled]="order.status === 'Anulada'">{{ order.status }}</span></div>
         @if (order.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(order.modifiedAt) }}</p> }
+        @if (order.cancelledAt) { <p class="modified-note">Anulada: {{ modifiedLabel(order.cancelledAt) }}</p> }
         <div class="table-scroll">
           <table class="mobile-detail-table"><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
             <tbody>@for (item of order.items; track item.productId) {
@@ -125,12 +128,14 @@
           </table>
         </div>
         <div class="operation-total"><span>Total · {{ weight(operationWeight(order.items)) }}</span><strong>{{ money(operationValue(order.items)) }}</strong></div>
-        @if (store.role() === 'admin') {
+        @if (store.role() === 'admin' && order.status !== 'Anulada') {
           <div class="detail-actions"><button type="button" class="btn btn-outline" (click)="openEdit(order)"><app-icon name="edit" /> Editar compra</button></div>
         }
         @if (detailError()) { <p class="form-error">{{ detailError() }}</p> }
         @if (order.status === 'Pendiente' && store.role() === 'admin') {
-          <div class="modal-actions"><button class="btn btn-primary" (click)="confirm(order.id)">Confirmar compra</button></div>
+          <label class="field-label">Fecha de recepción<input class="field-input" type="date" [(ngModel)]="confirmationDate" /></label>
+          @if (cancelPrompt()) { <p class="cancel-warning">¿Anular esta compra pendiente? Se comprobará que ninguna reserva quede sin respaldo.</p> }
+          <div class="modal-actions"><button type="button" class="btn btn-delete" (click)="cancelPrompt() ? cancel(order.id) : cancelPrompt.set(true)">{{ cancelPrompt() ? 'Sí, anular compra' : 'Anular compra' }}</button><button type="button" class="btn btn-primary" (click)="confirm(order.id)">Confirmar compra</button></div>
         }
       </div>
     </section>

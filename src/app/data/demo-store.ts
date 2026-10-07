@@ -23,17 +23,18 @@ export type Product = {
   sold: number;
 };
 export type Supplier = { id: string; name: string; phone: string; city: string; address: string; mapsUrl: string; modifiedAt?: string };
-export type OperationStatus = 'Pendiente' | 'Confirmado';
+export type OperationStatus = 'Pendiente' | 'Confirmado' | 'Anulada';
 export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number };
-export type Order = { id: string; supplier: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
-export type Sale = { id: string; customer: string; date: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string };
+export type Order = { id: string; supplier: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string };
+export type Sale = { id: string; customer: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string };
 export type SaleShortage = { product: Product; requested: number; physical: number; pending: number; missing: number };
 export type SaleResult = { kind: 'saved'; status: OperationStatus }
   | { kind: 'needs-pending'; product: Product; available: number; pending: number }
   | { kind: 'insufficient'; shortages: SaleShortage[] }
   | { kind: 'error'; message: string };
 export type DebtKind = 'Por cobrar' | 'Por pagar';
-export type Debt = { id: string; party: string; phone: string; kind: DebtKind; total: number; paid: number; date: string; dueDate: string; notes: string };
+export type DebtPayment = { id: string; date: string; amount: number; note: string };
+export type Debt = { id: string; party: string; phone: string; kind: DebtKind; total: number; payments: DebtPayment[]; date: string; dueDate: string; notes: string };
 export type DebtStatus = 'Pendiente' | 'Parcial' | 'Pagada' | 'Vencida';
 export type MonthlySummary = { key: string; label: string; purchases: number; sales: number; costs: number; profit: number };
 
@@ -83,13 +84,13 @@ const initialSales: Sale[] = [
 ];
 
 const initialDebts: Debt[] = [
-  { id: 'DEU-001', party: 'Salón Renueva', phone: '70112233', kind: 'Por cobrar', total: 4200, paid: 1800, date: '2026-08-28', dueDate: '2026-09-28', notes: 'Venta de cabello normal y premium.' },
-  { id: 'DEU-002', party: 'Extensiones Mía', phone: '71223344', kind: 'Por cobrar', total: 3780, paid: 1500, date: '2026-09-17', dueDate: '2026-10-02', notes: 'Pago acordado en dos partes.' },
-  { id: 'DEU-003', party: 'Studio Ambar', phone: '72334455', kind: 'Por cobrar', total: 4850, paid: 0, date: '2026-09-11', dueDate: '2026-09-20', notes: 'Crédito comercial.' },
-  { id: 'DEU-004', party: 'Valentina Rojas', phone: '73445566', kind: 'Por cobrar', total: 3276, paid: 3276, date: '2026-09-21', dueDate: '2026-09-21', notes: 'Venta cancelada en su totalidad.' },
-  { id: 'DEU-005', party: 'Select Hair Bolivia', phone: '73456712', kind: 'Por pagar', total: 8160, paid: 3000, date: '2026-09-05', dueDate: '2026-09-26', notes: 'Compra de cabello premium 60 cm.' },
-  { id: 'DEU-006', party: 'Cabellos del Valle', phone: '71245890', kind: 'Por pagar', total: 4370, paid: 1000, date: '2026-09-02', dueDate: '2026-09-18', notes: 'Saldo de lote choco.' },
-  { id: 'DEU-007', party: 'Mujeres del Altiplano', phone: '76543210', kind: 'Por pagar', total: 5180, paid: 5180, date: '2026-08-30', dueDate: '2026-09-15', notes: 'Compra liquidada.' },
+  { id: 'DEU-001', party: 'Ana Quispe', phone: '70112233', kind: 'Por cobrar', total: 4200, payments: [{ id: 'PAG-001-1', date: '2026-09-05', amount: 1000, note: 'Primer abono' }, { id: 'PAG-001-2', date: '2026-09-20', amount: 800, note: 'Segundo abono' }], date: '2026-08-28', dueDate: '2026-09-28', notes: 'Préstamo personal entregado.' },
+  { id: 'DEU-002', party: 'Marco Salinas', phone: '71223344', kind: 'Por cobrar', total: 3780, payments: [{ id: 'PAG-002-1', date: '2026-09-20', amount: 1000, note: '' }, { id: 'PAG-002-2', date: '2026-09-27', amount: 500, note: '' }], date: '2026-09-17', dueDate: '2026-10-02', notes: 'Devolución acordada en dos partes.' },
+  { id: 'DEU-003', party: 'Julia Méndez', phone: '72334455', kind: 'Por cobrar', total: 4850, payments: [], date: '2026-09-11', dueDate: '2026-09-20', notes: 'Dinero prestado.' },
+  { id: 'DEU-004', party: 'David Rojas', phone: '73445566', kind: 'Por cobrar', total: 3276, payments: [{ id: 'PAG-004-1', date: '2026-09-21', amount: 3276, note: 'Liquidación total' }], date: '2026-09-21', dueDate: '2026-09-21', notes: 'Préstamo devuelto en su totalidad.' },
+  { id: 'DEU-005', party: 'Lucía Vargas', phone: '73456712', kind: 'Por pagar', total: 8160, payments: [{ id: 'PAG-005-1', date: '2026-09-12', amount: 3000, note: '' }], date: '2026-09-05', dueDate: '2026-09-26', notes: 'Préstamo personal recibido.' },
+  { id: 'DEU-006', party: 'Rosa Flores', phone: '71245890', kind: 'Por pagar', total: 4370, payments: [{ id: 'PAG-006-1', date: '2026-09-10', amount: 1000, note: '' }], date: '2026-09-02', dueDate: '2026-09-18', notes: 'Devolución de dinero pendiente.' },
+  { id: 'DEU-007', party: 'Jorge Ibáñez', phone: '76543210', kind: 'Por pagar', total: 5180, payments: [{ id: 'PAG-007-1', date: '2026-09-10', amount: 5180, note: 'Liquidación total' }], date: '2026-08-30', dueDate: '2026-09-15', notes: 'Préstamo liquidado.' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -120,11 +121,11 @@ export class DemoStore {
     return Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const purchases = this.orders().filter(order => order.status === 'Confirmado' && order.date.startsWith(key))
+      const purchases = this.orders().filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(key))
         .reduce((sum, order) => sum + operationValue(order.items), 0);
-      const sales = this.confirmedSales().filter(sale => sale.date.startsWith(key))
+      const sales = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
         .reduce((sum, sale) => sum + operationValue(sale.items), 0);
-      const costs = this.confirmedSales().filter(sale => sale.date.startsWith(key))
+      const costs = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
         .reduce((sum, sale) => sum + (costsBySale.get(sale.id) ?? 0), 0);
       return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short' }).format(date), purchases, sales, costs, profit: sales - costs };
     });
@@ -204,7 +205,6 @@ export class DemoStore {
     if (previous.name !== updated.name) {
       this.products.update(items => items.map(product => product.supplier === previous.name ? { ...product, supplier: updated.name } : product));
       this.orders.update(items => items.map(order => order.supplier === previous.name ? { ...order, supplier: updated.name, modifiedAt } : order));
-      this.debts.update(items => items.map(debt => debt.kind === 'Por pagar' && debt.party === previous.name ? { ...debt, party: updated.name } : debt));
     }
     return true;
   }
@@ -212,26 +212,32 @@ export class DemoStore {
     const supplier = this.suppliers().find(item => item.id === id);
     if (!supplier) return 'No encontramos el proveedor que deseas eliminar.';
     if (this.orders().some(order => order.supplier === supplier.name)
-      || this.debts().some(debt => debt.kind === 'Por pagar' && debt.party === supplier.name)
       || this.products().some(product => product.supplier === supplier.name && (product.quantity > 0 || product.sold > 0))) {
-      return 'No se puede eliminar este proveedor porque aparece en compras, deudas o stock registrado.';
+      return 'No se puede eliminar este proveedor porque aparece en compras o stock registrado.';
     }
     this.suppliers.update(items => items.filter(item => item.id !== id));
     return '';
   }
   addOrder(item: Order) {
+    if (item.status === 'Anulada') return 'Una compra nueva debe crearse como pendiente o confirmada.';
+    const dateError = this.effectiveDateError(item);
+    if (dateError) return dateError;
     const prepared = this.prepareOrder(item);
     if (prepared.added.length) this.products.update(items => [...items, ...prepared.added]);
     if (prepared.order.status === 'Confirmado') this.applyPurchase(prepared.order.items);
     this.orders.update(items => [prepared.order, ...items]);
+    return '';
   }
   addSale(item: Sale, usePending = false): SaleResult {
+    if (item.status === 'Anulada') return { kind: 'error', message: 'Una venta nueva debe crearse como pendiente o confirmada.' };
     const assessment = this.assessSale(item.items);
     if (assessment.kind === 'error') return assessment;
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
-    const saved = { ...item, status };
+    const saved = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const dateError = this.effectiveDateError(saved);
+    if (dateError) return { kind: 'error', message: dateError };
     if (status === 'Confirmado') {
       const shortage = calculateFifo(this.initialLots, this.orders(), [...this.sales(), saved]).shortages[0];
       if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
@@ -243,8 +249,12 @@ export class DemoStore {
   updateOrder(item: Order) {
     const previous = this.orders().find(order => order.id === item.id);
     if (!previous) return 'No encontramos la compra que deseas editar.';
+    if (previous.status === 'Anulada') return 'Una compra anulada no se puede editar.';
+    if (item.status === 'Anulada') return 'Usa la acción Anular para cancelar una compra pendiente.';
+    const dateError = this.effectiveDateError(item);
+    if (dateError) return dateError;
     const prepared = this.prepareOrder(item);
-    const updated = prepared.order;
+    const updated = { ...prepared.order, effectiveDate: item.status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
     for (const product of [...this.products(), ...prepared.added]) {
       const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
       const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
@@ -266,21 +276,51 @@ export class DemoStore {
     this.orders.update(orders => orders.map(order => order.id === item.id ? { ...updated, modifiedAt: new Date().toISOString() } : order));
     return '';
   }
-  confirmOrder(id: string) {
+  confirmOrder(id: string, effectiveDate = todayLocal()) {
     const order = this.orders().find(item => item.id === id);
     if (!order || order.status !== 'Pendiente') return 'La compra ya no está pendiente.';
-    return this.updateOrder({ ...order, status: 'Confirmado' });
+    return this.updateOrder({ ...order, status: 'Confirmado', effectiveDate });
+  }
+  cancelOrder(id: string) {
+    const order = this.orders().find(item => item.id === id);
+    if (!order || order.status !== 'Pendiente') return 'Solo se pueden anular compras pendientes.';
+    const affected: string[] = [];
+    for (const item of order.items) {
+      const product = this.products().find(product => product.id === item.productId);
+      const remaining = (product?.quantity ?? 0) + this.pendingPurchaseWeight(item.productId)
+        - this.lineWeight(order.items, item.productId) - this.pendingSaleWeight(item.productId);
+      if (remaining < -0.000001) {
+        let backing = (product?.quantity ?? 0) + this.pendingPurchaseWeight(item.productId) - this.lineWeight(order.items, item.productId);
+        const sales = this.sales().filter(sale => sale.status === 'Pendiente' && sale.items.some(line => line.productId === item.productId))
+          .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+        const uncovered: string[] = [];
+        for (const sale of sales) {
+          const quantity = this.lineWeight(sale.items, item.productId);
+          if (quantity > backing + 0.000001) uncovered.push(`${sale.id} · ${sale.customer} (${weight(quantity - Math.max(0, backing))})`);
+          backing -= quantity;
+        }
+        affected.push(`${productName(item.category, item.length)}: faltan ${weight(-remaining)}; reservas sin respaldo: ${uncovered.join(', ')}`);
+      }
+    }
+    if (affected.length) return `No se puede anular esta compra porque dejaría reservas sin respaldo. ${affected.join('. ')}`;
+    this.orders.update(orders => orders.map(entry => entry.id === id ? { ...entry, status: 'Anulada', cancelledAt: new Date().toISOString() } : entry));
+    return '';
   }
   updateSale(item: Sale, usePending = false): SaleResult | { kind: 'error'; message: string } {
     const previous = this.sales().find(sale => sale.id === item.id);
     if (!previous) return { kind: 'error', message: 'No encontramos la venta que deseas editar.' };
+    if (previous.status === 'Anulada') return { kind: 'error', message: 'Una venta anulada no se puede editar.' };
+    if (item.status === 'Anulada') return { kind: 'error', message: 'Usa la acción Anular para cancelar una venta pendiente.' };
     const assessment = this.assessSale(item.items, previous);
     if (assessment.kind === 'error') return assessment;
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
+    const updated = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const dateError = this.effectiveDateError(updated);
+    if (dateError) return { kind: 'error', message: dateError };
     if (status === 'Confirmado') {
-      const candidateSales = this.sales().map(sale => sale.id === item.id ? { ...item, status } : sale);
+      const candidateSales = this.sales().map(sale => sale.id === item.id ? updated : sale);
       const shortage = calculateFifo(this.initialLots, this.orders(), candidateSales).shortages[0];
       if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
     }
@@ -289,7 +329,7 @@ export class DemoStore {
       const newQuantity = status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
       return { ...product, quantity: product.quantity + oldQuantity - newQuantity, sold: product.sold - oldQuantity + newQuantity };
     }));
-    this.sales.update(sales => sales.map(sale => sale.id === item.id ? { ...item, status, modifiedAt: new Date().toISOString() } : sale));
+    this.sales.update(sales => sales.map(sale => sale.id === item.id ? { ...updated, modifiedAt: new Date().toISOString() } : sale));
     return { kind: 'saved', status };
   }
   pendingPurchaseWeight(productId: string) {
@@ -307,18 +347,37 @@ export class DemoStore {
     if (!product) return 0;
     return Math.max(0, Math.min(product.quantity, product.quantity + this.pendingPurchaseWeight(productId) - this.pendingSaleWeight(productId)));
   }
+  reservableWeight(productId: string) {
+    const product = this.products().find(item => item.id === productId);
+    return product ? Math.max(0, product.quantity + this.pendingPurchaseWeight(productId) - this.pendingSaleWeight(productId)) : 0;
+  }
   availabilityStatus(product: Product) {
     return stockStatus({ ...product, quantity: this.sellableWeight(product.id) });
   }
-  confirmSale(id: string) {
+  confirmSale(id: string, effectiveDate = todayLocal()) {
     const sale = this.sales().find(item => item.id === id);
     if (!sale || sale.status !== 'Pendiente') return 'La venta ya no está pendiente.';
     for (const item of sale.items) {
       const product = this.products().find(entry => entry.id === item.productId);
       if (!product || product.quantity < item.quantity) return `Aún no hay stock físico suficiente de ${productName(item.category, item.length)} para confirmar esta venta.`;
     }
-    const result = this.updateSale({ ...sale, status: 'Confirmado' });
+    const result = this.updateSale({ ...sale, status: 'Confirmado', effectiveDate });
     return result.kind === 'saved' ? '' : result.kind === 'error' ? result.message : 'Esta venta aún depende de stock pendiente.';
+  }
+  cancelSale(id: string) {
+    const sale = this.sales().find(item => item.id === id);
+    if (!sale || sale.status !== 'Pendiente') return 'Solo se pueden anular ventas pendientes.';
+    this.sales.update(sales => sales.map(entry => entry.id === id ? { ...entry, status: 'Anulada', cancelledAt: new Date().toISOString() } : entry));
+    return '';
+  }
+  private effectiveDateError(item: Order | Sale) {
+    if (item.status !== 'Confirmado') return '';
+    const effectiveDate = operationEffectiveDate(item);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) return 'Ingresa una fecha efectiva válida para confirmar la operación.';
+    if (item.date > todayLocal()) return 'Una operación con fecha futura debe quedar pendiente hasta que se realice.';
+    if (effectiveDate > todayLocal()) return 'No se puede confirmar una compra o venta con fecha efectiva futura.';
+    if (effectiveDate < item.date) return 'La fecha efectiva no puede ser anterior a la fecha de compra o reserva.';
+    return '';
   }
   private fifoShortageMessage(productId: string, missing: number) {
     const product = this.products().find(item => item.id === productId);
@@ -363,7 +422,25 @@ export class DemoStore {
     }));
   }
   addDebt(item: Debt) { this.debts.update(items => [item, ...items]); }
-  updateDebt(item: Debt) { this.debts.update(items => items.map(d => d.id === item.id ? item : d)); }
+  updateDebt(item: Debt) { this.debts.update(items => items.map(debt => debt.id === item.id ? { ...item, payments: debt.payments } : debt)); }
+  addDebtPayment(debtId: string, date: string, amount: number, note: string) {
+    const debt = this.debts().find(item => item.id === debtId);
+    if (!debt) return 'No encontramos la deuda.';
+    const parsedDate = new Date(`${date}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime())
+      || parsedDate.toISOString().slice(0, 10) !== date || date < debt.date || date > todayLocal()) {
+      return 'La fecha del pago debe ser válida y estar entre la fecha de registro y hoy.';
+    }
+    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
+      return 'Ingresa un importe mayor a cero con un máximo de dos decimales.';
+    }
+    const normalizedAmount = Math.round(amount * 100) / 100;
+    if (normalizedAmount > debtBalance(debt)) return `El pago no puede superar el saldo de ${money(debtBalance(debt))}.`;
+    const next = Math.max(0, ...debt.payments.map(payment => Number(payment.id.split('-').at(-1)) || 0)) + 1;
+    const payment: DebtPayment = { id: `PAG-${debtId}-${next}`, date, amount: normalizedAmount, note: note.trim() };
+    this.debts.update(items => items.map(item => item.id === debtId ? { ...item, payments: [...item.payments, payment] } : item));
+    return '';
+  }
 }
 
 export const money = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(value)}`;
@@ -373,6 +450,7 @@ export const productName = (category: HairCategory, length: HairLength) => `Cabe
 export const operationName = (date: string, party: string) => `${dateLabel(date)} · ${party}`;
 export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity, 0);
 export const operationValue = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+export const operationEffectiveDate = (item: Order | Sale) => item.effectiveDate ?? item.date;
 export const todayLocal = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -380,11 +458,12 @@ export const todayLocal = () => {
 export const dateLabel = (value: string) => value ? new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—';
 export const modifiedLabel = (value: string) => new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 export const stockStatus = (product: Product) => product.quantity === 0 ? 'Agotado' : product.quantity <= product.threshold ? 'Stock bajo' : 'Disponible';
-export const debtBalance = (debt: Debt) => Math.max(0, debt.total - debt.paid);
+export const debtPaid = (debt: Debt) => Math.round(debt.payments.reduce((sum, payment) => sum + payment.amount, 0) * 100) / 100;
+export const debtBalance = (debt: Debt) => Math.max(0, Math.round((debt.total - debtPaid(debt)) * 100) / 100);
 export const debtStatus = (debt: Debt): DebtStatus => {
   if (debtBalance(debt) === 0) return 'Pagada';
   if (debt.dueDate && debt.dueDate < todayLocal()) return 'Vencida';
-  return debt.paid > 0 ? 'Parcial' : 'Pendiente';
+  return debtPaid(debt) > 0 ? 'Parcial' : 'Pendiente';
 };
 export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
