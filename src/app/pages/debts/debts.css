@@ -23,3 +23,22 @@
 .operation-list .status-partial { background: #fff0d1; color: #865a08; }
 .operation-list .status-warn { background: #fee5e5; color: #b42323; }
 .operation-list .status-bad { background: #f8cccc; color: #961919; }
+.debt-detail { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding: 10px 28px 26px; }
+.debt-detail dl { width: 100%; margin: 0; display: grid; gap: 11px; }
+.debt-detail dl div { display: flex; justify-content: space-between; gap: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
+.debt-detail dt { color: #777; font-size: 12px; }
+.debt-detail dd { margin: 0; text-align: right; font-size: 14px; overflow-wrap: anywhere; }
+.debt-detail .modal-actions { width: 100%; flex-wrap: wrap; }
+.debt-detail .status-good { background: #e8f4ec; color: #247344; }
+.debt-detail .status-partial { background: #fff0d1; color: #865a08; }
+.debt-detail .status-warn { background: #fee5e5; color: #b42323; }
+.debt-detail .status-bad { background: #f8cccc; color: #961919; }
+@media (max-width: 720px) {
+  .operation-list.mobile-list-table tr:is(.debt-overdue, .debt-pending, .debt-partial) td {
+    background: transparent;
+    box-shadow: none;
+  }
+  .row-payment-button app-icon { width: 21px; height: 21px; }
+  .debt-detail { padding: 10px 18px 22px; }
+  .debt-detail dt, .debt-detail dd { font-size: 15px; }
+}

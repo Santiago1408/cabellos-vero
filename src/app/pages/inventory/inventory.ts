@@ -45,6 +45,14 @@ export class Inventory {
     else { this.sortKey.set(key); this.sortDirection.set('asc'); }
     this.page.set(1);
   }
+  setMobileSort(value: string) {
+    const [key, direction] = value.split(':') as [StockSortKey, 'asc' | 'desc'];
+    this.sortKey.set(key); this.sortDirection.set(direction); this.page.set(1);
+  }
+  setMobilePendingSort(value: string) {
+    const [key, direction] = value.split(':') as [PendingSortKey, 'asc' | 'desc'];
+    this.pendingSortKey.set(key); this.pendingSortDirection.set(direction);
+  }
   sortAria(key: StockSortKey) { return this.sortKey() === key ? this.sortDirection() === 'asc' ? 'ascending' : 'descending' : 'none'; }
   sortIndicator(key: StockSortKey) { return this.sortKey() === key ? this.sortDirection() === 'asc' ? '↑' : '↓' : '↕'; }
   sortPendingBy(key: PendingSortKey) {

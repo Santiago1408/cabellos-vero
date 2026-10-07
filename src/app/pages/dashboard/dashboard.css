@@ -250,6 +250,30 @@
   .metric-row {
     padding: 0 18px 20px;
   }
+  .metric-icon { width: 40px; height: 40px; }
+  .metric-icon app-icon { width: 22px; height: 22px; }
+  .metric small, .quick-counts a, .pending-group h3, .pending-link,
+  .empty-pending, .low-stock-item small, .badge { font-size: 14px; }
+  .metric strong { font-size: 24px; line-height: 1.15; white-space: normal; overflow-wrap: anywhere; }
+  .quick-counts a { min-height: 48px; display: inline-flex; align-items: center; gap: 6px; }
+  .quick-counts a strong { font-size: 22px; line-height: 1; color: #252525; }
+  .pending-link { flex-wrap: wrap; gap: 4px; padding-block: 13px; }
+  .pending-link span, .pending-link strong { flex: 1 1 100%; }
+  .pending-link strong { font-size: 24px; line-height: 1.15; text-align: right; }
+  .pending-link small { font-size: 13px; }
+  .top-products td.mobile-title { flex-basis: 100%; }
+  .top-products td.mobile-meta { order: 1; font-size: 16px; }
+  .top-products td.mobile-value { order: 2; font-size: 24px; line-height: 1.15; }
+  .top-products td.mobile-value[data-label]::before { font-size: 14px; }
+  .top-products td.mobile-meta[data-label]::before { font-size: 13px; }
+  .low-stock-item strong { font-size: 16px; }
+  .low-stock-item small b { font-size: 22px; color: #333; }
+  .product-initial { width: 42px; height: 42px; font-size: 17px; }
+  .chart-gridlines, .bar-group small { font-size: 13px; }
+  .chart-legend { font-size: 14px; }
+  .chart-legend { flex-wrap: wrap; }
+  .low-stock-item { flex-wrap: wrap; }
+  .low-stock-item .badge { margin-left: auto; }
 }
 @media (max-width: 480px) {
   .metric-row.four {
@@ -265,10 +289,12 @@
   .metric-row.two .metric {
     padding-inline: 8px;
   }
-  .metric strong {
-    font-size: 14px;
-  }
   .bar-chart {
     padding-inline: 8px;
   }
+}
+@media (max-width: 360px) {
+  .metric-row.four, .metric-row.two { grid-template-columns: 1fr; gap: 14px; }
+  .metric-row.four .metric, .metric-row.two .metric { border-right: 0; padding-inline: 0; }
+  .metric-row.four .metric:not(:last-child), .metric-row.two .metric:not(:last-child) { border-bottom: 1px solid var(--color-border); padding-bottom: 14px; }
 }

@@ -158,4 +158,9 @@
     height: 34px;
     font-size: 11px;
   }
+  .auth-card h2 { font-size: 30px; }
+  .auth-intro, .auth-options, .auth-switch, .demo-divider { font-size: 14px; }
+  .auth-options input { width: 18px; height: 18px; }
+  .auth-submit { min-height: 48px; font-size: 15px; }
+  .demo-login-buttons .btn { min-height: 48px; font-size: 14px; }
 }

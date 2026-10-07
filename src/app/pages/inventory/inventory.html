@@ -39,13 +39,18 @@
           <option [value]="cm">{{ cm }} cm</option>
         }
       </select>
-      <button class="btn btn-outline" (click)="export()">
+      <button class="btn btn-outline download-button" aria-label="Descargar inventario" (click)="export()">
         <app-icon name="download" /> <span class="hide-small">Descargar</span>
       </button>
     </div>
   </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="sortKey() + ':' + sortDirection()" (ngModelChange)="setMobileSort($event)">
+      <option value="category:asc">Categoría A–Z</option><option value="length:asc">Menor longitud</option><option value="length:desc">Mayor longitud</option><option value="quantity:desc">Más stock</option><option value="quantity:asc">Menos stock</option>
+    </select>
+  </label>
   <div class="table-scroll">
-    <table>
+    <table class="mobile-list-table mobile-card-list inventory-list">
       <thead>
         <tr>
           <th [attr.aria-sort]="sortAria('category')"><button type="button" class="sort-heading" (click)="sortBy('category')">Categoría <span aria-hidden="true">{{ sortIndicator('category') }}</span></button></th>
@@ -57,10 +62,10 @@
       <tbody>
         @for (p of pageItems(); track p.id) {
           <tr>
-            <td>{{ categoryLabel(p.category) }}</td>
-            <td>{{ p.length }} cm</td>
-            <td>{{ weight(p.quantity) }}</td>
-            <td class="inventory-actions-cell"><a class="row-detail-button" [routerLink]="['/inventario', p.id]" [attr.aria-label]="'Ver detalle de ' + categoryLabel(p.category) + ' de ' + p.length + ' cm'" title="Ver detalle"><app-icon name="eye" /></a></td>
+            <td class="mobile-title"><a class="mobile-card-open" [routerLink]="['/inventario', p.id]" [attr.aria-label]="'Ver movimientos de ' + categoryLabel(p.category) + ' de ' + p.length + ' cm'"></a>{{ categoryLabel(p.category) }}</td>
+            <td class="mobile-meta" data-label="Longitud">{{ p.length }} cm</td>
+            <td class="mobile-value" data-label="En stock">{{ weight(p.quantity) }}</td>
+            <td class="inventory-actions-cell mobile-actions"><a class="row-detail-button" [routerLink]="['/inventario', p.id]" [attr.aria-label]="'Ver detalle de ' + categoryLabel(p.category) + ' de ' + p.length + ' cm'" title="Ver detalle"><app-icon name="eye" /></a></td>
           </tr>
         } @empty {
           <tr>
@@ -91,9 +96,14 @@
     <button type="button" role="tab" [attr.aria-selected]="pendingTab() === 'purchases'" [class.active]="pendingTab() === 'purchases'" (click)="pendingTab.set('purchases')">Compras pendientes · {{ pendingPurchaseCount() }}</button>
     <button type="button" role="tab" [attr.aria-selected]="pendingTab() === 'sales'" [class.active]="pendingTab() === 'sales'" (click)="pendingTab.set('sales')">Ventas reservadas · {{ pendingSaleCount() }}</button>
   </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="pendingSortKey() + ':' + pendingSortDirection()" (ngModelChange)="setMobilePendingSort($event)">
+      <option value="party:asc">Nombre A–Z</option><option value="category:asc">Calidad A–Z</option><option value="quantity:desc">Mayor peso</option><option value="value:desc">Mayor importe</option>
+    </select>
+  </label>
   <div class="table-scroll">
     @if (pendingTab() === 'purchases') {
-      <table>
+      <table class="mobile-list-table pending-list">
         <thead><tr>
           <th [attr.aria-sort]="pendingSortAria('party')"><button type="button" class="sort-heading" (click)="sortPendingBy('party')">Compra <span aria-hidden="true">{{ pendingSortIndicator('party') }}</span></button></th>
           <th [attr.aria-sort]="pendingSortAria('category')"><button type="button" class="sort-heading" (click)="sortPendingBy('category')">Calidad <span aria-hidden="true">{{ pendingSortIndicator('category') }}</span></button></th>
@@ -105,15 +115,15 @@
         <tbody>
           @for (entry of sortedPendingPurchases(); track entry.order.id + entry.item.productId) {
             <tr>
-              <td><a routerLink="/pedidos" [queryParams]="{ detalle: entry.order.id }" class="table-primary">{{ entry.order.supplier }}</a><small class="table-sub">{{ entry.order.date }}</small></td>
-              <td>{{ categoryLabel(entry.item.category) }}</td><td>{{ entry.item.length }} cm</td>
-              <td>{{ weight(entry.item.quantity) }}</td><td>{{ money(entry.item.unitPrice) }}</td><td>{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
+              <td class="mobile-title"><a routerLink="/pedidos" [queryParams]="{ detalle: entry.order.id }" class="table-primary">{{ entry.order.supplier }}</a><small class="table-sub">{{ entry.order.date }}</small></td>
+              <td class="mobile-meta" data-label="Cabello">{{ categoryLabel(entry.item.category) }}<span class="mobile-only"> · {{ entry.item.length }} cm</span></td><td class="mobile-hide">{{ entry.item.length }} cm</td>
+              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ money(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
             </tr>
           } @empty { <tr><td colspan="6" class="empty-table">No hay compras pendientes.</td></tr> }
         </tbody>
       </table>
     } @else {
-      <table>
+      <table class="mobile-list-table pending-list">
         <thead><tr>
           <th [attr.aria-sort]="pendingSortAria('party')"><button type="button" class="sort-heading" (click)="sortPendingBy('party')">Reserva <span aria-hidden="true">{{ pendingSortIndicator('party') }}</span></button></th>
           <th [attr.aria-sort]="pendingSortAria('category')"><button type="button" class="sort-heading" (click)="sortPendingBy('category')">Calidad <span aria-hidden="true">{{ pendingSortIndicator('category') }}</span></button></th>
@@ -125,9 +135,9 @@
         <tbody>
           @for (entry of sortedPendingSales(); track entry.sale.id + entry.item.productId) {
             <tr>
-              <td><a routerLink="/ventas" [queryParams]="{ detalle: entry.sale.id }" class="table-primary">{{ entry.sale.customer }}</a><small class="table-sub">{{ entry.sale.date }}</small></td>
-              <td>{{ categoryLabel(entry.item.category) }}</td><td>{{ entry.item.length }} cm</td>
-              <td>{{ weight(entry.item.quantity) }}</td><td>{{ money(entry.item.unitPrice) }}</td><td>{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
+              <td class="mobile-title"><a routerLink="/ventas" [queryParams]="{ detalle: entry.sale.id }" class="table-primary">{{ entry.sale.customer }}</a><small class="table-sub">{{ entry.sale.date }}</small></td>
+              <td class="mobile-meta" data-label="Cabello">{{ categoryLabel(entry.item.category) }}<span class="mobile-only"> · {{ entry.item.length }} cm</span></td><td class="mobile-hide">{{ entry.item.length }} cm</td>
+              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ money(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
             </tr>
           } @empty { <tr><td colspan="6" class="empty-table">No hay ventas reservadas.</td></tr> }
         </tbody>

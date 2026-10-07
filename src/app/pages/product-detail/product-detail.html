@@ -3,7 +3,7 @@
     <a routerLink="/inventario" class="back-link">‹ Volver al inventario</a>
     @if (product(); as p) {
       <h1>Cabello {{ categoryLabel(p.category) }} · {{ p.length }} cm</h1>
-      <p>Detalle de las compras confirmadas de este tipo de cabello.</p>
+      <p>Entradas y salidas confirmadas de este tipo de cabello.</p>
     } @else {
       <h1>Cabello no encontrado</h1>
     }
@@ -11,35 +11,46 @@
 </div>
 @if (product(); as p) {
   <section class="card stock-card">
-    <span>En stock</span>
-    <strong>{{ weight(p.quantity) }}</strong>
+    <div class="stock-primary"><span>En stock</span><strong>{{ weight(p.quantity) }}</strong></div>
+    <div class="stock-equation" aria-label="Cálculo del stock">
+      <div><span>Saldo inicial</span><strong>+{{ weight(openingWeight()) }}</strong></div>
+      <div><span>Compras</span><strong>+{{ weight(purchasedWeight()) }}</strong></div>
+      <div><span>Ventas</span><strong>−{{ weight(soldWeight()) }}</strong></div>
+    </div>
   </section>
-  <section class="card purchases-card">
+  <section class="card movements-card">
     <div class="card-heading">
-      <div><h2>Compras que ingresaron cabello</h2><p>{{ purchases().length }} compras confirmadas</p></div>
+      <div><h2>Historial de movimientos</h2><p>{{ movements().length }} {{ movements().length === 1 ? 'operación confirmada' : 'operaciones confirmadas' }} · más recientes primero</p></div>
     </div>
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th>Proveedor</th><th>Fecha de compra</th><th>Peso comprado</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
-        <tbody>
-          @for (entry of purchases(); track entry.order.id + entry.item.productId) {
-            <tr>
-              <td><a routerLink="/pedidos" [queryParams]="{ detalle: entry.order.id }" class="table-primary">{{ entry.order.supplier }}</a></td>
-              <td>{{ dateLabel(entry.order.date) }}</td>
-              <td>{{ weight(entry.item.quantity) }}</td>
-              <td>{{ money(entry.item.unitPrice) }}</td>
-              <td>{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
-            </tr>
-          } @empty {
-            <tr><td colspan="5" class="empty-table">No hay compras confirmadas para este cabello.</td></tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    @if (openingWeight() > 0) {
-      <p class="opening-note">Saldo inicial del prototipo: <strong>{{ weight(openingWeight()) }}</strong>. No hay compras registradas que identifiquen su proveedor o precio.</p>
-    }
-    <p class="balance-note">Stock actual = saldo inicial + compras confirmadas − ventas confirmadas.</p>
+    <ol class="movement-list">
+      @for (movement of movements(); track movement.kind + movement.id) {
+        <li class="movement-item" [class.movement-in]="movement.kind === 'purchase'" [class.movement-out]="movement.kind === 'sale'">
+          <div class="movement-head">
+            <span class="movement-type">{{ movement.kind === 'purchase' ? 'Entrada · compra' : 'Salida · venta' }}</span>
+            <time [attr.datetime]="movement.date">{{ dateLabel(movement.date) }}</time>
+          </div>
+          <div class="movement-body">
+            <div class="movement-party">
+              <small>{{ movement.kind === 'purchase' ? 'Proveedor' : 'Cliente' }}</small>
+              <a [routerLink]="movement.kind === 'purchase' ? '/pedidos' : '/ventas'" [queryParams]="{ detalle: movement.id }">{{ movement.party }}</a>
+            </div>
+            <strong class="movement-weight">{{ movement.kind === 'purchase' ? '+' : '−' }}{{ weight(movement.quantity) }}</strong>
+          </div>
+          <div class="movement-details"><span>Precio {{ money(movement.unitPrice) }}/g</span><span>Importe {{ money(movement.quantity * movement.unitPrice) }}</span></div>
+        </li>
+      }
+      @if (openingWeight() > 0) {
+        <li class="movement-item movement-in movement-opening">
+          <div class="movement-head"><span class="movement-type">Entrada · saldo inicial</span><span>Prototipo</span></div>
+          <div class="movement-body"><div class="movement-party"><small>Origen</small><strong>Stock inicial del sistema</strong></div><strong class="movement-weight">+{{ weight(openingWeight()) }}</strong></div>
+          <div class="movement-details"><span>Costo de referencia {{ money(openingLot()!.unitCost) }}/g</span><span>Valor estimado {{ money(openingWeight() * openingLot()!.unitCost) }}</span></div>
+        </li>
+      }
+      @if (movements().length === 0 && openingWeight() === 0) {
+        <li class="empty-movements">Aún no hay movimientos confirmados de este cabello.</li>
+      }
+    </ol>
+    <p class="balance-note">Las compras pendientes y ventas reservadas se muestran por separado en Inventario y no cambian el stock físico.</p>
   </section>
 } @else {
   <div class="card empty-state">No encontramos este cabello. <a routerLink="/inventario">Volver al inventario</a></div>

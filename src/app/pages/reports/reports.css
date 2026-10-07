@@ -129,6 +129,31 @@
     display: none;
   }
   .monthly-card .card-heading { flex-wrap: wrap; }
+  .report-period-select { width: 100%; font-size: 14px; }
+  .report-period-select select { flex: 1; min-width: 0; }
+  .report-primary-metrics strong { font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+  .report-secondary-metrics strong { font-size: 22px; line-height: 1.15; overflow-wrap: anywhere; }
+  .report-primary-metrics span, .report-secondary-metrics span, .report-note { font-size: 14px; }
+  .monthly-card .mobile-list-table, .category-card .mobile-list-table { min-width: 0; }
+  .line-chart { min-width: 0; padding-inline: 8px; }
+  .line-plot { min-width: 0; }
+  .line-y-axis { flex: 0 0 42px; font-size: 13px; }
+  .line-x-axis { font-size: 13px; }
+  .revenue-chart-card .chart-legend { font-size: 14px; }
+  .revenue-chart-card .chart-legend { flex-wrap: wrap; }
+  .category-card .mobile-list-table td.mobile-title { font-size: 18px; }
+  .category-card .mobile-list-table td.mobile-value { font-size: 24px; line-height: 1.15; }
+  .category-card .mobile-list-table td.mobile-value[data-label]::before { font-size: 14px; }
+  .period-list tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .period-list td.mobile-title { grid-column: 1 / -1; font-size: 17px; }
+  .period-list td.mobile-meta, .period-list td.mobile-value { font-size: 22px; line-height: 1.15; overflow-wrap: anywhere; }
+  .period-list td.mobile-meta[data-label]::before, .period-list td.mobile-value[data-label]::before { font-size: 14px; }
+  .period-list td.mobile-meta:last-child { grid-column: 1 / -1; border-top: 1px solid var(--color-border); padding-top: 10px; }
+  .best-products .mobile-list-table td.mobile-title { flex-basis: 100%; }
+  .best-products .mobile-list-table td.mobile-value { font-size: 24px; line-height: 1.15; }
+  .best-products .mobile-list-table td.mobile-value[data-label]::before { font-size: 14px; }
+  .best-products .mobile-list-table td.mobile-meta { font-size: 16px; }
+  .best-products .mobile-list-table td.mobile-meta[data-label]::before { font-size: 13px; }
 }
 @media (max-width: 480px) {
   .report-primary-metrics {
@@ -138,4 +163,8 @@
     grid-template-columns: 1fr 1fr;
     row-gap: 20px;
   }
+}
+@media (max-width: 360px) {
+  .report-primary-metrics, .report-secondary-metrics, .period-list tr { grid-template-columns: 1fr; }
+  .period-list td.mobile-value { text-align: left; margin-left: 0; }
 }

@@ -3,6 +3,7 @@
   --color-primary: #171717;
   --color-primary-hover: #343434;
   --color-primary-soft: #f0f0f0;
+  --color-delete: #c62828;
   --color-chart-secondary: #a3a3a3;
   --color-page: #f6f6f6;
   --color-surface: #fff;
@@ -28,7 +29,7 @@ html {
 }
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   background: var(--color-page);
 }
 button,
@@ -43,6 +44,8 @@ a {
   color: inherit;
   text-decoration: none;
 }
+.mobile-only, .mobile-sort { display: none; }
+.mobile-card-open { display: none; }
 app-icon {
   vertical-align: middle;
 }
@@ -160,6 +163,28 @@ app-icon {
 }
 .btn-outline:hover {
   border-color: #aaa;
+}
+.btn-delete-outline {
+  color: var(--color-delete);
+  background: color-mix(in srgb, var(--color-delete) 6%, white);
+  border: 1px solid color-mix(in srgb, var(--color-delete) 30%, white);
+}
+.btn-delete-outline:hover {
+  background: color-mix(in srgb, var(--color-delete) 12%, white);
+  border-color: var(--color-delete);
+}
+.btn-delete {
+  color: #fff;
+  background: var(--color-delete);
+  border: 1px solid var(--color-delete);
+}
+.btn-delete:hover {
+  background: color-mix(in srgb, var(--color-delete) 80%, black);
+  border-color: color-mix(in srgb, var(--color-delete) 80%, black);
+}
+.btn-delete-outline:focus-visible, .btn-delete:focus-visible {
+  outline: 2px solid var(--color-delete);
+  outline-offset: 2px;
 }
 .card-actions {
   display: flex;
@@ -403,6 +428,23 @@ tr:last-child td {
   }
 }
 @media (max-width: 720px) {
+  .download-button { display: none; }
+  .page-header .eyebrow, .page-header p { display: none; }
+  .summary-item span, .summary-item small { font-size: 13px; }
+  .page-header { margin-bottom: 18px; }
+  .page-header h1 { font-size: 28px; }
+  .page-header p { font-size: 14px; line-height: 1.45; }
+  .card-heading h2 { font-size: 18px; }
+  .card-heading p, .table-sub { font-size: 12px; }
+  .text-link { font-size: 13px; }
+  .text-link app-icon { width: 17px; height: 17px; }
+  .btn { min-height: 44px; font-size: 14px; padding-inline: 13px; }
+  .btn app-icon { width: 19px; height: 19px; }
+  .field-label { font-size: 14px; }
+  .field-input { min-height: 48px; height: auto; font-size: 16px; }
+  .status { font-size: 12px; padding: 6px 9px; }
+  .status:before { width: 7px; height: 7px; }
+  .mobile-only { display: inline; }
   .page-header {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -427,6 +469,55 @@ tr:last-child td {
   .card-actions {
     width: 100%;
   }
+  .card-actions .filter-select { flex: 1 1 155px; min-width: 0; }
+  .table-footer { padding: 14px 12px; font-size: 13px; }
+  .table-footer .btn { min-height: 40px; padding-inline: 10px; }
+  .mobile-sort { display: flex; align-items: center; gap: 9px; padding: 0 18px 14px; color: #666; font-size: 13px; font-weight: 650; }
+  .mobile-sort select { flex: 1; min-width: 0; min-height: 42px; border: 1px solid var(--color-border); border-radius: 7px; background: #fff; color: #333; padding: 0 10px; font-size: 14px; }
+  .table-scroll:has(> .mobile-list-table), .table-scroll:has(> .mobile-detail-table) { overflow: visible; }
+  .mobile-list-table, .table-card .mobile-list-table,
+  .mobile-detail-table, .table-card .mobile-detail-table { display: block; width: 100%; min-width: 0; }
+  .mobile-list-table thead, .mobile-detail-table thead { display: none; }
+  .mobile-list-table tbody, .mobile-detail-table tbody { display: grid; gap: 10px; padding: 0 12px 12px; }
+  .mobile-list-table tr, .mobile-detail-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; width: 100%; min-width: 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 9px; background: #fff; }
+  .mobile-list-table.operation-list tr:is(.operation-pending, .debt-overdue, .debt-pending, .debt-partial) { border-left: 3px solid #cf3434; background: #fff7f7; }
+  .mobile-list-table.operation-list tr.debt-overdue { background: #fff1f1; border-left-color: #b42323; }
+  .mobile-list-table.operation-list tr.debt-partial { background: #fffaf0; border-left-color: #b98321; }
+  .mobile-list-table.operation-list tr:is(.operation-pending, .debt-overdue, .debt-pending, .debt-partial) td { background: transparent; box-shadow: none; }
+  .mobile-list-table td, .mobile-detail-table td { display: block; min-width: 0; padding: 0; border: 0; white-space: normal; font-size: 14px; line-height: 1.35; }
+  .mobile-list-table td.mobile-hide { display: none; }
+  .mobile-list-table td.mobile-title { flex: 1 1 54%; color: #333; font-weight: 700; overflow-wrap: anywhere; }
+  .mobile-list-table td.mobile-title .table-primary { font-size: 16px; }
+  .mobile-list-table td.mobile-status { flex: none; margin-left: auto; }
+  .mobile-list-table td.mobile-meta { flex: 1 1 48%; color: #666; }
+  .mobile-list-table td.mobile-value { flex: none; margin-left: auto; text-align: right; font-weight: 750; color: #252525; }
+  .mobile-list-table td.mobile-meta[data-label]::before, .mobile-list-table td.mobile-value[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; color: #888; font-size: 11px; font-weight: 550; }
+  .mobile-list-table td.mobile-actions { flex: 1 1 100%; border-top: 1px solid var(--color-border); padding-top: 10px; margin-top: 3px; }
+  .mobile-list-table td.mobile-actions .operation-actions { justify-content: flex-end; }
+  .mobile-list-table td.mobile-actions :is(button, a) { width: 44px; height: 44px; }
+  .mobile-list-table td.mobile-actions app-icon { width: 21px; height: 21px; }
+  .mobile-card-list tr { position: relative; gap: 6px 10px; cursor: pointer; }
+  .mobile-card-list tr:has(.empty-table) { cursor: default; }
+  .mobile-card-list td.mobile-title { flex: 1 1 100%; order: 0; font-size: 17px; }
+  .mobile-card-list td.mobile-title .table-primary { font-size: 18px; }
+  .mobile-card-list td.mobile-status { flex: 1 1 100%; order: -1; margin: 0 0 3px; }
+  .mobile-card-list td.mobile-meta { flex: 1 1 100%; order: 1; }
+  .mobile-card-list td.mobile-value { flex: 1 1 100%; order: 2; margin: 4px 0 0; padding-top: 10px; border-top: 1px solid var(--color-border); font-size: 23px; line-height: 1.15; }
+  .mobile-card-list td.mobile-value[data-label]::before { font-size: 12px; margin-bottom: 3px; }
+  .mobile-card-list td.mobile-actions { display: none; }
+  .mobile-card-list .mobile-card-open { display: block; position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 9px; background: transparent; cursor: pointer; }
+  .mobile-card-list .mobile-card-open:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+  .mobile-card-list tr:has(.mobile-card-open):hover { border-color: #aaa; box-shadow: 0 3px 12px #00000012; }
+  .mobile-list-table tr:has(.empty-table), .mobile-detail-table tr:has(.empty-table) { display: block; text-align: center; }
+  .mobile-list-table td.empty-table, .mobile-detail-table td.empty-table { width: 100%; padding: 16px 4px; }
+  .mobile-detail-table tr { align-items: stretch; flex-direction: column; gap: 9px; }
+  .mobile-detail-table td { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .mobile-detail-table td::before { content: attr(data-label); color: #777; font-size: 12px; text-align: left; flex: none; }
+  .mobile-detail-table td:first-child { font-weight: 700; font-size: 16px; text-align: left; }
+  .mobile-detail-table td:first-child::before { display: none; }
+  .modal-header h2 { font-size: 21px; }
+  .modal-header .icon-button { width: 44px; height: 44px; flex: none; }
+  .modal-header .icon-button app-icon { width: 22px; height: 22px; }
 }
 @media (max-width: 480px) {
   .summary-item strong {
@@ -436,7 +527,13 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
   .modal-backdrop {
-    padding: 10px;
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal-card {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 16px 16px 0 0;
   }
   .modal-header {
     padding: 20px 18px 8px;
@@ -444,6 +541,8 @@ tr:last-child td {
   .modal-form {
     padding: 10px 18px 20px;
   }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { flex: 1 1 auto; }
   .hide-small {
     display: none;
   }

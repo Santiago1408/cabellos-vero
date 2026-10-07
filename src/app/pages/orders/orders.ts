@@ -66,6 +66,10 @@ export class Orders {
     else { this.sortKey.set(key); this.sortDirection.set('asc'); }
     this.page.set(1);
   }
+  setMobileSort(value: string) {
+    const [key, direction] = value.split(':') as [SortKey, 'asc' | 'desc'];
+    this.sortKey.set(key); this.sortDirection.set(direction); this.page.set(1);
+  }
   sortAria(key: SortKey) { return this.sortKey() === key ? this.sortDirection() === 'asc' ? 'ascending' : 'descending' : 'none'; }
   sortIndicator(key: SortKey) { return this.sortKey() === key ? this.sortDirection() === 'asc' ? '↑' : '↓' : '↕'; }
 

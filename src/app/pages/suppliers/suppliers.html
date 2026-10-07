@@ -11,11 +11,16 @@
       @if (store.role() === 'admin') {
         <button class="btn btn-primary" (click)="open()"><app-icon name="plus" /> Agregar proveedor</button>
       }
-      <button class="btn btn-outline" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
+      <button class="btn btn-outline download-button" aria-label="Descargar proveedores" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
     </div>
   </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="sortKey() + ':' + sortDirection()" (ngModelChange)="setMobileSort($event)">
+      <option value="name:asc">Nombre A–Z</option><option value="name:desc">Nombre Z–A</option><option value="city:asc">Ciudad A–Z</option><option value="phone:asc">Teléfono</option>
+    </select>
+  </label>
   <div class="table-scroll">
-    <table class="operation-list">
+    <table class="operation-list mobile-list-table mobile-card-list">
       <thead><tr>
         <th [attr.aria-sort]="sortAria('name')"><button type="button" class="sort-heading" (click)="sortBy('name')">Proveedor <span aria-hidden="true">{{ sortIndicator('name') }}</span></button></th>
         <th [attr.aria-sort]="sortAria('phone')"><button type="button" class="sort-heading" (click)="sortBy('phone')">Teléfono <span aria-hidden="true">{{ sortIndicator('phone') }}</span></button></th>
@@ -26,14 +31,14 @@
       <tbody>
         @for (supplier of pageItems(); track supplier.id) {
           <tr>
-            <td><span class="table-primary">{{ supplier.name }}</span><small class="table-sub">{{ supplier.id }}</small></td>
-            <td>{{ supplier.phone }}</td>
-            <td>{{ supplier.city || '—' }}</td>
-            <td>
+            <td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de ' + supplier.name" (click)="detailId.set(supplier.id)"></button><span class="table-primary">{{ supplier.name }}</span><small class="table-sub">{{ supplier.id }}</small></td>
+            <td class="mobile-meta" data-label="Teléfono">{{ supplier.phone }}</td>
+            <td class="mobile-hide">{{ supplier.city || '—' }}</td>
+            <td class="mobile-hide">
               {{ supplier.address || '—' }}
               @if (supplier.mapsUrl) { <a class="table-sub map-link" [href]="supplier.mapsUrl" target="_blank" rel="noopener noreferrer">Abrir mapa ↗</a> }
             </td>
-            <td class="operation-actions-cell"><div class="operation-actions">
+            <td class="operation-actions-cell mobile-actions"><div class="operation-actions">
               <button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de ' + supplier.name" title="Ver detalle" (click)="detailId.set(supplier.id)"><app-icon name="eye" /></button>
               @if (store.role() === 'admin') {
                 <button type="button" class="row-edit-button" [attr.aria-label]="'Editar ' + supplier.name" title="Editar proveedor" (click)="openEdit(supplier)"><app-icon name="edit" /></button>
@@ -103,7 +108,7 @@
         </dl>
         @if (supplier.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(supplier.modifiedAt) }}</p> }
         @if (store.role() === 'admin') {
-          <div class="modal-actions"><button class="btn btn-primary" (click)="openEdit(supplier)"><app-icon name="edit" /> Editar proveedor</button></div>
+          <div class="modal-actions"><button type="button" class="btn btn-delete-outline" (click)="askDelete(supplier)"><app-icon name="trash" /> Eliminar</button><button type="button" class="btn btn-primary" (click)="openEdit(supplier)"><app-icon name="edit" /> Editar proveedor</button></div>
         }
       </div>
     </section>
@@ -116,7 +121,7 @@
       <div class="delete-content">
         <p>¿Eliminar a <strong>{{ supplier.name }}</strong> de la lista de proveedores?</p>
         @if (deleteError()) { <p class="form-error" role="alert">{{ deleteError() }}</p> }
-        <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="deleteTarget.set(null)">Cancelar</button><button type="button" class="btn btn-danger" (click)="confirmDelete()"><app-icon name="trash" /> Eliminar</button></div>
+        <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="deleteTarget.set(null)">Cancelar</button><button type="button" class="btn btn-delete" (click)="confirmDelete()"><app-icon name="trash" /> Eliminar</button></div>
       </div>
     </section>
   </div>

@@ -61,13 +61,18 @@
         <option>Parcial</option>
         <option>Vencida</option>
         <option>Pagada</option></select
-      ><button class="btn btn-outline" (click)="export()">
+      ><button class="btn btn-outline download-button" aria-label="Descargar deudas" (click)="export()">
         <app-icon name="download" /><span class="hide-small">Descargar</span>
       </button>
     </div>
   </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="sortKey() + ':' + sortDirection()" (ngModelChange)="setMobileSort($event)">
+      <option value="party:asc">Nombre A–Z</option><option value="dueDate:asc">Vencimiento próximo</option><option value="balance:desc">Mayor saldo</option><option value="status:asc">Estado</option>
+    </select>
+  </label>
   <div class="table-scroll">
-    <table class="operation-list">
+    <table class="operation-list mobile-list-table mobile-card-list">
       <thead>
         <tr>
           <th [attr.aria-sort]="sortAria('party')"><button type="button" class="sort-heading" (click)="sortBy('party')">Persona o empresa <span aria-hidden="true">{{ sortIndicator('party') }}</span></button></th>
@@ -83,17 +88,18 @@
       <tbody>
         @for (d of pageItems(); track d.id) {
           <tr [class.debt-overdue]="status(d) === 'Vencida'" [class.debt-pending]="status(d) === 'Pendiente'" [class.debt-partial]="status(d) === 'Parcial'">
-            <td>
+            <td class="mobile-title">
+              <button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la deuda de ' + d.party" (click)="detailId.set(d.id)"></button>
               <span class="table-primary">{{ d.party }}</span>
             </td>
-            <td>{{ d.kind }}</td>
-            <td>{{ money(d.total) }}</td>
-            <td>{{ money(d.paid) }}</td>
-            <td>
+            <td class="mobile-hide">{{ d.kind }}</td>
+            <td class="mobile-hide">{{ money(d.total) }}</td>
+            <td class="mobile-hide">{{ money(d.paid) }}</td>
+            <td class="mobile-value" data-label="Saldo">
               <strong>{{ money(balance(d)) }}</strong>
             </td>
-            <td>{{ dateLabel(d.dueDate) }}</td>
-            <td>
+            <td class="mobile-meta" data-label="Vence">{{ dateLabel(d.dueDate) }}</td>
+            <td class="mobile-status">
               <span
                 class="status"
                 [class.status-good]="status(d) === 'Pagada'"
@@ -103,7 +109,7 @@
                 >{{ status(d) }}</span
               >
             </td>
-            <td class="operation-actions-cell">
+            <td class="operation-actions-cell mobile-actions">
               <div class="operation-actions">
                 @if (store.role() === 'admin') {
                   <button type="button" class="row-edit-button" [attr.aria-label]="'Editar deuda de ' + d.party" title="Editar deuda" (click)="openEdit(d)"><app-icon name="edit" /></button>
@@ -138,6 +144,37 @@
     </button>
   </div>
 </section>
+
+
+@if (detail(); as debt) {
+  <div class="modal-backdrop" (click)="detailId.set(null)">
+    <section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Detalle de deuda" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ debt.party }}</h2>
+        <button type="button" class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
+      </div>
+      <div class="debt-detail">
+        <span class="status" [class.status-good]="status(debt) === 'Pagada'" [class.status-partial]="status(debt) === 'Parcial'" [class.status-warn]="status(debt) === 'Pendiente'" [class.status-bad]="status(debt) === 'Vencida'">{{ status(debt) }}</span>
+        <dl>
+          <div><dt>Tipo</dt><dd>{{ debt.kind }}</dd></div>
+          <div><dt>Teléfono</dt><dd>{{ debt.phone }}</dd></div>
+          <div><dt>Monto original</dt><dd>{{ money(debt.total) }}</dd></div>
+          <div><dt>Pagado</dt><dd>{{ money(debt.paid) }}</dd></div>
+          <div><dt>Saldo</dt><dd><strong>{{ money(balance(debt)) }}</strong></dd></div>
+          <div><dt>Fecha de registro</dt><dd>{{ dateLabel(debt.date) }}</dd></div>
+          <div><dt>Vencimiento</dt><dd>{{ dateLabel(debt.dueDate) }}</dd></div>
+          @if (debt.notes) { <div><dt>Notas</dt><dd>{{ debt.notes }}</dd></div> }
+        </dl>
+        @if (store.role() === 'admin') {
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" (click)="openEdit(debt)"><app-icon name="edit" /> Editar deuda</button>
+            @if (balance(debt) > 0) { <button type="button" class="btn btn-primary" (click)="openPayment(debt)"><app-icon name="payment" /> Registrar pago</button> }
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+}
 
 @if (modalOpen()) {
   <div class="modal-backdrop" (click)="closeForm()">

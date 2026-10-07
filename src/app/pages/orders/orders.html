@@ -16,11 +16,17 @@
         <option>Pendiente</option>
         <option>Confirmado</option>
       </select>
-      <button class="btn btn-outline" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
+      <button class="btn btn-outline download-button" aria-label="Descargar compras" (click)="export()"><app-icon name="download" /><span class="hide-small">Descargar</span></button>
     </div>
   </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="sortKey() + ':' + sortDirection()" (ngModelChange)="setMobileSort($event)">
+      <option value="date:desc">Más recientes</option><option value="date:asc">Más antiguas</option>
+      <option value="supplier:asc">Proveedor A–Z</option><option value="value:desc">Mayor importe</option><option value="status:asc">Estado</option>
+    </select>
+  </label>
   <div class="table-scroll">
-    <table class="operation-list">
+    <table class="operation-list mobile-list-table mobile-card-list">
       <thead><tr>
         <th [attr.aria-sort]="sortAria('supplier')"><button type="button" class="sort-heading" (click)="sortBy('supplier')">Proveedor <span aria-hidden="true">{{ sortIndicator('supplier') }}</span></button></th>
         <th [attr.aria-sort]="sortAria('value')"><button type="button" class="sort-heading" (click)="sortBy('value')">Valor de compra <span aria-hidden="true">{{ sortIndicator('value') }}</span></button></th>
@@ -32,12 +38,12 @@
       <tbody>
         @for (order of pageItems(); track order.id) {
           <tr [class.operation-pending]="order.status === 'Pendiente'" [class.operation-confirmed]="order.status === 'Confirmado'">
-            <td><span class="table-primary">{{ order.supplier }}</span><small class="table-sub">{{ order.items.length }} tipo(s) de cabello</small></td>
-            <td>{{ money(operationValue(order.items)) }}</td>
-            <td>{{ weight(operationWeight(order.items)) }}</td>
-            <td>{{ dateLabel(order.date) }}</td>
-            <td><span class="status" [class.status-good]="order.status === 'Confirmado'" [class.status-warn]="order.status === 'Pendiente'">{{ order.status }}</span></td>
-            <td class="operation-actions-cell"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" title="Ver detalle" (click)="openDetail(order.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar compra a ' + order.supplier" title="Editar compra" (click)="openEdit(order)"><app-icon name="edit" /></button> }</div></td>
+            <td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" (click)="openDetail(order.id)"></button><span class="table-primary">{{ order.supplier }}</span><small class="table-sub">{{ order.items.length }} tipo(s) de cabello</small></td>
+            <td class="mobile-value" data-label="Total">{{ money(operationValue(order.items)) }}</td>
+            <td class="mobile-hide">{{ weight(operationWeight(order.items)) }}</td>
+            <td class="mobile-meta" data-label="Fecha">{{ dateLabel(order.date) }}</td>
+            <td class="mobile-status"><span class="status" [class.status-good]="order.status === 'Confirmado'" [class.status-warn]="order.status === 'Pendiente'">{{ order.status }}</span></td>
+            <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la compra a ' + order.supplier" title="Ver detalle" (click)="openDetail(order.id)"><app-icon name="eye" /></button>@if (store.role() === 'admin') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar compra a ' + order.supplier" title="Editar compra" (click)="openEdit(order)"><app-icon name="edit" /></button> }</div></td>
           </tr>
         } @empty {
           <tr><td colspan="6" class="empty-table">No encontramos compras con ese criterio.</td></tr>
@@ -112,13 +118,16 @@
         <div class="detail-meta"><span>Proveedor: <strong>{{ order.supplier }}</strong></span><span>Fecha: <strong>{{ dateLabel(order.date) }}</strong></span><span class="status" [class.status-good]="order.status === 'Confirmado'">{{ order.status }}</span></div>
         @if (order.modifiedAt) { <p class="modified-note">Última modificación: {{ modifiedLabel(order.modifiedAt) }}</p> }
         <div class="table-scroll">
-          <table><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
+          <table class="mobile-detail-table"><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
             <tbody>@for (item of order.items; track item.productId) {
-              <tr><td>{{ categoryLabel(item.category) }}</td><td>{{ item.length }} cm</td><td>{{ weight(item.quantity) }}</td><td>{{ money(item.unitPrice) }}</td><td>{{ money(item.quantity * item.unitPrice) }}</td></tr>
+              <tr><td>{{ categoryLabel(item.category) }}</td><td data-label="Longitud">{{ item.length }} cm</td><td data-label="Peso">{{ weight(item.quantity) }}</td><td data-label="Precio Bs./g">{{ money(item.unitPrice) }}</td><td data-label="Importe">{{ money(item.quantity * item.unitPrice) }}</td></tr>
             }</tbody>
           </table>
         </div>
         <div class="operation-total"><span>Total · {{ weight(operationWeight(order.items)) }}</span><strong>{{ money(operationValue(order.items)) }}</strong></div>
+        @if (store.role() === 'admin') {
+          <div class="detail-actions"><button type="button" class="btn btn-outline" (click)="openEdit(order)"><app-icon name="edit" /> Editar compra</button></div>
+        }
         @if (detailError()) { <p class="form-error">{{ detailError() }}</p> }
         @if (order.status === 'Pendiente' && store.role() === 'admin') {
           <div class="modal-actions"><button class="btn btn-primary" (click)="confirm(order.id)">Confirmar compra</button></div>

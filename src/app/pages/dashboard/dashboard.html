@@ -17,7 +17,7 @@
     <div class="metric-row one">
       <div class="metric"><span class="metric-icon"><app-icon name="box" /></span><strong>{{ weight(stockWeight()) }}</strong><small>Stock físico</small></div>
     </div>
-    <div class="quick-counts"><a routerLink="/pedidos">{{ pendingOrdersCount() }} compras pendientes</a><a routerLink="/ventas">{{ pendingSalesCount() }} ventas reservadas</a></div>
+    <div class="quick-counts"><a routerLink="/pedidos"><strong>{{ pendingOrdersCount() }}</strong> compras pendientes</a><a routerLink="/ventas"><strong>{{ pendingSalesCount() }}</strong> ventas reservadas</a></div>
   </section>
   <section class="card chart-card">
     <div class="card-heading"><h2>Compras y ventas confirmadas</h2><span class="period-pill">Últimos 6 meses</span></div>
@@ -59,17 +59,17 @@
   </section>
   <section class="card table-card top-products">
     <div class="card-heading"><h2>Cabellos más vendidos</h2><a routerLink="/reportes" class="text-link">Ver reportes <app-icon name="arrow" /></a></div>
-    <div class="table-scroll"><table>
+    <div class="table-scroll"><table class="mobile-list-table">
       <thead><tr><th>Cabello</th><th>Peso vendido</th><th>En stock</th><th>Ingresos reales</th></tr></thead>
       <tbody>@for (product of topProducts(); track product.id) {
-        <tr><td><a [routerLink]="['/inventario', product.id]" class="table-primary">{{ product.name }}</a></td><td>{{ weight(product.soldWeight) }}</td><td>{{ weight(product.quantity) }}</td><td>{{ money(product.revenue) }}</td></tr>
+        <tr><td class="mobile-title"><a [routerLink]="['/inventario', product.id]" class="table-primary">{{ product.name }}</a></td><td class="mobile-value" data-label="Vendido">{{ weight(product.soldWeight) }}</td><td class="mobile-meta" data-label="En stock">{{ weight(product.quantity) }}</td><td class="mobile-hide">{{ money(product.revenue) }}</td></tr>
       } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }</tbody>
     </table></div>
   </section>
   <section class="card low-stock-card">
     <div class="card-heading"><h2>Stock bajo</h2><a routerLink="/inventario" class="text-link">Ver inventario <app-icon name="arrow" /></a></div>
     <div class="low-stock-list">@for (product of lowProducts(); track product.id) {
-      <a [routerLink]="['/inventario', product.id]" class="low-stock-item"><span class="product-initial">{{ product.length }}</span><span><strong>{{ product.name }}</strong><small>{{ weight(product.quantity) }} en stock</small></span><span class="badge" [class.badge-danger]="product.quantity === 0">{{ store.availabilityStatus(product) }}</span></a>
+      <a [routerLink]="['/inventario', product.id]" class="low-stock-item"><span class="product-initial">{{ product.length }}</span><span><strong>{{ product.name }}</strong><small><b>{{ weight(product.quantity) }}</b> en stock</small></span><span class="badge" [class.badge-danger]="product.quantity === 0">{{ store.availabilityStatus(product) }}</span></a>
     } @empty { <p class="empty-pending">No hay alertas de stock bajo.</p> }</div>
   </section>
 </div>

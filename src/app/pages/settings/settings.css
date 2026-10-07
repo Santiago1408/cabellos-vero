@@ -119,4 +119,7 @@
   .settings-grid {
     grid-template-columns: 1fr;
   }
+  .settings-card { padding: 20px; }
+  .settings-card h2 { font-size: 19px; }
+  .muted, .theme-preview strong, .theme-preview small, .inline-hint { font-size: 14px; }
 }

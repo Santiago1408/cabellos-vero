@@ -23,11 +23,11 @@
   </section>
   <section class="card category-card">
     <div class="card-heading"><h2>Calidades más vendidas</h2></div>
-    <div class="table-scroll"><table>
+    <div class="table-scroll"><table class="mobile-list-table category-list">
       <thead><tr><th>Calidad</th><th>Peso vendido</th><th>Participación</th></tr></thead>
       <tbody>
         @for (category of topCategories(); track category.name) {
-          <tr><td>{{ categoryLabel(category.name) }}</td><td>{{ weight(category.sold) }}</td><td>{{ category.percent }}%</td></tr>
+          <tr><td class="mobile-title">{{ categoryLabel(category.name) }}</td><td class="mobile-value" data-label="Vendido">{{ weight(category.sold) }}</td><td class="mobile-hide">{{ category.percent }}%</td></tr>
         } @empty { <tr><td colspan="3" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }
       </tbody>
     </table></div>
@@ -50,20 +50,20 @@
   </section>
   <section class="card table-card monthly-card">
     <div class="card-heading"><h2>{{ periodHeading() }}</h2><label class="report-period-select">Periodo <select class="btn btn-outline filter-select" aria-label="Periodo del reporte" [ngModel]="period()" (ngModelChange)="setPeriod($event)"><option value="days">Días · últimos 30</option><option value="weeks">Semanas · últimas 12</option><option value="months">Meses · últimos 6</option></select></label></div>
-    <div class="table-scroll"><table>
+    <div class="table-scroll"><table class="mobile-list-table period-list">
       <thead><tr><th>{{ periodColumn() }}</th><th>Compras confirmadas</th><th>Ingresos por ventas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead>
       <tbody>@for (row of periodRows(); track row.key) {
-        <tr><td>{{ row.label }}</td><td>{{ money(row.purchases) }}</td><td>{{ money(row.sales) }}</td><td>{{ money(row.costs) }}</td><td><strong>{{ money(row.profit) }}</strong></td></tr>
+        <tr><td class="mobile-title">{{ row.label }}</td><td class="mobile-meta" data-label="Compras">{{ money(row.purchases) }}</td><td class="mobile-value" data-label="Ventas">{{ money(row.sales) }}</td><td class="mobile-hide">{{ money(row.costs) }}</td><td class="mobile-meta" data-label="Margen">{{ money(row.profit) }}</td></tr>
       }</tbody>
     </table></div>
   </section>
   <section class="card table-card best-products">
     <div class="card-heading"><h2>Cabellos más vendidos</h2><a routerLink="/inventario" class="text-link">Ver inventario <app-icon name="arrow" /></a></div>
-    <div class="table-scroll"><table>
+    <div class="table-scroll"><table class="mobile-list-table">
       <thead><tr><th>Cabello</th><th>En stock</th><th>Peso vendido</th><th>Ingresos reales</th></tr></thead>
       <tbody>
         @for (product of topProducts(); track product.id) {
-          <tr><td><a class="table-primary" [routerLink]="['/inventario', product.id]">{{ productName(product.category, product.length) }}</a></td><td>{{ weight(product.quantity) }}</td><td>{{ weight(product.soldWeight) }}</td><td>{{ money(product.revenue) }}</td></tr>
+          <tr><td class="mobile-title"><a class="table-primary" [routerLink]="['/inventario', product.id]">{{ productName(product.category, product.length) }}</a></td><td class="mobile-meta" data-label="En stock">{{ weight(product.quantity) }}</td><td class="mobile-value" data-label="Vendido">{{ weight(product.soldWeight) }}</td><td class="mobile-hide">{{ money(product.revenue) }}</td></tr>
         } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }
       </tbody>
     </table></div>
