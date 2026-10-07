@@ -15,6 +15,8 @@ export class Suppliers {
   readonly editingId = signal<string | null>(null);
   readonly detailId = signal<string | null>(null);
   readonly error = signal('');
+  readonly deleteTarget = signal<Supplier | null>(null);
+  readonly deleteError = signal('');
   readonly page = signal(1);
   readonly sortKey = signal<SortKey>('name');
   readonly sortDirection = signal<'asc' | 'desc'>('asc');
@@ -83,6 +85,15 @@ export class Suppliers {
     }
     this.page.set(1);
     this.modalOpen.set(false);
+  }
+  askDelete(supplier: Supplier) { this.detailId.set(null); this.deleteError.set(''); this.deleteTarget.set(supplier); }
+  confirmDelete() {
+    const supplier = this.deleteTarget();
+    if (!supplier) return;
+    const message = this.store.removeSupplier(supplier.id);
+    if (message) { this.deleteError.set(message); return; }
+    this.deleteTarget.set(null);
+    this.page.set(1);
   }
   export() {
     downloadCsv('proveedores-cabello.csv', ['Proveedor', 'Teléfono', 'Ciudad', 'Dirección', 'Enlace de Google Maps'],

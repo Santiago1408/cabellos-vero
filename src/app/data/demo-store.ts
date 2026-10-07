@@ -208,6 +208,17 @@ export class DemoStore {
     }
     return true;
   }
+  removeSupplier(id: string) {
+    const supplier = this.suppliers().find(item => item.id === id);
+    if (!supplier) return 'No encontramos el proveedor que deseas eliminar.';
+    if (this.orders().some(order => order.supplier === supplier.name)
+      || this.debts().some(debt => debt.kind === 'Por pagar' && debt.party === supplier.name)
+      || this.products().some(product => product.supplier === supplier.name && (product.quantity > 0 || product.sold > 0))) {
+      return 'No se puede eliminar este proveedor porque aparece en compras, deudas o stock registrado.';
+    }
+    this.suppliers.update(items => items.filter(item => item.id !== id));
+    return '';
+  }
   addOrder(item: Order) {
     const prepared = this.prepareOrder(item);
     if (prepared.added.length) this.products.update(items => [...items, ...prepared.added]);
@@ -372,7 +383,7 @@ export const stockStatus = (product: Product) => product.quantity === 0 ? 'Agota
 export const debtBalance = (debt: Debt) => Math.max(0, debt.total - debt.paid);
 export const debtStatus = (debt: Debt): DebtStatus => {
   if (debtBalance(debt) === 0) return 'Pagada';
-  if (debt.dueDate && debt.dueDate < new Date().toISOString().slice(0, 10)) return 'Vencida';
+  if (debt.dueDate && debt.dueDate < todayLocal()) return 'Vencida';
   return debt.paid > 0 ? 'Parcial' : 'Pendiente';
 };
 export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {

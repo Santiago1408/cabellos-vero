@@ -37,6 +37,7 @@
               <button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de ' + supplier.name" title="Ver detalle" (click)="detailId.set(supplier.id)"><app-icon name="eye" /></button>
               @if (store.role() === 'admin') {
                 <button type="button" class="row-edit-button" [attr.aria-label]="'Editar ' + supplier.name" title="Editar proveedor" (click)="openEdit(supplier)"><app-icon name="edit" /></button>
+                <button type="button" class="row-delete-button" [attr.aria-label]="'Eliminar ' + supplier.name" title="Eliminar proveedor" (click)="askDelete(supplier)"><app-icon name="trash" /></button>
               }
             </div></td>
           </tr>
@@ -104,6 +105,18 @@
         @if (store.role() === 'admin') {
           <div class="modal-actions"><button class="btn btn-primary" (click)="openEdit(supplier)"><app-icon name="edit" /> Editar proveedor</button></div>
         }
+      </div>
+    </section>
+  </div>
+}
+@if (deleteTarget(); as supplier) {
+  <div class="modal-backdrop" (click)="deleteTarget.set(null)">
+    <section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Eliminar proveedor" (click)="$event.stopPropagation()">
+      <div class="modal-header"><h2>Eliminar proveedor</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="deleteTarget.set(null)"><app-icon name="close" /></button></div>
+      <div class="delete-content">
+        <p>¿Eliminar a <strong>{{ supplier.name }}</strong> de la lista de proveedores?</p>
+        @if (deleteError()) { <p class="form-error" role="alert">{{ deleteError() }}</p> }
+        <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="deleteTarget.set(null)">Cancelar</button><button type="button" class="btn btn-danger" (click)="confirmDelete()"><app-icon name="trash" /> Eliminar</button></div>
       </div>
     </section>
   </div>

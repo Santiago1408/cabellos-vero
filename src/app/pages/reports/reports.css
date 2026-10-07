@@ -42,21 +42,13 @@
 }
 .revenue-chart-card,
 .best-products,
-.monthly-card,
-.sales-profit-card {
+.monthly-card {
   grid-column: 1/-1;
 }
-.monthly-card table, .sales-profit-card table { min-width: 680px; }
+.monthly-card table { min-width: 680px; }
+.report-period-select { display: inline-flex; align-items: center; gap: 9px; color: #777; font-size: 11px; }
+.report-period-select select { min-height: 34px; }
 .report-note { border-top: 1px solid var(--color-border); padding: 12px 24px 18px; margin: 0; color: #888; font-size: 11px; }
-.row-detail-button { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: 7px; background: #fff; color: #555; cursor: pointer; }
-.row-detail-button:hover { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-primary-soft); }
-.row-detail-button app-icon { width: 18px; height: 18px; }
-.report-lots-modal { width: min(100%, 800px); }
-.report-lots-modal .table-scroll { padding: 0 20px; }
-.report-lots-modal table { min-width: 650px; }
-.report-lots-modal .modal-header p { margin: 6px 0 0; font-size: 11px; color: #777; }
-.report-lots-total { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 16px; border-top: 1px solid var(--color-border); padding: 18px 28px 24px; font-size: 11px; color: #777; }
-.report-lots-total strong { color: #333; }
 .line-chart {
   display: flex;
   height: 285px;
@@ -130,12 +122,13 @@
   .best-products {
     grid-column: auto;
   }
-  .monthly-card, .sales-profit-card { grid-column: auto; }
+  .monthly-card { grid-column: auto; }
 }
 @media (max-width: 720px) {
   .page-period {
     display: none;
   }
+  .monthly-card .card-heading { flex-wrap: wrap; }
 }
 @media (max-width: 480px) {
   .report-primary-metrics {

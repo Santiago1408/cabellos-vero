@@ -1,19 +1,25 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DemoStore, Sale, categoryLabel, dateLabel, debtBalance, money, operationValue, productName, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, debtBalance, money, operationValue, productName, todayLocal, weight } from '../../data/demo-store';
+import { ReportPeriod, summarizePeriods } from '../../data/report-periods';
 import { Icon } from '../../shared/icon/icon';
 
-@Component({ selector: 'app-reports', standalone: true, imports: [RouterLink, Icon], templateUrl: './reports.html',
+@Component({ selector: 'app-reports', standalone: true, imports: [FormsModule, RouterLink, Icon], templateUrl: './reports.html',
   styleUrl: './reports.css' })
 export class Reports {
   readonly store = inject(DemoStore);
   readonly money = money;
   readonly weight = weight;
-  readonly dateLabel = dateLabel;
   readonly categoryLabel = categoryLabel;
   readonly productName = productName;
-  readonly storeSaleValue = (sale: Sale) => operationValue(sale.items);
   readonly months = this.store.monthlySummaries;
+  readonly period = signal<ReportPeriod>('months');
+  readonly today = todayLocal();
+  readonly periodRows = computed(() => summarizePeriods(this.period(), this.today, this.store.orders(), this.store.sales(), this.store.fifo().allocations));
+  readonly periodHeading = computed(() => ({ days: 'Resultados diarios', weeks: 'Resultados semanales', months: 'Resultados mensuales' })[this.period()]);
+  readonly periodColumn = computed(() => ({ days: 'Día', weeks: 'Semana', months: 'Mes' })[this.period()]);
+  setPeriod(value: ReportPeriod) { this.period.set(value); }
   readonly revenue = computed(() => this.store.confirmedSales().reduce((sum, sale) => sum + operationValue(sale.items), 0));
   readonly costs = computed(() => this.store.fifo().allocations.reduce((sum, item) => sum + item.quantity * item.unitCost, 0));
   readonly profit = computed(() => this.revenue() - this.costs());
@@ -31,14 +37,6 @@ export class Reports {
     return [...totals].sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([name, sold]) => ({ name, sold, percent: all ? Math.round(sold / all * 100) : 0 }));
   });
-  readonly confirmedSales = computed(() => [...this.store.confirmedSales()].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)));
-  readonly selectedSaleId = signal<string | null>(null);
-  readonly selectedSale = computed(() => this.store.confirmedSales().find(sale => sale.id === this.selectedSaleId()));
-  readonly allocations = computed(() => this.store.fifo().allocations.filter(item => item.saleId === this.selectedSaleId()));
-  allocationName(productId: string) {
-    const product = this.store.products().find(item => item.id === productId);
-    return product ? productName(product.category, product.length) : 'Cabello';
-  }
   readonly chartBounds = computed(() => {
     const values = this.months().flatMap(month => [month.purchases, month.sales, month.profit]);
     const maximum = Math.max(0, ...values);

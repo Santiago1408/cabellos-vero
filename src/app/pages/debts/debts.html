@@ -67,25 +67,24 @@
     </div>
   </div>
   <div class="table-scroll">
-    <table>
+    <table class="operation-list">
       <thead>
         <tr>
-          <th>Persona o empresa</th>
-          <th>Tipo</th>
-          <th>Monto original</th>
-          <th>Pagado</th>
-          <th>Saldo</th>
-          <th>Vencimiento</th>
-          <th>Estado</th>
-          <th>Acciones</th>
+          <th [attr.aria-sort]="sortAria('party')"><button type="button" class="sort-heading" (click)="sortBy('party')">Persona o empresa <span aria-hidden="true">{{ sortIndicator('party') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('kind')"><button type="button" class="sort-heading" (click)="sortBy('kind')">Tipo <span aria-hidden="true">{{ sortIndicator('kind') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('total')"><button type="button" class="sort-heading" (click)="sortBy('total')">Monto original <span aria-hidden="true">{{ sortIndicator('total') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('paid')"><button type="button" class="sort-heading" (click)="sortBy('paid')">Pagado <span aria-hidden="true">{{ sortIndicator('paid') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('balance')"><button type="button" class="sort-heading" (click)="sortBy('balance')">Saldo <span aria-hidden="true">{{ sortIndicator('balance') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('dueDate')"><button type="button" class="sort-heading" (click)="sortBy('dueDate')">Vencimiento <span aria-hidden="true">{{ sortIndicator('dueDate') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('status')"><button type="button" class="sort-heading" (click)="sortBy('status')">Estado <span aria-hidden="true">{{ sortIndicator('status') }}</span></button></th>
+          <th class="operation-actions-heading">Acciones</th>
         </tr>
       </thead>
       <tbody>
         @for (d of pageItems(); track d.id) {
-          <tr>
+          <tr [class.debt-overdue]="status(d) === 'Vencida'" [class.debt-pending]="status(d) === 'Pendiente'" [class.debt-partial]="status(d) === 'Parcial'">
             <td>
-              <span class="table-primary">{{ d.party }}</span
-              ><small class="table-sub">{{ d.phone }} · {{ d.id }}</small>
+              <span class="table-primary">{{ d.party }}</span>
             </td>
             <td>{{ d.kind }}</td>
             <td>{{ money(d.total) }}</td>
@@ -98,22 +97,21 @@
               <span
                 class="status"
                 [class.status-good]="status(d) === 'Pagada'"
-                [class.status-warn]="status(d) === 'Parcial' || status(d) === 'Pendiente'"
+                [class.status-partial]="status(d) === 'Parcial'"
+                [class.status-warn]="status(d) === 'Pendiente'"
                 [class.status-bad]="status(d) === 'Vencida'"
                 >{{ status(d) }}</span
               >
             </td>
-            <td>
-              <div class="row-actions">
+            <td class="operation-actions-cell">
+              <div class="operation-actions">
                 @if (store.role() === 'admin') {
-                  <button class="btn btn-outline" (click)="openEdit(d)">
-                    <app-icon name="edit" /> Editar</button
-                  ><button
-                    class="btn btn-outline"
+                  <button type="button" class="row-edit-button" [attr.aria-label]="'Editar deuda de ' + d.party" title="Editar deuda" (click)="openEdit(d)"><app-icon name="edit" /></button>
+                  <button type="button" class="row-payment-button" [attr.aria-label]="'Registrar pago de ' + d.party" title="Registrar pago"
                     [disabled]="balance(d) === 0"
                     (click)="openPayment(d)"
                   >
-                    Registrar pago
+                    <app-icon name="payment" />
                   </button>
                 }
               </div>

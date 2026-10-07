@@ -21,8 +21,6 @@ export class Dashboard {
   readonly stockWeight = computed(() => this.store.products().reduce((sum, product) => sum + product.quantity, 0));
   readonly lowProducts = computed(() => this.store.managedProducts().filter(product => product.threshold > 0
     && this.store.sellableWeight(product.id) <= product.threshold).slice(0, 3));
-  readonly lowCount = computed(() => this.store.managedProducts().filter(product => product.threshold > 0
-    && this.store.sellableWeight(product.id) <= product.threshold).length);
   readonly pendingOrders = computed(() => this.store.orders().filter(order => order.status === 'Pendiente').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3));
   readonly pendingSales = computed(() => this.store.sales().filter(sale => sale.status === 'Pendiente').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3));
   readonly pendingOrdersCount = computed(() => this.store.orders().filter(order => order.status === 'Pendiente').length);

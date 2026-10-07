@@ -48,9 +48,9 @@
     <table>
       <thead>
         <tr>
-          <th>Categoría</th>
-          <th>Longitud</th>
-          <th>En stock</th>
+          <th [attr.aria-sort]="sortAria('category')"><button type="button" class="sort-heading" (click)="sortBy('category')">Categoría <span aria-hidden="true">{{ sortIndicator('category') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('length')"><button type="button" class="sort-heading" (click)="sortBy('length')">Longitud <span aria-hidden="true">{{ sortIndicator('length') }}</span></button></th>
+          <th [attr.aria-sort]="sortAria('quantity')"><button type="button" class="sort-heading" (click)="sortBy('quantity')">En stock <span aria-hidden="true">{{ sortIndicator('quantity') }}</span></button></th>
           <th class="inventory-actions-heading">Acciones</th>
         </tr>
       </thead>
@@ -94,9 +94,16 @@
   <div class="table-scroll">
     @if (pendingTab() === 'purchases') {
       <table>
-        <thead><tr><th>Compra</th><th>Calidad</th><th>Longitud</th><th>Peso pendiente</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
+        <thead><tr>
+          <th [attr.aria-sort]="pendingSortAria('party')"><button type="button" class="sort-heading" (click)="sortPendingBy('party')">Compra <span aria-hidden="true">{{ pendingSortIndicator('party') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('category')"><button type="button" class="sort-heading" (click)="sortPendingBy('category')">Calidad <span aria-hidden="true">{{ pendingSortIndicator('category') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('length')"><button type="button" class="sort-heading" (click)="sortPendingBy('length')">Longitud <span aria-hidden="true">{{ pendingSortIndicator('length') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('quantity')"><button type="button" class="sort-heading" (click)="sortPendingBy('quantity')">Peso pendiente <span aria-hidden="true">{{ pendingSortIndicator('quantity') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('unitPrice')"><button type="button" class="sort-heading" (click)="sortPendingBy('unitPrice')">Precio Bs./g <span aria-hidden="true">{{ pendingSortIndicator('unitPrice') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('value')"><button type="button" class="sort-heading" (click)="sortPendingBy('value')">Importe <span aria-hidden="true">{{ pendingSortIndicator('value') }}</span></button></th>
+        </tr></thead>
         <tbody>
-          @for (entry of pendingPurchases(); track entry.order.id + entry.item.productId) {
+          @for (entry of sortedPendingPurchases(); track entry.order.id + entry.item.productId) {
             <tr>
               <td><a routerLink="/pedidos" [queryParams]="{ detalle: entry.order.id }" class="table-primary">{{ entry.order.supplier }}</a><small class="table-sub">{{ entry.order.date }}</small></td>
               <td>{{ categoryLabel(entry.item.category) }}</td><td>{{ entry.item.length }} cm</td>
@@ -107,9 +114,16 @@
       </table>
     } @else {
       <table>
-        <thead><tr><th>Reserva</th><th>Calidad</th><th>Longitud</th><th>Peso reservado</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
+        <thead><tr>
+          <th [attr.aria-sort]="pendingSortAria('party')"><button type="button" class="sort-heading" (click)="sortPendingBy('party')">Reserva <span aria-hidden="true">{{ pendingSortIndicator('party') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('category')"><button type="button" class="sort-heading" (click)="sortPendingBy('category')">Calidad <span aria-hidden="true">{{ pendingSortIndicator('category') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('length')"><button type="button" class="sort-heading" (click)="sortPendingBy('length')">Longitud <span aria-hidden="true">{{ pendingSortIndicator('length') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('quantity')"><button type="button" class="sort-heading" (click)="sortPendingBy('quantity')">Peso reservado <span aria-hidden="true">{{ pendingSortIndicator('quantity') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('unitPrice')"><button type="button" class="sort-heading" (click)="sortPendingBy('unitPrice')">Precio Bs./g <span aria-hidden="true">{{ pendingSortIndicator('unitPrice') }}</span></button></th>
+          <th [attr.aria-sort]="pendingSortAria('value')"><button type="button" class="sort-heading" (click)="sortPendingBy('value')">Importe <span aria-hidden="true">{{ pendingSortIndicator('value') }}</span></button></th>
+        </tr></thead>
         <tbody>
-          @for (entry of pendingSales(); track entry.sale.id + entry.item.productId) {
+          @for (entry of sortedPendingSales(); track entry.sale.id + entry.item.productId) {
             <tr>
               <td><a routerLink="/ventas" [queryParams]="{ detalle: entry.sale.id }" class="table-primary">{{ entry.sale.customer }}</a><small class="table-sub">{{ entry.sale.date }}</small></td>
               <td>{{ categoryLabel(entry.item.category) }}</td><td>{{ entry.item.length }} cm</td>

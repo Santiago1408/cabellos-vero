@@ -7,16 +7,15 @@
     <div class="card-heading"><h2>Resultados del mes</h2><a routerLink="/reportes" class="text-link">Ver reportes <app-icon name="arrow" /></a></div>
     <div class="metric-row four">
       <div class="metric"><span class="metric-icon"><app-icon name="chart" /></span><strong>{{ money(revenue()) }}</strong><small>Ingresos por ventas confirmadas</small></div>
-      <div class="metric"><span class="metric-icon"><app-icon name="package" /></span><strong>{{ money(costs()) }}</strong><small>Costo FIFO vendido</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="package" /></span><strong>{{ money(costs()) }}</strong><small>Costo del cabello vendido</small></div>
       <div class="metric"><span class="metric-icon"><app-icon name="arrow" /></span><strong>{{ money(profit()) }}</strong><small>Margen bruto</small></div>
       <div class="metric"><span class="metric-icon"><app-icon name="truck" /></span><strong>{{ money(purchaseValue()) }}</strong><small>Compras confirmadas</small></div>
     </div>
   </section>
   <section class="card dash-panel inventory-panel">
     <div class="card-heading"><h2>Stock y pendientes</h2><a routerLink="/inventario" class="text-link">Ver inventario <app-icon name="arrow" /></a></div>
-    <div class="metric-row two">
+    <div class="metric-row one">
       <div class="metric"><span class="metric-icon"><app-icon name="box" /></span><strong>{{ weight(stockWeight()) }}</strong><small>Stock físico</small></div>
-      <div class="metric"><span class="metric-icon"><app-icon name="alert" /></span><strong>{{ lowCount() }}</strong><small>Tipos por reponer</small></div>
     </div>
     <div class="quick-counts"><a routerLink="/pedidos">{{ pendingOrdersCount() }} compras pendientes</a><a routerLink="/ventas">{{ pendingSalesCount() }} ventas reservadas</a></div>
   </section>

@@ -8,4 +8,15 @@
 .supplier-detail dt { color: #888; font-size: 11px; }
 .supplier-detail dd { margin: 0; color: #333; font-size: 13px; overflow-wrap: anywhere; }
 .supplier-detail a { color: var(--color-primary); text-decoration: underline; }
+.operation-list .operation-actions-heading, .operation-list .operation-actions-cell { width: 144px; min-width: 144px; }
+.row-delete-button { width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #f0c7c7; border-radius: 7px; background: #fff5f5; color: #c62828; cursor: pointer; }
+.row-delete-button:hover { background: #ffe8e8; border-color: #db9292; }
+.row-delete-button:focus-visible { outline: 2px solid #c62828; outline-offset: 2px; }
+.row-delete-button app-icon { width: 18px; height: 18px; }
+.delete-content { padding: 0 28px 26px; font-size: 12px; color: #555; }
+.delete-content p { margin: 5px 0 18px; }
+.delete-content .form-error { margin-bottom: 16px; }
+.delete-content .modal-actions { padding: 0; }
+.btn-danger { background: #c62828; border-color: #c62828; color: #fff; }
+.btn-danger:hover { background: #aa2020; border-color: #aa2020; }
 @media (max-width: 600px) { .supplier-detail { padding: 10px 18px 22px; } }

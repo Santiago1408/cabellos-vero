@@ -7,14 +7,14 @@
 </div>
 <div class="reports-grid">
   <section class="card report-overview">
-    <div class="card-heading"><h2>Resultado de ventas confirmadas</h2></div>
+    <div class="card-heading"><h2>Acumulado de ventas confirmadas</h2></div>
     <div class="report-primary-metrics">
       <div><strong>{{ money(revenue()) }}</strong><span>Ingresos</span></div>
-      <div><strong>{{ money(costs()) }}</strong><span>Costo FIFO del cabello vendido</span></div>
+      <div><strong>{{ money(costs()) }}</strong><span>Costo del cabello vendido</span></div>
       <div><strong>{{ money(profit()) }}</strong><span>Margen bruto</span></div>
     </div>
     <div class="report-secondary-metrics">
-      <div><strong>{{ money(stockValue()) }}</strong><span>Stock a costo FIFO</span></div>
+      <div><strong>{{ money(stockValue()) }}</strong><span>Valor del stock al costo</span></div>
       <div><strong>{{ money(receivable()) }}</strong><span>Saldo por cobrar</span></div>
       <div><strong>{{ money(payable()) }}</strong><span>Saldo por pagar</span></div>
       <div><strong>{{ store.confirmedSales().length }}</strong><span>Ventas confirmadas</span></div>
@@ -49,23 +49,12 @@
     <div class="chart-legend"><span><i class="legend-swatch black"></i> Compras</span><span><i class="legend-swatch gray"></i> Ventas</span><span><i class="legend-swatch margin"></i> Margen bruto</span></div>
   </section>
   <section class="card table-card monthly-card">
-    <div class="card-heading"><h2>Resultados mensuales</h2></div>
+    <div class="card-heading"><h2>{{ periodHeading() }}</h2><label class="report-period-select">Periodo <select class="btn btn-outline filter-select" aria-label="Periodo del reporte" [ngModel]="period()" (ngModelChange)="setPeriod($event)"><option value="days">Días · últimos 30</option><option value="weeks">Semanas · últimas 12</option><option value="months">Meses · últimos 6</option></select></label></div>
     <div class="table-scroll"><table>
-      <thead><tr><th>Mes</th><th>Compras confirmadas</th><th>Ingresos por ventas</th><th>Costo FIFO vendido</th><th>Margen bruto</th></tr></thead>
-      <tbody>@for (month of months(); track month.key) {
-        <tr><td>{{ month.label }} · {{ month.key.slice(0, 4) }}</td><td>{{ money(month.purchases) }}</td><td>{{ money(month.sales) }}</td><td>{{ money(month.costs) }}</td><td><strong>{{ money(month.profit) }}</strong></td></tr>
+      <thead><tr><th>{{ periodColumn() }}</th><th>Compras confirmadas</th><th>Ingresos por ventas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead>
+      <tbody>@for (row of periodRows(); track row.key) {
+        <tr><td>{{ row.label }}</td><td>{{ money(row.purchases) }}</td><td>{{ money(row.sales) }}</td><td>{{ money(row.costs) }}</td><td><strong>{{ money(row.profit) }}</strong></td></tr>
       }</tbody>
-    </table></div>
-  </section>
-  <section class="card table-card sales-profit-card">
-    <div class="card-heading"><h2>Margen por venta confirmada</h2></div>
-    <div class="table-scroll"><table>
-      <thead><tr><th>Fecha</th><th>Cliente</th><th>Ingresos</th><th>Costo FIFO</th><th>Margen bruto</th><th>Detalle</th></tr></thead>
-      <tbody>
-        @for (sale of confirmedSales(); track sale.id) {
-          <tr><td>{{ dateLabel(sale.date) }}</td><td>{{ sale.customer }}</td><td>{{ money(storeSaleValue(sale)) }}</td><td>{{ money(store.saleCost(sale.id)) }}</td><td><strong>{{ money(storeSaleValue(sale) - store.saleCost(sale.id)) }}</strong></td><td><button type="button" class="row-detail-button" [attr.aria-label]="'Ver lotes usados en venta a ' + sale.customer" title="Ver lotes usados" (click)="selectedSaleId.set(sale.id)"><app-icon name="eye" /></button></td></tr>
-        } @empty { <tr><td colspan="6" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }
-      </tbody>
     </table></div>
   </section>
   <section class="card table-card best-products">
@@ -80,17 +69,3 @@
     </table></div>
   </section>
 </div>
-@if (selectedSale(); as sale) {
-  <div class="modal-backdrop" (click)="selectedSaleId.set(null)">
-    <section class="modal-card report-lots-modal" role="dialog" aria-modal="true" aria-label="Costo FIFO de la venta" (click)="$event.stopPropagation()">
-      <div class="modal-header"><div><h2>Lotes usados en la venta</h2><p>{{ dateLabel(sale.date) }} · {{ sale.customer }}</p></div><button class="icon-button" aria-label="Cerrar" (click)="selectedSaleId.set(null)"><app-icon name="close" /></button></div>
-      <div class="table-scroll"><table>
-        <thead><tr><th>Cabello</th><th>Origen del lote</th><th>Peso usado</th><th>Costo Bs./g</th><th>Costo</th></tr></thead>
-        <tbody>@for (allocation of allocations(); track $index) {
-          <tr><td>{{ allocationName(allocation.productId) }}</td><td>{{ allocation.supplier }} @if (allocation.purchaseDate) { <small class="table-sub">{{ dateLabel(allocation.purchaseDate) }}</small> }</td><td>{{ weight(allocation.quantity) }}</td><td>{{ money(allocation.unitCost) }}</td><td>{{ money(allocation.quantity * allocation.unitCost) }}</td></tr>
-        }</tbody>
-      </table></div>
-      <div class="report-lots-total"><span>Ingreso: <strong>{{ money(storeSaleValue(sale)) }}</strong></span><span>Costo FIFO: <strong>{{ money(store.saleCost(sale.id)) }}</strong></span><span>Margen bruto: <strong>{{ money(storeSaleValue(sale) - store.saleCost(sale.id)) }}</strong></span></div>
-    </section>
-  </div>
-}
