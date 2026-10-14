@@ -35,6 +35,7 @@ class SecurityConfiguration {
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/csrf", "/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/password").authenticated()
+                .requestMatchers("/api/employees", "/api/employees/**").hasRole("ADMIN")
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, error) -> {

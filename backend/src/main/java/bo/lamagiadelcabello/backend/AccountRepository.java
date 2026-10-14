@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Repository;
 class AccountRepository {
 
     private static final String ACCOUNT_COLUMNS = """
-        id, username, password_hash, role, full_name, active,
+        id, username, password_hash, role, full_name, ci, birth_date, phone, active,
         must_change_password, failed_login_count, next_login_at, session_version
         """;
 
@@ -102,6 +103,9 @@ class AccountRepository {
             row.getString("password_hash"),
             row.getString("role"),
             row.getString("full_name"),
+            row.getString("ci"),
+            row.getObject("birth_date", LocalDate.class),
+            row.getString("phone"),
             row.getBoolean("active"),
             row.getBoolean("must_change_password"),
             row.getInt("failed_login_count"),
@@ -116,6 +120,9 @@ class AccountRepository {
         String passwordHash,
         String role,
         String fullName,
+        String ci,
+        LocalDate birthDate,
+        String phone,
         boolean active,
         boolean mustChangePassword,
         int failedLoginCount,

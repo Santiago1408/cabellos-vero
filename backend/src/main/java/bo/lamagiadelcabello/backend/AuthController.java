@@ -2,6 +2,7 @@ package bo.lamagiadelcabello.backend;
 
 import java.util.Map;
 import java.util.UUID;
+import java.time.LocalDate;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -151,10 +152,12 @@ class AuthController {
 
     record CsrfView(String headerName, String token) {}
 
-    record AccountView(UUID id, String username, String displayName, String role, boolean mustChangePassword) {
+    record AccountView(UUID id, String username, String displayName, String role,
+                       String ci, LocalDate birthDate, String phone, boolean mustChangePassword) {
         static AccountView from(Account account) {
             return new AccountView(
-                account.id(), account.username(), account.displayName(), account.role(), account.mustChangePassword()
+                account.id(), account.username(), account.displayName(), account.role(),
+                account.ci(), account.birthDate(), account.phone(), account.mustChangePassword()
             );
         }
     }
