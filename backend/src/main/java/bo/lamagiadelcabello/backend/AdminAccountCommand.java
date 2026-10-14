@@ -102,10 +102,15 @@ class AdminAccountCommand implements ApplicationRunner {
         if (countAdmins() != 0) {
             throw new IllegalStateException("Ya existe un administrador.");
         }
+        UUID id = UUID.randomUUID();
         jdbc.update("""
             INSERT INTO app_user (id, username, username_normalized, password_hash, role, active, must_change_password)
             VALUES (?, ?, ?, ?, 'ADMIN', TRUE, FALSE)
-            """, UUID.randomUUID(), username, normalized, hash);
+            """, id, username, normalized, hash);
+        jdbc.update("""
+            INSERT INTO app_user_history (user_id, event_type, source, new_values)
+            VALUES (?, 'ACCOUNT_CREATED', 'PRIVATE_COMMAND', jsonb_build_object('username', ?, 'role', 'ADMIN'))
+            """, id, username);
     }
 
     private void recover(AdminAccount admin, String username, String normalized, String hash) {
@@ -115,10 +120,17 @@ class AdminAccountCommand implements ApplicationRunner {
         jdbc.update("""
             UPDATE app_user
             SET username = ?, username_normalized = ?, password_hash = ?, active = TRUE,
-                must_change_password = FALSE, updated_at = now(), password_changed_at = now()
+                must_change_password = FALSE, failed_login_count = 0, next_login_at = NULL,
+                updated_at = now(), password_changed_at = now(),
+                session_version = session_version + 1
             WHERE id = ? AND role = 'ADMIN'
             """, username, normalized, hash, admin.id());
         jdbc.update("DELETE FROM spring_session WHERE principal_name IN (?, ?)", admin.id().toString(), admin.username());
+        jdbc.update("""
+            INSERT INTO app_user_history (user_id, event_type, source, old_values, new_values)
+            VALUES (?, 'ADMIN_RECOVERED', 'PRIVATE_COMMAND',
+                    jsonb_build_object('username', ?), jsonb_build_object('username', ?))
+            """, admin.id(), admin.username(), username);
     }
 
     private boolean usernameIsUsed(String normalized, UUID excludedId) {
