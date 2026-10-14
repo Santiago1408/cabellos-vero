@@ -51,7 +51,7 @@
     <div class="table-scroll"><table class="mobile-list-table period-list">
       <thead><tr><th>{{ periodColumn() }}</th><th>Compras confirmadas</th><th>Ingresos por ventas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead>
       <tbody>@for (row of periodRows(); track row.key) {
-        <tr><td class="mobile-title">{{ row.label }}</td><td class="mobile-meta" data-label="Compras">{{ money(row.purchases) }}</td><td class="mobile-value" data-label="Ventas">{{ money(row.sales) }}</td><td class="mobile-hide">{{ money(row.costs) }}</td><td class="mobile-meta" data-label="Margen">{{ money(row.profit) }}</td></tr>
+        <tr><td class="mobile-title">{{ row.label }}</td><td class="mobile-meta" data-label="Compras">{{ money(row.purchases) }}</td><td class="mobile-value" data-label="Ventas">{{ money(row.sales) }}</td><td class="mobile-hide period-cost" data-label="Costo del cabello">{{ money(row.costs) }}</td><td class="mobile-meta period-margin" data-label="Margen bruto" [class.negative]="row.profit < 0">{{ money(row.profit) }}</td></tr>
       }</tbody>
     </table></div>
   </section>

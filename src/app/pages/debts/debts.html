@@ -89,7 +89,7 @@
         @for (d of pageItems(); track d.id) {
           <tr [class.debt-overdue]="status(d) === 'Vencida'" [class.debt-pending]="status(d) === 'Pendiente'" [class.debt-partial]="status(d) === 'Parcial'">
             <td class="mobile-title">
-              <button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la deuda de ' + d.party" (click)="detailId.set(d.id)"></button>
+              <button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la deuda de ' + d.party" (click)="openDetail(d.id)"></button>
               <span class="table-primary">{{ d.party }}</span>
             </td>
             <td class="mobile-hide">{{ d.kind }}</td>
@@ -147,11 +147,11 @@
 
 
 @if (detail(); as debt) {
-  <div class="modal-backdrop" (click)="detailId.set(null)">
+  <div class="modal-backdrop" (click)="closeDetail()">
     <section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Detalle de deuda" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h2>{{ debt.party }}</h2>
-        <button type="button" class="icon-button" aria-label="Cerrar" (click)="detailId.set(null)"><app-icon name="close" /></button>
+        <button type="button" class="icon-button" aria-label="Cerrar" (click)="closeDetail()"><app-icon name="close" /></button>
       </div>
       <div class="debt-detail">
         <span class="status" [class.status-good]="status(debt) === 'Pagada'" [class.status-partial]="status(debt) === 'Parcial'" [class.status-warn]="status(debt) === 'Pendiente'" [class.status-bad]="status(debt) === 'Vencida'">{{ status(debt) }}</span>
@@ -170,16 +170,75 @@
           @if (paymentHistory().length) {
             <ol>
               @for (payment of paymentHistory(); track payment.id) {
-                <li><div><time [attr.datetime]="payment.date">{{ dateLabel(payment.date) }}</time><strong>{{ money(payment.amount) }}</strong></div>@if (payment.note) { <p>{{ payment.note }}</p> }</li>
+                <li [class.payment-voided]="payment.voidedAt">
+                  <div class="payment-main">
+                    <div class="payment-values">
+                      <time [attr.datetime]="payment.date">{{ dateLabel(payment.date) }}</time>
+                      <strong>{{ money(payment.amount) }}</strong>
+                    </div>
+                    @if (store.role() === 'admin' && !payment.voidedAt) {
+                      <div class="payment-actions">
+                        <button type="button" class="payment-action" [attr.aria-label]="'Editar abono de ' + money(payment.amount)" title="Editar abono" (click)="openEditPayment(debt,payment)"><app-icon name="edit" /></button>
+                        <button type="button" class="payment-action payment-action-delete" [attr.aria-label]="'Anular abono de ' + money(payment.amount)" title="Anular abono" (click)="voidPromptId.set(payment.id);paymentActionError.set('')"><app-icon name="trash" /></button>
+                      </div>
+                    }
+                  </div>
+                  @if (payment.voidedAt) { <span class="payment-voided-label">Anulado</span> }
+                  @if (payment.note) { <p>{{ payment.note }}</p> }
+                  @if (voidPromptId() === payment.id) {
+                    <div class="payment-void-prompt">
+                      <p>¿Anular este abono? Dejará de contar en el saldo, pero permanecerá en el historial.</p>
+                      <div><button type="button" class="btn btn-outline" (click)="voidPromptId.set(null)">Cancelar</button><button type="button" class="btn btn-delete" (click)="voidPayment(debt.id,payment.id)">Sí, anular</button></div>
+                    </div>
+                  }
+                  @if (payment.changes?.length) {
+                    <details class="payment-change-log">
+                      <summary>Historial de cambios ({{ payment.changes?.length }})</summary>
+                      <ol>
+                        @for (change of payment.changes ?? []; track $index) {
+                          <li>
+                            <div class="payment-change-heading"><strong>{{ change.reason }}</strong><time [attr.datetime]="change.at">{{ modifiedLabel(change.at) }}</time></div>
+                            <div class="payment-change-values">
+                              <p><b>Antes</b><span>{{ dateLabel(change.before.date) }} · {{ money(change.before.amount) }} · {{ change.before.voided ? 'Anulado' : 'Vigente' }}</span>@if (change.before.note) { <small>{{ change.before.note }}</small> }</p>
+                              <p><b>Después</b><span>{{ dateLabel(change.after.date) }} · {{ money(change.after.amount) }} · {{ change.after.voided ? 'Anulado' : 'Vigente' }}</span>@if (change.after.note) { <small>{{ change.after.note }}</small> }</p>
+                            </div>
+                          </li>
+                        }
+                      </ol>
+                    </details>
+                  }
+                </li>
               }
             </ol>
           } @else { <p class="payment-empty">Aún no hay abonos registrados.</p> }
+          @if (paymentActionError()) { <p class="form-error">{{ paymentActionError() }}</p> }
         </section>
         @if (store.role() === 'admin') {
           <div class="modal-actions">
             <button type="button" class="btn btn-outline" (click)="openEdit(debt)"><app-icon name="edit" /> Editar deuda</button>
-            @if (balance(debt) > 0) { <button type="button" class="btn btn-primary" (click)="openPayment(debt)"><app-icon name="payment" /> Registrar pago</button> }
+            @if (balance(debt) > 0) { <button type="button" class="btn btn-primary" (click)="openPayment(debt,true)"><app-icon name="payment" /> Registrar pago</button> }
           </div>
+        }
+        @if (debtChangeHistory().length) {
+          <details class="debt-change-log">
+            <summary>Historial de cambios de la deuda ({{ debtChangeHistory().length }})</summary>
+            <ol>
+              @for (change of debtChangeHistory(); track change.at + $index) {
+                <li>
+                  <time [attr.datetime]="change.at">{{ modifiedLabel(change.at) }}</time>
+                  <div class="debt-change-rows">
+                    @for (row of debtChangeRows(change); track row.label) {
+                      <div class="debt-change-row">
+                        <strong>{{ row.label }}</strong>
+                        <span><small>Antes</small>{{ row.before }}</span>
+                        <span><small>Después</small>{{ row.after }}</span>
+                      </div>
+                    }
+                  </div>
+                </li>
+              }
+            </ol>
+          </details>
         }
       </div>
     </section>
@@ -278,13 +337,13 @@
       class="modal-card small-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="Registrar pago"
+      [attr.aria-label]="editingPaymentId() ? 'Editar abono' : 'Registrar pago'"
       (click)="$event.stopPropagation()"
     >
       <div class="modal-header">
         <div>
           <div class="eyebrow">{{ d.kind }}</div>
-          <h2>Registrar pago</h2>
+          <h2>{{ editingPaymentId() ? 'Editar abono' : 'Registrar pago' }}</h2>
         </div>
         <button class="icon-button" aria-label="Cerrar" (click)="closePayment()">
           <app-icon name="close" />
@@ -293,14 +352,14 @@
       <form class="modal-form" (ngSubmit)="applyPayment()">
         <p class="inline-hint">
           <strong>{{ d.party }}</strong
-          ><br />Saldo pendiente: {{ money(balance(d)) }}
+          ><br />{{ editingPaymentId() ? 'Saldo actual' : 'Saldo pendiente' }}: {{ money(balance(d)) }}
         </p>
         <label class="field-label"
           >Monto del pago (Bs.)<input
             class="field-input"
             type="number"
             min="0.01"
-            [max]="balance(d)"
+            [max]="paymentMaximum(d)"
             step="0.01"
             name="paymentAmount"
             [(ngModel)]="paymentAmount"
@@ -313,7 +372,7 @@
         }
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" (click)="closePayment()">Cancelar</button
-          ><button type="submit" class="btn btn-primary">Aplicar pago</button>
+          ><button type="submit" class="btn btn-primary">{{ editingPaymentId() ? 'Guardar cambios' : 'Aplicar pago' }}</button>
         </div>
       </form>
     </section>

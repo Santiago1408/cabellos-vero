@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, categoryLabel, downloadCsv, money, weight } from '../../data/demo-store';
+import { DemoStore, HairCategory, HairLength, HairLine, categoryLabel, downloadCsv, lineValue, money, unitPriceLabel, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 
 type StockSortKey = 'category' | 'length' | 'quantity' | 'pendingPurchase' | 'reserved' | 'immediate' | 'additional';
@@ -11,6 +11,7 @@ type PendingSortKey = 'party' | 'category' | 'length' | 'quantity' | 'unitPrice'
   styleUrl: './inventory.css' })
 export class Inventory {
   readonly store = inject(DemoStore); readonly money = money; readonly weight = weight; readonly categoryLabel = categoryLabel;
+  readonly lineValue = lineValue; readonly unitPriceLabel = unitPriceLabel;
   pendingPurchase(productId: string) { return this.store.pendingPurchaseWeight(productId); }
   reserved(productId: string) { return this.store.pendingSaleWeight(productId); }
   immediate(productId: string) { return this.store.sellableWeight(productId); }
@@ -73,7 +74,7 @@ export class Inventory {
   private sortPending<T extends { party: string; item: HairLine }>(entries: T[]): T[] {
     const key = this.pendingSortKey();
     const direction = this.pendingSortDirection() === 'asc' ? 1 : -1;
-    const value = (entry: T) => key === 'party' ? entry.party : key === 'value' ? entry.item.quantity * entry.item.unitPrice : entry.item[key];
+    const value = (entry: T) => key === 'party' ? entry.party : key === 'value' ? lineValue(entry.item.quantity, entry.item.unitPrice) : entry.item[key];
     return [...entries].sort((left, right) => {
       const a = value(left); const b = value(right);
       const comparison = typeof a === 'number' && typeof b === 'number'

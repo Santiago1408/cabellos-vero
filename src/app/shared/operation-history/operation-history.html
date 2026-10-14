@@ -1,0 +1,47 @@
+@if (changes.length) {
+  <details class="change-history">
+    <summary>Historial de cambios <span>{{ changes.length }}</span></summary>
+    <ol>
+      @for (change of recentChanges; track $index) {
+        <li class="history-entry">
+          <div class="history-heading">
+            <strong>{{ change.reason }}</strong>
+            <time [attr.datetime]="change.at">{{ modifiedLabel(change.at) }}</time>
+          </div>
+          <div class="history-comparison">
+            <section class="history-snapshot" aria-label="Valores anteriores">
+              <h4>Antes</h4>
+              <dl>
+                <div><dt>{{ partyLabel }}</dt><dd>{{ change.before.party }}</dd></div>
+                <div><dt>Fecha</dt><dd>{{ dateLabel(change.before.date) }}</dd></div>
+                <div><dt>{{ effectiveDateLabel }}</dt><dd>{{ change.before.effectiveDate ? dateLabel(change.before.effectiveDate) : '—' }}</dd></div>
+                <div><dt>Estado</dt><dd>{{ change.before.status }}</dd></div>
+              </dl>
+              <ul>
+                @for (line of change.before.items; track line.productId) {
+                  <li><span>{{ categoryLabel(line.category) }} · {{ line.length }} cm</span><small>{{ weight(line.quantity) }} · {{ unitPriceLabel(line.unitPrice) }}/g · {{ money(lineValue(line.quantity, line.unitPrice)) }}</small></li>
+                }
+              </ul>
+              <p>Total: <strong>{{ money(operationValue(change.before.items)) }}</strong></p>
+            </section>
+            <section class="history-snapshot" aria-label="Valores nuevos">
+              <h4>Después</h4>
+              <dl>
+                <div><dt>{{ partyLabel }}</dt><dd>{{ change.after.party }}</dd></div>
+                <div><dt>Fecha</dt><dd>{{ dateLabel(change.after.date) }}</dd></div>
+                <div><dt>{{ effectiveDateLabel }}</dt><dd>{{ change.after.effectiveDate ? dateLabel(change.after.effectiveDate) : '—' }}</dd></div>
+                <div><dt>Estado</dt><dd>{{ change.after.status }}</dd></div>
+              </dl>
+              <ul>
+                @for (line of change.after.items; track line.productId) {
+                  <li><span>{{ categoryLabel(line.category) }} · {{ line.length }} cm</span><small>{{ weight(line.quantity) }} · {{ unitPriceLabel(line.unitPrice) }}/g · {{ money(lineValue(line.quantity, line.unitPrice)) }}</small></li>
+                }
+              </ul>
+              <p>Total: <strong>{{ money(operationValue(change.after.items)) }}</strong></p>
+            </section>
+          </div>
+        </li>
+      }
+    </ol>
+  </details>
+}

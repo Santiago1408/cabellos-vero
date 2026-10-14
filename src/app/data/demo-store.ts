@@ -1,5 +1,8 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { calculateFifo, openingLots } from './fifo';
+import { amountCents, lineValue, sumMoney } from './money';
+
+export { lineValue } from './money';
 
 export type Role = 'admin' | 'user';
 export const hairCategories = ['normal', 'choco', 'tinturado', 'premium', 'elite'] as const;
@@ -25,16 +28,22 @@ export type Product = {
 export type Supplier = { id: string; name: string; phone: string; city: string; address: string; mapsUrl: string; modifiedAt?: string };
 export type OperationStatus = 'Pendiente' | 'Confirmado' | 'Anulada';
 export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number };
-export type Order = { id: string; supplier: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string };
-export type Sale = { id: string; customer: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string };
+export type OperationSnapshot = { party: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[] };
+export type OperationChange = { at: string; reason: 'Edición' | 'Confirmación' | 'Anulación' | 'Proveedor actualizado'; before: OperationSnapshot; after: OperationSnapshot };
+export type Order = { id: string; supplier: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
+export type Sale = { id: string; customer: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
 export type SaleShortage = { product: Product; requested: number; physical: number; pending: number; missing: number };
 export type SaleResult = { kind: 'saved'; status: OperationStatus }
   | { kind: 'needs-pending'; product: Product; available: number; pending: number }
   | { kind: 'insufficient'; shortages: SaleShortage[] }
   | { kind: 'error'; message: string };
 export type DebtKind = 'Por cobrar' | 'Por pagar';
-export type DebtPayment = { id: string; date: string; amount: number; note: string };
-export type Debt = { id: string; party: string; phone: string; kind: DebtKind; total: number; payments: DebtPayment[]; date: string; dueDate: string; notes: string };
+export type DebtPaymentSnapshot = { date: string; amount: number; note: string; voided: boolean };
+export type DebtPaymentChange = { at: string; reason: 'Corrección' | 'Anulación'; before: DebtPaymentSnapshot; after: DebtPaymentSnapshot };
+export type DebtPayment = { id: string; date: string; amount: number; note: string; voidedAt?: string; changes?: DebtPaymentChange[] };
+export type DebtSnapshot = { party: string; phone: string; kind: DebtKind; total: number; date: string; dueDate: string; notes: string };
+export type DebtChange = { at: string; before: DebtSnapshot; after: DebtSnapshot };
+export type Debt = DebtSnapshot & { id: string; payments: DebtPayment[]; changeHistory?: DebtChange[] };
 export type DebtStatus = 'Pendiente' | 'Parcial' | 'Pagada' | 'Vencida';
 export type MonthlySummary = { key: string; label: string; purchases: number; sales: number; costs: number; profit: number };
 
@@ -65,6 +74,29 @@ const demoLine = (productId: string, quantity: number, unitPrice: number): HairL
   const product = initialProducts.find(item => item.id === productId)!;
   return { productId, category: product.category, length: product.length, quantity, unitPrice };
 };
+
+const operationSnapshot = (item: Order | Sale): OperationSnapshot => ({
+  party: 'supplier' in item ? item.supplier : item.customer,
+  date: item.date,
+  effectiveDate: item.status === 'Confirmado' ? operationEffectiveDate(item) : undefined,
+  status: item.status,
+  items: item.items.map(line => ({ ...line })),
+});
+
+const operationChange = (before: Order | Sale, after: Order | Sale, reason: OperationChange['reason'], at: string): OperationChange | null => {
+  const previous = operationSnapshot(before);
+  const next = operationSnapshot(after);
+  return JSON.stringify(previous) === JSON.stringify(next) ? null : { at, reason, before: previous, after: next };
+};
+
+const paymentSnapshot = (payment: DebtPayment): DebtPaymentSnapshot => ({
+  date: payment.date, amount: payment.amount, note: payment.note, voided: !!payment.voidedAt,
+});
+
+const debtSnapshot = (debt: Debt): DebtSnapshot => ({
+  party: debt.party, phone: debt.phone, kind: debt.kind, total: debt.total,
+  date: debt.date, dueDate: debt.dueDate, notes: debt.notes,
+});
 
 const initialOrders: Order[] = [
   { id: 'COMP-1046', supplier: 'Acopio Cochabamba', date: '2026-09-25', status: 'Confirmado', items: [demoLine('CAB-001', 1800, 2.2), demoLine('CAB-002', 250, 2.8)] },
@@ -117,22 +149,26 @@ export class DemoStore {
     const now = new Date();
     const costsBySale = new Map<string, number>();
     for (const allocation of this.fifo().allocations) costsBySale.set(allocation.saleId,
-      (costsBySale.get(allocation.saleId) ?? 0) + allocation.quantity * allocation.unitCost);
+      sumMoney([costsBySale.get(allocation.saleId) ?? 0, allocation.cost]));
     return Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const purchases = this.orders().filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(key))
-        .reduce((sum, order) => sum + operationValue(order.items), 0);
+        .map(order => operationValue(order.items));
       const sales = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
-        .reduce((sum, sale) => sum + operationValue(sale.items), 0);
+        .map(sale => operationValue(sale.items));
       const costs = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
-        .reduce((sum, sale) => sum + (costsBySale.get(sale.id) ?? 0), 0);
-      return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short' }).format(date), purchases, sales, costs, profit: sales - costs };
+        .map(sale => costsBySale.get(sale.id) ?? 0);
+      const purchaseTotal = sumMoney(purchases);
+      const saleTotal = sumMoney(sales);
+      const costTotal = sumMoney(costs);
+      return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short' }).format(date),
+        purchases: purchaseTotal, sales: saleTotal, costs: costTotal, profit: sumMoney([saleTotal, -costTotal]) };
     });
   });
-  saleCost(saleId: string) { return this.fifo().allocations.filter(item => item.saleId === saleId).reduce((sum, item) => sum + item.quantity * item.unitCost, 0); }
+  saleCost(saleId: string) { return sumMoney(this.fifo().allocations.filter(item => item.saleId === saleId).map(item => item.cost)); }
   productSold(productId: string) { return this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0); }
-  productRevenue(productId: string) { return this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity * item.unitPrice, 0); }
+  productRevenue(productId: string) { return sumMoney(this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).map(item => lineValue(item.quantity, item.unitPrice))); }
 
   addCategory(value: string) {
     const category = value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-BO');
@@ -204,7 +240,12 @@ export class DemoStore {
     this.suppliers.update(items => items.map(supplier => supplier.id === item.id ? updated : supplier));
     if (previous.name !== updated.name) {
       this.products.update(items => items.map(product => product.supplier === previous.name ? { ...product, supplier: updated.name } : product));
-      this.orders.update(items => items.map(order => order.supplier === previous.name ? { ...order, supplier: updated.name, modifiedAt } : order));
+      this.orders.update(items => items.map(order => {
+        if (order.supplier !== previous.name) return order;
+        const renamed = { ...order, supplier: updated.name };
+        const change = operationChange(order, renamed, 'Proveedor actualizado', modifiedAt);
+        return { ...renamed, modifiedAt, changeHistory: change ? [...(order.changeHistory ?? []), change] : order.changeHistory };
+      }));
     }
     return true;
   }
@@ -246,7 +287,7 @@ export class DemoStore {
     this.sales.update(items => [saved, ...items]);
     return { kind: 'saved', status };
   }
-  updateOrder(item: Order) {
+  updateOrder(item: Order, reason: OperationChange['reason'] = 'Edición') {
     const previous = this.orders().find(order => order.id === item.id);
     if (!previous) return 'No encontramos la compra que deseas editar.';
     if (previous.status === 'Anulada') return 'Una compra anulada no se puede editar.';
@@ -255,6 +296,9 @@ export class DemoStore {
     if (dateError) return dateError;
     const prepared = this.prepareOrder(item);
     const updated = { ...prepared.order, effectiveDate: item.status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const modifiedAt = new Date().toISOString();
+    const change = operationChange(previous, updated, reason, modifiedAt);
+    if (!change) return '';
     for (const product of [...this.products(), ...prepared.added]) {
       const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
       const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
@@ -273,13 +317,14 @@ export class DemoStore {
       const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
       return { ...product, quantity: product.quantity + newQuantity - oldQuantity };
     }));
-    this.orders.update(orders => orders.map(order => order.id === item.id ? { ...updated, modifiedAt: new Date().toISOString() } : order));
+    this.orders.update(orders => orders.map(order => order.id === item.id
+      ? { ...updated, modifiedAt, changeHistory: [...(previous.changeHistory ?? []), change] } : order));
     return '';
   }
   confirmOrder(id: string, effectiveDate = todayLocal()) {
     const order = this.orders().find(item => item.id === id);
     if (!order || order.status !== 'Pendiente') return 'La compra ya no está pendiente.';
-    return this.updateOrder({ ...order, status: 'Confirmado', effectiveDate });
+    return this.updateOrder({ ...order, status: 'Confirmado', effectiveDate }, 'Confirmación');
   }
   cancelOrder(id: string) {
     const order = this.orders().find(item => item.id === id);
@@ -303,10 +348,14 @@ export class DemoStore {
       }
     }
     if (affected.length) return `No se puede anular esta compra porque dejaría reservas sin respaldo. ${affected.join('. ')}`;
-    this.orders.update(orders => orders.map(entry => entry.id === id ? { ...entry, status: 'Anulada', cancelledAt: new Date().toISOString() } : entry));
+    const cancelledAt = new Date().toISOString();
+    const cancelled = { ...order, status: 'Anulada' as const };
+    const change = operationChange(order, cancelled, 'Anulación', cancelledAt);
+    this.orders.update(orders => orders.map(entry => entry.id === id
+      ? { ...cancelled, cancelledAt, changeHistory: change ? [...(order.changeHistory ?? []), change] : order.changeHistory } : entry));
     return '';
   }
-  updateSale(item: Sale, usePending = false): SaleResult | { kind: 'error'; message: string } {
+  updateSale(item: Sale, usePending = false, reason: OperationChange['reason'] = 'Edición'): SaleResult | { kind: 'error'; message: string } {
     const previous = this.sales().find(sale => sale.id === item.id);
     if (!previous) return { kind: 'error', message: 'No encontramos la venta que deseas editar.' };
     if (previous.status === 'Anulada') return { kind: 'error', message: 'Una venta anulada no se puede editar.' };
@@ -319,6 +368,9 @@ export class DemoStore {
     const updated = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
     const dateError = this.effectiveDateError(updated);
     if (dateError) return { kind: 'error', message: dateError };
+    const modifiedAt = new Date().toISOString();
+    const change = operationChange(previous, updated, reason, modifiedAt);
+    if (!change) return { kind: 'saved', status };
     if (status === 'Confirmado') {
       const candidateSales = this.sales().map(sale => sale.id === item.id ? updated : sale);
       const shortage = calculateFifo(this.initialLots, this.orders(), candidateSales).shortages[0];
@@ -329,7 +381,8 @@ export class DemoStore {
       const newQuantity = status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
       return { ...product, quantity: product.quantity + oldQuantity - newQuantity, sold: product.sold - oldQuantity + newQuantity };
     }));
-    this.sales.update(sales => sales.map(sale => sale.id === item.id ? { ...updated, modifiedAt: new Date().toISOString() } : sale));
+    this.sales.update(sales => sales.map(sale => sale.id === item.id
+      ? { ...updated, modifiedAt, changeHistory: [...(previous.changeHistory ?? []), change] } : sale));
     return { kind: 'saved', status };
   }
   pendingPurchaseWeight(productId: string) {
@@ -361,13 +414,17 @@ export class DemoStore {
       const product = this.products().find(entry => entry.id === item.productId);
       if (!product || product.quantity < item.quantity) return `Aún no hay stock físico suficiente de ${productName(item.category, item.length)} para confirmar esta venta.`;
     }
-    const result = this.updateSale({ ...sale, status: 'Confirmado', effectiveDate });
+    const result = this.updateSale({ ...sale, status: 'Confirmado', effectiveDate }, false, 'Confirmación');
     return result.kind === 'saved' ? '' : result.kind === 'error' ? result.message : 'Esta venta aún depende de stock pendiente.';
   }
   cancelSale(id: string) {
     const sale = this.sales().find(item => item.id === id);
     if (!sale || sale.status !== 'Pendiente') return 'Solo se pueden anular ventas pendientes.';
-    this.sales.update(sales => sales.map(entry => entry.id === id ? { ...entry, status: 'Anulada', cancelledAt: new Date().toISOString() } : entry));
+    const cancelledAt = new Date().toISOString();
+    const cancelled = { ...sale, status: 'Anulada' as const };
+    const change = operationChange(sale, cancelled, 'Anulación', cancelledAt);
+    this.sales.update(sales => sales.map(entry => entry.id === id
+      ? { ...cancelled, cancelledAt, changeHistory: change ? [...(sale.changeHistory ?? []), change] : sale.changeHistory } : entry));
     return '';
   }
   private effectiveDateError(item: Order | Sale) {
@@ -422,10 +479,18 @@ export class DemoStore {
     }));
   }
   addDebt(item: Debt) { this.debts.update(items => [item, ...items]); }
-  updateDebt(item: Debt) { this.debts.update(items => items.map(debt => debt.id === item.id ? { ...item, payments: debt.payments } : debt)); }
-  addDebtPayment(debtId: string, date: string, amount: number, note: string) {
-    const debt = this.debts().find(item => item.id === debtId);
-    if (!debt) return 'No encontramos la deuda.';
+  updateDebt(item: Debt) {
+    const previous = this.debts().find(debt => debt.id === item.id);
+    if (!previous) return;
+    const before = debtSnapshot(previous);
+    const after = debtSnapshot(item);
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    const change: DebtChange = { at: new Date().toISOString(), before, after };
+    this.debts.update(items => items.map(debt => debt.id === item.id
+      ? { ...item, payments: debt.payments, changeHistory: [...(debt.changeHistory ?? []), change] }
+      : debt));
+  }
+  private debtPaymentError(debt: Debt, date: string, amount: number, maximum: number) {
     const parsedDate = new Date(`${date}T12:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsedDate.getTime())
       || parsedDate.toISOString().slice(0, 10) !== date || date < debt.date || date > todayLocal()) {
@@ -434,22 +499,64 @@ export class DemoStore {
     if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
       return 'Ingresa un importe mayor a cero con un máximo de dos decimales.';
     }
-    const normalizedAmount = Math.round(amount * 100) / 100;
-    if (normalizedAmount > debtBalance(debt)) return `El pago no puede superar el saldo de ${money(debtBalance(debt))}.`;
+    if (amountCents(amount, 1) > amountCents(maximum, 1)) return `El abono no puede superar ${money(maximum)}.`;
+    return '';
+  }
+  addDebtPayment(debtId: string, date: string, amount: number, note: string) {
+    const debt = this.debts().find(item => item.id === debtId);
+    if (!debt) return 'No encontramos la deuda.';
+    const error = this.debtPaymentError(debt, date, amount, debtBalance(debt));
+    if (error) return error;
+    const normalizedAmount = amountCents(amount, 1) / 100;
     const next = Math.max(0, ...debt.payments.map(payment => Number(payment.id.split('-').at(-1)) || 0)) + 1;
     const payment: DebtPayment = { id: `PAG-${debtId}-${next}`, date, amount: normalizedAmount, note: note.trim() };
     this.debts.update(items => items.map(item => item.id === debtId ? { ...item, payments: [...item.payments, payment] } : item));
     return '';
   }
+  updateDebtPayment(debtId: string, paymentId: string, date: string, amount: number, note: string) {
+    const debt = this.debts().find(item => item.id === debtId);
+    const payment = debt?.payments.find(item => item.id === paymentId);
+    if (!debt || !payment) return 'No encontramos el abono que deseas corregir.';
+    if (payment.voidedAt) return 'Un abono anulado no se puede editar.';
+    const maximum = sumMoney([debtBalance(debt), payment.amount]);
+    const error = this.debtPaymentError(debt, date, amount, maximum);
+    if (error) return error;
+    const updated = { ...payment, date, amount: amountCents(amount, 1) / 100, note: note.trim() };
+    const before = paymentSnapshot(payment);
+    const after = paymentSnapshot(updated);
+    if (JSON.stringify(before) === JSON.stringify(after)) return '';
+    const change: DebtPaymentChange = { at: new Date().toISOString(), reason: 'Corrección', before, after };
+    this.debts.update(items => items.map(item => item.id === debtId ? {
+      ...item, payments: item.payments.map(entry => entry.id === paymentId
+        ? { ...updated, changes: [...(payment.changes ?? []), change] } : entry),
+    } : item));
+    return '';
+  }
+  voidDebtPayment(debtId: string, paymentId: string) {
+    const debt = this.debts().find(item => item.id === debtId);
+    const payment = debt?.payments.find(item => item.id === paymentId);
+    if (!debt || !payment) return 'No encontramos el abono que deseas anular.';
+    if (payment.voidedAt) return 'Este abono ya está anulado.';
+    const voidedAt = new Date().toISOString();
+    const updated = { ...payment, voidedAt };
+    const change: DebtPaymentChange = { at: voidedAt, reason: 'Anulación',
+      before: paymentSnapshot(payment), after: paymentSnapshot(updated) };
+    this.debts.update(items => items.map(item => item.id === debtId ? {
+      ...item, payments: item.payments.map(entry => entry.id === paymentId
+        ? { ...updated, changes: [...(payment.changes ?? []), change] } : entry),
+    } : item));
+    return '';
+  }
 }
 
-export const money = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(value)}`;
+export const money = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+export const unitPriceLabel = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 12 }).format(value)}`;
 export const weight = (grams: number) => grams >= 1000 ? `${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(grams / 1000)} kg` : `${new Intl.NumberFormat('es-BO').format(grams)} g`;
 export const categoryLabel = (value: HairCategory) => value.charAt(0).toUpperCase() + value.slice(1);
 export const productName = (category: HairCategory, length: HairLength) => `Cabello ${category} ${length} cm`;
 export const operationName = (date: string, party: string) => `${dateLabel(date)} · ${party}`;
 export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity, 0);
-export const operationValue = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+export const operationValue = (items: HairLine[]) => sumMoney(items.map(item => lineValue(item.quantity, item.unitPrice)));
 export const operationEffectiveDate = (item: Order | Sale) => item.effectiveDate ?? item.date;
 export const todayLocal = () => {
   const now = new Date();
@@ -458,8 +565,8 @@ export const todayLocal = () => {
 export const dateLabel = (value: string) => value ? new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—';
 export const modifiedLabel = (value: string) => new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 export const stockStatus = (product: Product) => product.quantity === 0 ? 'Agotado' : product.quantity <= product.threshold ? 'Stock bajo' : 'Disponible';
-export const debtPaid = (debt: Debt) => Math.round(debt.payments.reduce((sum, payment) => sum + payment.amount, 0) * 100) / 100;
-export const debtBalance = (debt: Debt) => Math.max(0, Math.round((debt.total - debtPaid(debt)) * 100) / 100);
+export const debtPaid = (debt: Debt) => sumMoney(debt.payments.filter(payment => !payment.voidedAt).map(payment => payment.amount));
+export const debtBalance = (debt: Debt) => Math.max(0, sumMoney([debt.total, -debtPaid(debt)]));
 export const debtStatus = (debt: Debt): DebtStatus => {
   if (debtBalance(debt) === 0) return 'Pagada';
   if (debt.dueDate && debt.dueDate < todayLocal()) return 'Vencida';

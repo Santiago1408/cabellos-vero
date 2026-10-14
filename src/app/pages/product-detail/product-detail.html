@@ -43,14 +43,14 @@
             </div>
             <strong class="movement-weight">{{ movement.kind === 'purchase' ? '+' : '−' }}{{ weight(movement.quantity) }}</strong>
           </div>
-          <div class="movement-details"><span>Precio {{ money(movement.unitPrice) }}/g</span><span>Importe {{ money(movement.quantity * movement.unitPrice) }}</span></div>
+          <div class="movement-details"><span>Precio {{ unitPriceLabel(movement.unitPrice) }}/g</span><span>Importe {{ money(lineValue(movement.quantity, movement.unitPrice)) }}</span></div>
         </li>
       }
       @if (openingWeight() > 0) {
         <li class="movement-item movement-in movement-opening">
           <div class="movement-head"><span class="movement-type">Entrada · saldo inicial</span><span>Prototipo</span></div>
           <div class="movement-body"><div class="movement-party"><small>Origen</small><strong>Stock inicial del sistema</strong></div><strong class="movement-weight">+{{ weight(openingWeight()) }}</strong></div>
-          <div class="movement-details"><span>Costo de referencia {{ money(openingLot()!.unitCost) }}/g</span><span>Valor estimado {{ money(openingWeight() * openingLot()!.unitCost) }}</span></div>
+          <div class="movement-details"><span>Costo de referencia {{ unitPriceLabel(openingLot()!.unitCost) }}/g</span><span>Valor estimado {{ money(lineValue(openingWeight(), openingLot()!.unitCost)) }}</span></div>
         </li>
       }
       @if (movements().length === 0 && openingWeight() === 0) {

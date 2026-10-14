@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DemoStore, categoryLabel, dateLabel, money, operationEffectiveDate, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, dateLabel, lineValue, money, operationEffectiveDate, unitPriceLabel, weight } from '../../data/demo-store';
 
 type Movement = {
   kind: 'purchase' | 'sale';
@@ -19,6 +19,8 @@ export class ProductDetail {
   private readonly route = inject(ActivatedRoute);
   readonly weight = weight;
   readonly money = money;
+  readonly lineValue = lineValue;
+  readonly unitPriceLabel = unitPriceLabel;
   readonly dateLabel = dateLabel;
   readonly categoryLabel = categoryLabel;
   readonly params = toSignal(this.route.paramMap, { initialValue: this.route.snapshot.paramMap });

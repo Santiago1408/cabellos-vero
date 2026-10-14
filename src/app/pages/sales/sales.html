@@ -96,7 +96,7 @@
               <label class="field-label">Peso (g)<input class="field-input" type="number" min="0.01" step="any" [name]="'quantity-' + i" [(ngModel)]="line.quantity" /></label>
               <label class="field-label">Precio de venta (Bs./g)<input class="field-input" type="number" min="0" step="any" [name]="'price-' + i" [(ngModel)]="line.unitPrice" /></label>
             </div>
-            <span class="line-subtotal">Importe: {{ money(line.quantity * line.unitPrice) }}</span>
+            <span class="line-subtotal">Importe: {{ money(lineValue(line.quantity, line.unitPrice)) }}</span>
           </div>
         }
         <div class="operation-total"><span>Total de la venta</span><strong>{{ money(draftValue) }}</strong></div>
@@ -132,7 +132,7 @@
         <div class="table-scroll">
           <table class="mobile-detail-table"><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Precio Bs./g</th><th>Importe</th></tr></thead>
             <tbody>@for (item of sale.items; track item.productId) {
-              <tr><td>{{ categoryLabel(item.category) }}</td><td data-label="Longitud">{{ item.length }} cm</td><td data-label="Peso">{{ weight(item.quantity) }}</td><td data-label="Precio Bs./g">{{ money(item.unitPrice) }}</td><td data-label="Importe">{{ money(item.quantity * item.unitPrice) }}</td></tr>
+              <tr><td>{{ categoryLabel(item.category) }}</td><td data-label="Longitud">{{ item.length }} cm</td><td data-label="Peso">{{ weight(item.quantity) }}</td><td data-label="Precio Bs./g">{{ unitPriceLabel(item.unitPrice) }}</td><td data-label="Importe">{{ money(lineValue(item.quantity, item.unitPrice)) }}</td></tr>
             }</tbody>
           </table>
         </div>
@@ -145,6 +145,9 @@
           <label class="field-label">Fecha de entrega<input class="field-input" type="date" [(ngModel)]="confirmationDate" /></label>
           @if (cancelPrompt()) { <p class="cancel-warning">¿Anular esta reserva? El cabello apartado volverá a estar disponible.</p> }
           <div class="modal-actions"><button type="button" class="btn btn-delete" (click)="cancelPrompt() ? cancel(sale.id) : cancelPrompt.set(true)">{{ cancelPrompt() ? 'Sí, anular venta' : 'Anular venta' }}</button><button type="button" class="btn btn-primary" (click)="confirm(sale.id)">Confirmar venta</button></div>
+        }
+        @if (sale.changeHistory?.length) {
+          <app-operation-history [changes]="sale.changeHistory ?? []" partyLabel="Cliente" effectiveDateLabel="Entrega" />
         }
       </div>
     </section>

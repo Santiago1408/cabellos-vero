@@ -1,4 +1,5 @@
 import type { Order, Product, Sale } from './demo-store';
+import { amountCents } from './money';
 
 export type OpeningLot = { productId: string; quantity: number; unitCost: number };
 export type FifoAllocation = {
@@ -9,18 +10,19 @@ export type FifoAllocation = {
   purchaseDate: string;
   quantity: number;
   unitCost: number;
+  cost: number;
 };
 export type FifoShortage = { saleId: string; productId: string; quantity: number };
 export type FifoResult = { allocations: FifoAllocation[]; remainingValue: number; shortages: FifoShortage[] };
 
-type Lot = { id: string; productId: string; supplier: string; date: string; remaining: number; unitCost: number };
+type Lot = { id: string; productId: string; supplier: string; date: string; remaining: number; unitCost: number; original: number; allocatedCents: number };
 const byDate = (a: { date: string; id: string }, b: { date: string; id: string }) =>
   a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
 
 export function calculateFifo(opening: OpeningLot[], orders: Order[], sales: Sale[]): FifoResult {
   const lots: Lot[] = opening.filter(item => item.quantity > 0).map(item => ({
     id: `INICIAL-${item.productId}`, productId: item.productId, supplier: 'Saldo inicial',
-    date: '', remaining: item.quantity, unitCost: item.unitCost,
+    date: '', remaining: item.quantity, unitCost: item.unitCost, original: item.quantity, allocatedCents: 0,
   }));
   const events = [
     ...orders.filter(order => order.status === 'Confirmado').map(order => ({ kind: 'purchase' as const, date: order.effectiveDate ?? order.date, id: order.id, order })),
@@ -33,6 +35,7 @@ export function calculateFifo(opening: OpeningLot[], orders: Order[], sales: Sal
       for (const item of event.order.items) lots.push({
         id: event.order.id, productId: item.productId, supplier: event.order.supplier,
         date: event.date, remaining: item.quantity, unitCost: item.unitPrice,
+        original: item.quantity, allocatedCents: 0,
       });
       continue;
     }
@@ -41,15 +44,19 @@ export function calculateFifo(opening: OpeningLot[], orders: Order[], sales: Sal
       for (const lot of lots) {
         if (lot.productId !== item.productId || lot.remaining <= 0 || missing <= 0) continue;
         const quantity = Math.min(missing, lot.remaining);
+        const consumedCents = amountCents(Math.min(lot.original, lot.original - lot.remaining + quantity), lot.unitCost);
+        const cost = (consumedCents - lot.allocatedCents) / 100;
         allocations.push({ saleId: event.sale.id, productId: item.productId, lotId: lot.id,
-          supplier: lot.supplier, purchaseDate: lot.date, quantity, unitCost: lot.unitCost });
+          supplier: lot.supplier, purchaseDate: lot.date, quantity, unitCost: lot.unitCost, cost });
+        lot.allocatedCents = consumedCents;
         lot.remaining -= quantity;
         missing -= quantity;
       }
       if (missing > 0.000001) shortages.push({ saleId: event.sale.id, productId: item.productId, quantity: missing });
     }
   }
-  return { allocations, remainingValue: lots.reduce((sum, lot) => sum + lot.remaining * lot.unitCost, 0), shortages };
+  return { allocations, remainingValue: lots.reduce((sum, lot) =>
+    sum + amountCents(lot.original, lot.unitCost) - lot.allocatedCents, 0) / 100, shortages };
 }
 
 export function openingLots(products: Product[], orders: Order[], sales: Sale[]): OpeningLot[] {

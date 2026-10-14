@@ -1,14 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Sale, categoryLabel, dateLabel, downloadCsv, modifiedLabel, money, operationName, operationValue, operationWeight, productName, todayLocal, weight } from '../../data/demo-store';
+import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Sale, categoryLabel, dateLabel, downloadCsv, lineValue, modifiedLabel, money, operationName, operationValue, operationWeight, productName, todayLocal, unitPriceLabel, weight } from '../../data/demo-store';
+import { sumMoney } from '../../data/money';
 import { Icon } from '../../shared/icon/icon';
+import { OperationHistory } from '../../shared/operation-history/operation-history';
 
 type LineDraft = { category: HairCategory | ''; length: HairLength | ''; quantity: number; unitPrice: number };
 type SortKey = 'customer' | 'value' | 'weight' | 'date' | 'status';
 const blankLine = (): LineDraft => ({ category: '', length: '', quantity: 0, unitPrice: 0 });
 
-@Component({ selector: 'app-sales', standalone: true, imports: [FormsModule, Icon], templateUrl: './sales.html', styleUrls: ['./sales.css', '../../shared/operation.css'] })
+@Component({ selector: 'app-sales', standalone: true, imports: [FormsModule, Icon, OperationHistory], templateUrl: './sales.html', styleUrls: ['./sales.css', '../../shared/operation.css'] })
 export class Sales {
   readonly store = inject(DemoStore);
   readonly categories = this.store.categories;
@@ -18,6 +20,8 @@ export class Sales {
   readonly modifiedLabel = modifiedLabel;
   readonly operationName = operationName;
   readonly operationValue = operationValue;
+  readonly lineValue = lineValue;
+  readonly unitPriceLabel = unitPriceLabel;
   readonly operationWeight = operationWeight;
   readonly categoryLabel = categoryLabel;
   readonly page = signal(1);
@@ -105,7 +109,7 @@ export class Sales {
     const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
     line.unitPrice = product?.salePrice ?? 0;
   }
-  get draftValue() { return this.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0); }
+  get draftValue() { return sumMoney(this.lines.map(line => lineValue(Number(line.quantity) || 0, Number(line.unitPrice) || 0))); }
   save(usePending = false) {
     const customer = this.draft.customer.trim();
     if (!customer || !this.draft.date) { this.error.set('Completa el cliente y la fecha de venta.'); return; }
@@ -143,6 +147,6 @@ export class Sales {
   }
   export() {
     downloadCsv('ventas-cabello.csv', ['Venta', 'Fecha de venta o reserva', 'Fecha de entrega', 'Cliente', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(sale => sale.items.map(item => [operationName(sale.date, sale.customer), sale.date, sale.status === 'Confirmado' ? sale.effectiveDate ?? sale.date : '', sale.customer, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, sale.status])));
+      this.sorted().flatMap(sale => sale.items.map(item => [operationName(sale.date, sale.customer), sale.date, sale.status === 'Confirmado' ? sale.effectiveDate ?? sale.date : '', sale.customer, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, lineValue(item.quantity, item.unitPrice), sale.status])));
   }
 }

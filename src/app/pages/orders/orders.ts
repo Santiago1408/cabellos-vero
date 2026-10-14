@@ -1,14 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, weight, money } from '../../data/demo-store';
+import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, lineValue, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, unitPriceLabel, weight, money } from '../../data/demo-store';
+import { sumMoney } from '../../data/money';
 import { Icon } from '../../shared/icon/icon';
+import { OperationHistory } from '../../shared/operation-history/operation-history';
 
 type LineDraft = { category: HairCategory | ''; length: HairLength | ''; quantity: number; unitPrice: number };
 type SortKey = 'supplier' | 'value' | 'weight' | 'date' | 'status';
 const blankLine = (): LineDraft => ({ category: '', length: '', quantity: 0, unitPrice: 0 });
 
-@Component({ selector: 'app-orders', standalone: true, imports: [FormsModule, Icon], templateUrl: './orders.html', styleUrls: ['./orders.css', '../../shared/operation.css'] })
+@Component({ selector: 'app-orders', standalone: true, imports: [FormsModule, Icon, OperationHistory], templateUrl: './orders.html', styleUrls: ['./orders.css', '../../shared/operation.css'] })
 export class Orders {
   readonly store = inject(DemoStore);
   readonly categories = this.store.categories;
@@ -18,6 +20,8 @@ export class Orders {
   readonly modifiedLabel = modifiedLabel;
   readonly operationName = operationName;
   readonly operationValue = operationValue;
+  readonly lineValue = lineValue;
+  readonly unitPriceLabel = unitPriceLabel;
   readonly operationWeight = operationWeight;
   readonly productName = productName;
   readonly categoryLabel = categoryLabel;
@@ -101,7 +105,7 @@ export class Orders {
     const product = this.store.products().find(item => item.category === line.category && item.length === Number(line.length));
     line.unitPrice = product?.purchasePrice ?? 0;
   }
-  get draftValue() { return this.lines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0); }
+  get draftValue() { return sumMoney(this.lines.map(line => lineValue(Number(line.quantity) || 0, Number(line.unitPrice) || 0))); }
   confirm(id: string) { this.detailError.set(this.store.confirmOrder(id, this.confirmationDate)); }
   cancel(id: string) { const message = this.store.cancelOrder(id); this.detailError.set(message); if (!message) this.cancelPrompt.set(false); }
   save() {
@@ -134,6 +138,6 @@ export class Orders {
   }
   export() {
     downloadCsv('compras-cabello.csv', ['Compra', 'Fecha de compra', 'Fecha de recepción', 'Proveedor', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.status === 'Confirmado' ? order.effectiveDate ?? order.date : '', order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, item.quantity * item.unitPrice, order.status])));
+      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.status === 'Confirmado' ? order.effectiveDate ?? order.date : '', order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, lineValue(item.quantity, item.unitPrice), order.status])));
   }
 }

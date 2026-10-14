@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { DemoStore, categoryLabel, money, operationValue, productName, todayLocal, weight } from '../../data/demo-store';
 import { ReportPeriod, summarizePeriods } from '../../data/report-periods';
 import { Icon } from '../../shared/icon/icon';
+import { sumMoney } from '../../data/money';
 
 @Component({ selector: 'app-reports', standalone: true, imports: [FormsModule, RouterLink, Icon], templateUrl: './reports.html',
   styleUrl: './reports.css' })
@@ -20,9 +21,9 @@ export class Reports {
   readonly periodHeading = computed(() => ({ days: 'Resultados diarios', weeks: 'Resultados semanales', months: 'Resultados mensuales' })[this.period()]);
   readonly periodColumn = computed(() => ({ days: 'Día', weeks: 'Semana', months: 'Mes' })[this.period()]);
   setPeriod(value: ReportPeriod) { this.period.set(value); }
-  readonly revenue = computed(() => this.store.confirmedSales().reduce((sum, sale) => sum + operationValue(sale.items), 0));
-  readonly costs = computed(() => this.store.fifo().allocations.reduce((sum, item) => sum + item.quantity * item.unitCost, 0));
-  readonly profit = computed(() => this.revenue() - this.costs());
+  readonly revenue = computed(() => sumMoney(this.store.confirmedSales().map(sale => operationValue(sale.items))));
+  readonly costs = computed(() => sumMoney(this.store.fifo().allocations.map(item => item.cost)));
+  readonly profit = computed(() => sumMoney([this.revenue(), -this.costs()]));
   readonly stockValue = computed(() => this.store.fifo().remainingValue);
   readonly topProducts = computed(() => this.store.products().map(product => ({
     ...product, soldWeight: this.store.productSold(product.id), revenue: this.store.productRevenue(product.id),

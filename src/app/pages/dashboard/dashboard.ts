@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DemoStore, dateLabel, debtBalance, money, operationEffectiveDate, operationValue, todayLocal, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
+import { sumMoney } from '../../data/money';
 
 @Component({ selector: 'app-dashboard', standalone: true, imports: [RouterLink, Icon], templateUrl: './dashboard.html', styleUrl: './dashboard.css' })
 export class Dashboard {
@@ -13,11 +14,12 @@ export class Dashboard {
   readonly currentMonth = todayLocal().slice(0, 7);
   readonly todayLabel = new Intl.DateTimeFormat('es-BO', { dateStyle: 'long' }).format(new Date());
   readonly monthSales = computed(() => this.store.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(this.currentMonth)));
-  readonly revenue = computed(() => this.monthSales().reduce((sum, sale) => sum + operationValue(sale.items), 0));
-  readonly costs = computed(() => this.monthSales().reduce((sum, sale) => sum + this.store.saleCost(sale.id), 0));
-  readonly profit = computed(() => this.revenue() - this.costs());
-  readonly purchaseValue = computed(() => this.store.orders().filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(this.currentMonth))
-    .reduce((sum, order) => sum + operationValue(order.items), 0));
+  readonly revenue = computed(() => sumMoney(this.monthSales().map(sale => operationValue(sale.items))));
+  readonly costs = computed(() => sumMoney(this.monthSales().map(sale => this.store.saleCost(sale.id))));
+  readonly profit = computed(() => sumMoney([this.revenue(), -this.costs()]));
+  readonly purchaseValue = computed(() => sumMoney(this.store.orders()
+    .filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(this.currentMonth))
+    .map(order => operationValue(order.items))));
   readonly stockWeight = computed(() => this.store.products().reduce((sum, product) => sum + product.quantity, 0));
   readonly lowProducts = computed(() => this.store.managedProducts().filter(product => product.threshold > 0
     && this.store.sellableWeight(product.id) <= product.threshold).slice(0, 3));

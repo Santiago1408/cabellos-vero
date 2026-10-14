@@ -1,5 +1,6 @@
 import { operationEffectiveDate, operationValue, type Order, type Sale } from './demo-store';
 import type { FifoAllocation } from './fifo';
+import { sumMoney } from './money';
 
 export type ReportPeriod = 'days' | 'weeks' | 'months';
 export type PeriodSummary = { key: string; label: string; purchases: number; sales: number; costs: number; profit: number };
@@ -15,7 +16,7 @@ export function summarizePeriods(period: ReportPeriod, today: string, orders: Or
   const currentWeek = addDays(current, -((current.getUTCDay() + 6) % 7));
   const costsBySale = new Map<string, number>();
   for (const item of allocations) costsBySale.set(item.saleId,
-    (costsBySale.get(item.saleId) ?? 0) + item.quantity * item.unitCost);
+    sumMoney([costsBySale.get(item.saleId) ?? 0, item.cost]));
 
   const count = period === 'days' ? 30 : period === 'weeks' ? 12 : 6;
   return Array.from({ length: count }, (_, index) => {
@@ -38,10 +39,10 @@ export function summarizePeriods(period: ReportPeriod, today: string, orders: Or
     const startKey = dateKey(start);
     const endKey = dateKey(end);
     const purchases = orders.filter(order => order.status === 'Confirmado' && operationEffectiveDate(order) >= startKey && operationEffectiveDate(order) < endKey)
-      .reduce((sum, order) => sum + operationValue(order.items), 0);
+      .map(order => operationValue(order.items));
     const includedSales = sales.filter(sale => sale.status === 'Confirmado' && operationEffectiveDate(sale) >= startKey && operationEffectiveDate(sale) < endKey);
-    const income = includedSales.reduce((sum, sale) => sum + operationValue(sale.items), 0);
-    const costs = includedSales.reduce((sum, sale) => sum + (costsBySale.get(sale.id) ?? 0), 0);
-    return { key: startKey, label, purchases, sales: income, costs, profit: income - costs };
+    const income = sumMoney(includedSales.map(sale => operationValue(sale.items)));
+    const costs = sumMoney(includedSales.map(sale => costsBySale.get(sale.id) ?? 0));
+    return { key: startKey, label, purchases: sumMoney(purchases), sales: income, costs, profit: sumMoney([income, -costs]) };
   });
 }

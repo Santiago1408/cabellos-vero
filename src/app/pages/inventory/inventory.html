@@ -125,7 +125,7 @@
             <tr>
               <td class="mobile-title"><a routerLink="/pedidos" [queryParams]="{ detalle: entry.order.id }" class="table-primary">{{ entry.order.supplier }}</a><small class="table-sub">{{ entry.order.date }}</small></td>
               <td class="mobile-meta" data-label="Cabello">{{ categoryLabel(entry.item.category) }}<span class="mobile-only"> · {{ entry.item.length }} cm</span></td><td class="mobile-hide">{{ entry.item.length }} cm</td>
-              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ money(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
+              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ unitPriceLabel(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(lineValue(entry.item.quantity, entry.item.unitPrice)) }}</td>
             </tr>
           } @empty { <tr><td colspan="6" class="empty-table">No hay compras pendientes.</td></tr> }
         </tbody>
@@ -145,7 +145,7 @@
             <tr>
               <td class="mobile-title"><a routerLink="/ventas" [queryParams]="{ detalle: entry.sale.id }" class="table-primary">{{ entry.sale.customer }}</a><small class="table-sub">{{ entry.sale.date }}</small></td>
               <td class="mobile-meta" data-label="Cabello">{{ categoryLabel(entry.item.category) }}<span class="mobile-only"> · {{ entry.item.length }} cm</span></td><td class="mobile-hide">{{ entry.item.length }} cm</td>
-              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ money(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(entry.item.quantity * entry.item.unitPrice) }}</td>
+              <td class="mobile-value" data-label="Peso">{{ weight(entry.item.quantity) }}</td><td class="mobile-hide">{{ unitPriceLabel(entry.item.unitPrice) }}</td><td class="mobile-hide">{{ money(lineValue(entry.item.quantity, entry.item.unitPrice)) }}</td>
             </tr>
           } @empty { <tr><td colspan="6" class="empty-table">No hay ventas reservadas.</td></tr> }
         </tbody>
