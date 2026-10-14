@@ -52,6 +52,20 @@ export type Debt = DebtSnapshot & { id: string; payments: DebtPayment[]; changeH
 export type DebtStatus = 'Pendiente' | 'Parcial' | 'Pagada' | 'Vencida';
 export type MonthlySummary = { key: string; label: string; purchases: number; sales: number; costs: number; profit: number };
 
+const backupReminderKey = 'lmc-backup-reminder-v1';
+const readBackupReminder = (): { intervalDays: number; lastBackupAt: string | null } => {
+  if (typeof localStorage === 'undefined') return { intervalDays: 7, lastBackupAt: null };
+  try {
+    const saved = JSON.parse(localStorage.getItem(backupReminderKey) ?? '{}') as { intervalDays?: unknown; lastBackupAt?: unknown };
+    return {
+      intervalDays: Number.isInteger(saved.intervalDays) && Number(saved.intervalDays) >= 1 && Number(saved.intervalDays) <= 365
+        ? Number(saved.intervalDays) : 7,
+      lastBackupAt: typeof saved.lastBackupAt === 'string' && Number.isFinite(Date.parse(saved.lastBackupAt))
+        ? saved.lastBackupAt : null,
+    };
+  } catch { return { intervalDays: 7, lastBackupAt: null }; }
+};
+
 const initialProducts: Product[] = [
   { id: 'CAB-001', name: 'Cabello normal 38 cm', category: 'normal', length: 38, purchasePrice: 2.2, salePrice: 3.2, quantity: 2450, threshold: 500, unit: 'g', color: 'Castaño oscuro', quality: 'Natural seleccionado', supplier: 'Acopio Cochabamba', sold: 1850 },
   { id: 'CAB-002', name: 'Cabello normal 45 cm', category: 'normal', length: 45, purchasePrice: 2.8, salePrice: 4.1, quantity: 1320, threshold: 450, unit: 'g', color: 'Negro natural', quality: 'Natural seleccionado', supplier: 'Acopio Cochabamba', sold: 1420 },
@@ -160,11 +174,46 @@ export class DemoStore {
   readonly storeName = signal('La Magia del Cabello');
   readonly storeAddress = signal('Av. Principal 123, La Paz, Bolivia');
   readonly storePhone = signal('70123456');
+  readonly backupIntervalDays = signal(readBackupReminder().intervalDays);
+  readonly lastBackupAt = signal<string | null>(readBackupReminder().lastBackupAt);
+  readonly pendingBackupAt = signal<string | null>(null);
+  readonly nextBackupAt = computed(() => {
+    const last = this.lastBackupAt();
+    return last ? new Date(Date.parse(last) + this.backupIntervalDays() * 24 * 60 * 60 * 1000).toISOString() : null;
+  });
   readonly initialLots = openingLots(initialProducts, initialOrders, initialSales);
   readonly confirmedSales = computed(() => this.sales().filter(sale => sale.status === 'Confirmado'));
   readonly managedProducts = computed(() => this.products().filter(product => product.quantity > 0
     || this.orders().some(order => order.status === 'Confirmado' && order.items.some(item => item.productId === product.id))));
   readonly fifo = computed(() => calculateFifo(this.initialLots, this.orders(), this.sales()));
+  private saveBackupReminder() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(backupReminderKey, JSON.stringify({
+        intervalDays: this.backupIntervalDays(), lastBackupAt: this.lastBackupAt(),
+      }));
+    } catch { /* La configuración sigue disponible durante esta sesión. */ }
+  }
+  backupDue(now = Date.now()) {
+    const next = this.nextBackupAt();
+    return this.role() === 'admin' && (!next || now >= Date.parse(next));
+  }
+  setBackupIntervalDays(days: number) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede cambiar la frecuencia de respaldos.';
+    if (!Number.isInteger(days) || days < 1 || days > 365) return 'Ingresa un número entero de días entre 1 y 365.';
+    this.backupIntervalDays.set(days);
+    this.saveBackupReminder();
+    return '';
+  }
+  noteBackupDownloaded() {
+    if (this.role() === 'admin') this.pendingBackupAt.set(new Date().toISOString());
+  }
+  confirmBackupSaved() {
+    if (this.role() !== 'admin' || !this.pendingBackupAt()) return;
+    this.lastBackupAt.set(this.pendingBackupAt());
+    this.pendingBackupAt.set(null);
+    this.saveBackupReminder();
+  }
   login(username: string, password: string) {
     const normalized = username.trim().toLocaleLowerCase('es-BO');
     if (normalized === demoAdminCredentials.username && password === demoAdminCredentials.password) {

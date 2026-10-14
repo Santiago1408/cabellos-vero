@@ -225,6 +225,22 @@
   max-width: 1680px;
   margin: 0 auto;
 }
+.backup-reminder {
+  margin: 20px 38px 0;
+  padding: 13px 16px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  background: var(--color-primary-soft);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 12px;
+}
+.backup-reminder div { display: grid; gap: 3px; }
+.backup-reminder strong { font-size: 13px; }
+.backup-reminder-link { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.backup-reminder-mobile { display: none; }
 @media (max-width: 1200px) {
   .sidebar {
     padding-inline: 11px;
@@ -232,6 +248,7 @@
   .page-content {
     padding: 28px 24px 36px;
   }
+  .backup-reminder { margin-inline: 24px; }
   .topbar {
     padding-inline: 24px;
   }
@@ -271,6 +288,10 @@
   .page-content {
     padding: 20px 14px 32px;
   }
+  .backup-reminder { margin: 14px 14px 0; padding: 12px; font-size: 13px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .backup-reminder strong { font-size: 15px; }
+  .backup-reminder-link { display: none; }
+  .backup-reminder-mobile { display: block; }
   .topbar-right {
     gap: 4px;
   }

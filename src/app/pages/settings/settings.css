@@ -75,6 +75,8 @@
 .settings-card .muted {
   margin: -10px 0 0;
 }
+.backup-download-controls { display: grid; gap: 14px; }
+.backup-mobile-note { display: none; }
 .profile-data { margin: 0; color: #777; font-size: 12px; }
 .profile-data strong { color: #333; }
 .profile-details { display: grid; gap: 12px; margin: 0; }
@@ -129,4 +131,6 @@
   .settings-card h2 { font-size: 19px; }
   .muted, .theme-preview strong, .theme-preview small, .inline-hint { font-size: 14px; }
   .profile-data, .profile-details { font-size: 15px; }
+  .backup-download-controls { display: none; }
+  .backup-mobile-note { display: block; }
 }

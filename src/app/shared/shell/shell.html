@@ -97,6 +97,16 @@
         </div>
       }
     </header>
+    @if (store.backupDue(now())) {
+      <div class="backup-reminder" role="status">
+        <div>
+          <strong>Respaldo de datos pendiente</strong>
+          <span>{{ store.lastBackupAt() ? 'Se cumplió el plazo configurado para guardar una nueva copia.' : 'Todavía no se registró un respaldo guardado.' }}</span>
+        </div>
+        <a routerLink="/configuracion" class="backup-reminder-link">Ir a Configuración</a>
+        <span class="backup-reminder-mobile">Realízalo desde una computadora.</span>
+      </div>
+    }
     <main class="page-content"><router-outlet /></main>
   </div>
 </div>

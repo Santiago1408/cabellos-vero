@@ -23,18 +23,33 @@
     }
   </section>
   @if (store.role() === 'admin') {
-    <section class="card settings-card download-button">
+    <section class="card settings-card">
       <h2>Respaldo de datos</h2>
       <p class="muted">Descarga todas las categorías, longitudes, productos, compras, ventas, proveedores, deudas, empleados e historiales del prototipo.</p>
-      <label class="field-label">Contraseña para cifrar el respaldo
-        <input class="field-input" type="password" autocomplete="new-password" [(ngModel)]="backupPassword" />
+      <label class="field-label">Recordar respaldo cada cuántos días
+        <input class="field-input" type="number" min="1" max="365" step="1" [(ngModel)]="backupIntervalDraft" />
       </label>
-      <label class="field-label">Repetir contraseña
-        <input class="field-input" type="password" autocomplete="new-password" [(ngModel)]="backupConfirmation" />
-      </label>
-      @if (backupError()) { <p class="form-error" role="alert">{{ backupError() }}</p> }
-      <button type="button" class="btn btn-outline" (click)="downloadBackup()">Descargar respaldo cifrado</button>
-      <p class="muted">Guarda la contraseña fuera de la computadora. El archivo contiene un CSV completo al descifrarlo, pero no incluye contraseñas de empleados. La restauración automática se implementará con el backend.</p>
+      @if (backupIntervalError()) { <p class="form-error" role="alert">{{ backupIntervalError() }}</p> }
+      <button type="button" class="btn btn-outline" (click)="saveBackupInterval()">Guardar frecuencia</button>
+      <p class="profile-data">Último respaldo guardado:
+        @if (store.lastBackupAt(); as lastBackupAt) { <strong>{{ modifiedLabel(lastBackupAt) }}</strong> }
+        @else { <strong>Aún no registrado</strong> }
+      </p>
+      <p class="profile-data">Próximo recordatorio:
+        @if (store.nextBackupAt(); as nextBackupAt) { <strong>{{ modifiedLabel(nextBackupAt) }}</strong> }
+        @else { <strong>Pendiente ahora</strong> }
+      </p>
+      <div class="backup-download-controls download-button">
+        @if (backupError()) { <p class="form-error" role="alert">{{ backupError() }}</p> }
+        <button type="button" class="btn btn-outline" (click)="downloadBackup()">Descargar respaldo CSV</button>
+        @if (store.pendingBackupAt()) {
+          <p class="inline-hint">La descarga se inició. Cuando compruebes que el archivo está guardado en tu computadora, confírmalo aquí para reiniciar el recordatorio.</p>
+          <button type="button" class="btn btn-primary" (click)="confirmBackupSaved()">Confirmar archivo guardado</button>
+        }
+        <p class="muted">El archivo CSV incluye los datos del negocio y de los empleados, pero no sus contraseñas. Guárdalo en un lugar al que solo tenga acceso el administrador. La restauración desde el panel se implementará con el backend.</p>
+        <p class="muted">Conserva las cuatro copias más recientes. Elimina una antigua solo después de comprobar que la nueva quedó guardada. Si cambias la frecuencia, cambiará el periodo que cubren esas copias.</p>
+      </div>
+      <p class="muted backup-mobile-note">La descarga del respaldo está disponible desde una computadora.</p>
     </section>
     <section class="card settings-card">
       <h2>Apariencia</h2>

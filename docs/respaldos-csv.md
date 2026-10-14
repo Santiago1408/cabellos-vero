@@ -1,25 +1,28 @@
 # Respaldo CSV del prototipo
 
-En **Configuración → Respaldo de datos**, el administrador puede descargar un archivo `respaldo-completo-cabello-AAAA-MM-DD.csv.enc`. El archivo contiene un CSV cifrado, no un CSV legible directamente. Los CSV de Compras, Ventas, Inventario, Proveedores y Deudas sirven para consulta; el respaldo integral reúne todas las secciones aunque haya filtros activos.
+En **Configuración → Respaldo de datos**, el administrador puede descargar un archivo `respaldo-completo-cabello-AAAA-MM-DD.csv`. Es un CSV legible directamente, sin contraseña ni cifrado. Los CSV de Compras, Ventas, Inventario, Proveedores y Deudas sirven para consulta; el respaldo integral reúne todas las secciones aunque haya filtros activos.
+
+El intervalo del recordatorio se configura en días (1 a 365, inicialmente 7). El aviso aparece si nunca se confirmó una copia o si transcurrió el intervalo desde la última descarga confirmada. Después de descargar, el administrador debe comprobar que el archivo está guardado y pulsar **Confirmar archivo guardado**. El prototipo conserva únicamente el intervalo y la fecha de confirmación en el almacenamiento de este navegador para mantener el recordatorio tras una recarga. El backend deberá persistirlos por sucursal y usuario administrador para que se compartan entre dispositivos. La aplicación no puede verificar por sí sola que el archivo continúe en la computadora.
 
 ## Contenido
 
 El CSV integral tiene las columnas `Tipo de registro`, `Identificador` y `Datos completos JSON`. Separa columnas con punto y coma y codifica el texto en UTF-8 con BOM. La primera fila de datos es un manifiesto con versión, fecha de exportación, moneda, unidad, zona horaria y cantidad de registros de cada tipo. Después incluye configuración, categorías, longitudes, lotes iniciales, productos, proveedores, compras, ventas, deudas, empleados y asignaciones de coste calculadas. Los objetos de compras, ventas, deudas y empleados incluyen sus líneas, pagos e historiales completos. Los identificadores y fechas se conservan tal como están en el prototipo.
 
-Las contraseñas de empleados no se exportan. En el prototipo solo existen en memoria y nunca deben aparecer en un CSV. Las sesiones activas tampoco se exportan. Cuando se implemente el backend, su respaldo principal será el archivo restaurable de PostgreSQL, que sí contendrá los hashes de contraseñas; el importador CSV será una vía adicional de recuperación y tendrá que pedir restablecer las contraseñas que no estén en el archivo.
+Las contraseñas de empleados no se exportan. En el prototipo solo existen en memoria y nunca deben aparecer en un CSV. Las sesiones activas tampoco se exportan. Cuando se implemente el backend, el CSV semanal deberá poder restaurar los datos del negocio desde el panel. Si todavía existe la base de datos anterior, se conservarán los hashes de contraseña actuales de las cuentas que correspondan al mismo identificador estable, incluido el administrador; el CSV no contendrá contraseñas ni hashes. Para un empleado presente en ambas bases, el estado desactivado prevalecerá si aparece en cualquiera de las dos, de modo que restaurar una copia antigua no reactive su acceso. En una recuperación sin base anterior, el administrador obtendrá acceso mediante el comando privado del VPS ya previsto. Un respaldo nativo de PostgreSQL puede mantenerse como vía técnica adicional.
 
-## Descifrar
-
-En una computadora con Node.js, ejecutar:
-
-```sh
-node scripts/decrypt-backup.mjs respaldo-completo-cabello-AAAA-MM-DD.csv.enc respaldo.csv
-```
-
-El comando solicita la contraseña sin mostrarla, verifica la autenticidad del contenido con AES-256-GCM y crea `respaldo.csv` sin sobrescribir un archivo existente. El encabezado binario es `LMCB1`, seguido de 16 bytes de sal, 12 bytes de IV y el texto cifrado. La clave se deriva con PBKDF2-HMAC-SHA-256 y 600 000 iteraciones. Guardar la contraseña por separado del respaldo.
+El CSV contiene datos personales y comerciales legibles. Guardarlo en un lugar al que solo tenga acceso el administrador. Los respaldos antiguos con extensión `.csv.enc`, si existen, pueden descifrarse con `scripts/decrypt-backup.mjs` antes de importarlos.
 
 ## Restauración futura
 
-El prototipo todavía no tiene base de datos ni importador. Para que el CSV sirva tras un fallo del VPS, el backend deberá aceptar este formato versionado, validar el manifiesto y todas las referencias antes de modificar datos, e importar todo en una transacción. El inventario debe restaurarse desde el estado guardado de productos; al importar también compras y ventas, no se deben volver a aplicar sus movimientos al stock. El importador deberá conservar identificadores, estados, fechas, pagos e historiales, reconstruir los lotes iniciales y exigir el cambio de contraseñas de las cuentas importadas.
+El prototipo todavía no tiene base de datos ni importador. Para que el CSV sirva tras un fallo del VPS, el backend deberá aceptar este formato versionado, validar el manifiesto y todas las referencias antes de modificar datos, e importar todo en una transacción. El inventario debe restaurarse desde el estado guardado de productos; al importar también compras y ventas, no se deben volver a aplicar sus movimientos al stock. El importador deberá conservar identificadores, estados, fechas, pagos e historiales. Las cuentas sin una credencial conservable de la base anterior requerirán una contraseña nueva antes de acceder.
+
+La restauración del respaldo integral se iniciará desde el panel del administrador. El flujo deberá permitir cargar el CSV, comprobar su formato, versión, fecha y referencias internas sin alterar los datos actuales, y mostrar una vista previa con los tipos y cantidades de registros. Antes de ejecutar la restauración, mostrará una advertencia clara de que se reemplazarán todos los datos incluidos en el CSV y se perderán los movimientos posteriores a la fecha de la copia; después pedirá una confirmación explícita. No se combinarán registros del archivo con los actuales. El reemplazo completo deberá ejecutarse en una transacción, para que un error no deje datos parcialmente restaurados. La operación quedará restringida al administrador y deberá dejar constancia del resultado.
+
+Después de validar el archivo y antes de habilitar la confirmación final, el panel deberá generar y descargar un CSV del estado actual. El administrador tendrá que confirmar que el archivo quedó guardado. Si no puede generarse o descargarse esa copia, no se iniciará el reemplazo. Durante la restauración se impedirán nuevas escrituras para evitar que queden movimientos fuera de la copia previa o del estado restaurado.
+
+La restauración no cerrará automáticamente las sesiones abiertas. En cada solicitud posterior, el backend comprobará contra el estado restaurado que la cuenta vinculada a la sesión todavía existe, está activa y conserva permiso para la acción. Una sesión de una cuenta eliminada o desactivada no concederá acceso, aunque la sesión aún esté almacenada. Las cuentas que sigan activas continuarán con sus sesiones normales.
+
+La restauración no cerrará automáticamente las sesiones abiertas. El backend comprobará en cada solicitud que la cuenta vinculada a la sesión aún existe, está activa y tiene permiso para la acción. Si la cuenta ya no existe o está desactivada, la sesión no permitirá acceder aunque siga almacenada. Las sesiones de cuentas que conserven acceso continuarán normalmente.
 
 Una copia semanal guardada únicamente en la computadora del administrador puede perderse junto con esa computadora y puede tener hasta siete días de antigüedad. La copia automática incluida de OVHcloud conserva solo la última copia durante 24 horas.
+Con la frecuencia inicial de siete días, el administrador conservará manualmente las últimas cuatro copias descargadas. Solo eliminará la más antigua después de comprobar que la nueva quedó guardada. Si cambia la frecuencia, deberá revisar cuánto tiempo histórico cubren esas cuatro copias.

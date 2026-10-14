@@ -1,7 +1,7 @@
-import { DemoStore, csvContent, downloadBlob, todayLocal } from './demo-store';
+import { DemoStore, downloadCsv, todayLocal } from './demo-store';
 
 /** Exportación versionada del estado del prototipo para una futura importación. */
-export async function downloadCompleteBackup(store: DemoStore, passphrase: string) {
+export function downloadCompleteBackup(store: DemoStore) {
   if (store.role() !== 'admin') return;
 
   const rows: (string | number)[][] = [];
@@ -23,11 +23,12 @@ export async function downloadCompleteBackup(store: DemoStore, passphrase: strin
   add('manifest', 'backup', {
     format: 'la-magia-del-cabello-csv', version: 1, exportedAt: new Date().toISOString(),
     currency: 'BOB', weightUnit: 'g', businessTimeZone: 'America/La_Paz', counts,
-    note: 'Los empleados se exportan sin contraseñas. Este archivo no sustituye el respaldo de PostgreSQL.',
+    note: 'Los empleados se exportan sin contraseñas y las sesiones activas no se incluyen.',
   });
   add('settings', 'main', {
     storeName: store.storeName(), storeAddress: store.storeAddress(), storePhone: store.storePhone(),
-    adminDisplayName: store.adminDisplayName(),
+    adminDisplayName: store.adminDisplayName(), backupIntervalDays: store.backupIntervalDays(),
+    lastBackupAt: store.lastBackupAt(),
   });
   store.categories().forEach(category => add('category', category, { name: category }));
   store.lengths().forEach(length => add('length', String(length), { centimeters: length }));
@@ -41,15 +42,5 @@ export async function downloadCompleteBackup(store: DemoStore, passphrase: strin
   store.fifo().allocations.forEach((allocation, index) => add('cost-allocation', String(index + 1), allocation));
   store.fifo().shortages.forEach((shortage, index) => add('cost-shortage', String(index + 1), shortage));
 
-  const csv = csvContent(['Tipo de registro', 'Identificador', 'Datos completos JSON'], rows);
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const header = new TextEncoder().encode('LMCB1');
-  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 600_000, hash: 'SHA-256' }, material,
-    { name: 'AES-GCM', length: 256 }, false, ['encrypt'],
-  );
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: header }, key, new TextEncoder().encode(csv));
-  downloadBlob(`respaldo-completo-cabello-${todayLocal()}.csv.enc`, new Blob([header, salt, iv, encrypted], { type: 'application/octet-stream' }));
+  downloadCsv(`respaldo-completo-cabello-${todayLocal()}.csv`, ['Tipo de registro', 'Identificador', 'Datos completos JSON'], rows);
 }
