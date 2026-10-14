@@ -4,8 +4,8 @@ Esta guía parte de las [decisiones ya acordadas](decisiones-backend.md). El fro
 
 ## 1. Preparar el repositorio y el entorno local
 
-1. Mantener el repositorio privado actual como monorepositorio: `src/` para Angular y `backend/` para Spring Boot. Abrir una rama por cambio; revisar resultados y aprobar su incorporación a `main` antes de que se publique.
-2. Instalar localmente una versión LTS de Java compatible con la versión estable de Spring Boot elegida al empezar, Docker Desktop o Docker Engine con Compose, y las herramientas de Angular ya usadas en este proyecto. Fijar versiones en archivos del repositorio. No instalar herramientas de desarrollo en el VPS de producción.
+1. Mantener el repositorio privado actual como monorepositorio: `src/` para Angular y `backend/` para Spring Boot. Abrir una rama por cambio; revisar resultados y aprobar su incorporación a `main` antes de que se publique. El procedimiento está en [ramas.md](ramas.md).
+2. La primera etapa ya fija Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. El entorno local usa Docker Engine con Compose. Para compilar directamente fuera de Docker, instalar **JDK 21**, que incluye `javac`; la máquina actual solo tiene el entorno de ejecución Java 21. No instalar herramientas de desarrollo en el VPS de producción.
 3. Levantar PostgreSQL local con Compose. Mantener usuario, contraseña y nombre de base en variables locales fuera de Git. Crear perfiles `local` y `prod`; ninguna credencial real debe quedar en código, imágenes ni CSV.
 4. Crear el proyecto Spring Boot dentro de `backend/` con Web, Validation, Security, Spring Session JDBC, PostgreSQL, Flyway y Actuator. Definir el paquete raíz, configuración y esquema de errores de API. Los cambios de esquema se harán solo con migraciones Flyway.
 
@@ -55,6 +55,6 @@ Esta guía parte de las [decisiones ya acordadas](decisiones-backend.md). El fro
 
 - Nombre concreto del subdominio gratuito y ubicación de la computadora donde se conservarán los CSV.
 - Nombre de usuario del primer administrador, que se introducirá en el comando privado.
-- Versiones LTS soportadas de Java y Spring Boot vigentes al iniciar la implementación.
+- Versiones a usar en producción tras revisar actualizaciones y compatibilidad cuando se acerque el despliegue.
 
 Estas elecciones no cambian las reglas de negocio ya acordadas. Si surge una decisión nueva sobre la lógica, se planteará en un lote de preguntas antes de codificarla.

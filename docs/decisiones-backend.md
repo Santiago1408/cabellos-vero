@@ -6,6 +6,7 @@ Este documento registra las decisiones de producto tomadas durante la planificac
 
 - Una sola sucursal al inicio, con empleados y un administrador. Varias sucursales y superadministrador, incluida su estructura de datos específica, quedan para una etapa posterior.
 - Aplicación siempre conectada a internet. Angular, API Java con Spring Boot y PostgreSQL se desplegarán con Docker en el mismo OVHcloud VPS-1. El desarrollo y las pruebas serán locales; en el VPS habrá solo producción.
+- La primera etapa local del backend usa Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6; las versiones se revisarán antes del despliegue de producción.
 - El backend se incorporará al repositorio privado actual de GitHub. Cada cambio aprobado en la rama principal se publicará automáticamente después de pasar las comprobaciones acordadas.
 - En GitHub Free, un repositorio privado no dispone de protecciones de rama ni aprobaciones de despliegue exigibles. El flujo gratuito será revisar el cambio y sus comprobaciones antes de incorporarlo manualmente a `main`; el despliegue automático se activará al llegar a esa rama. Si se necesita imponer esas reglas técnicamente dentro de GitHub, habrá que revisar un plan de pago.
 - La base de datos real empezará sin los registros de demostración del prototipo, pero con las categorías y longitudes actuales y stock cero.

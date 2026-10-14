@@ -8,7 +8,7 @@ Actúa como desarrollador principal de La Magia del Cabello. Trabaja en el repos
 ALCANCE Y TECNOLOGÍA
 - Una sola sede, un administrador y empleados; hasta unos cinco empleados y unas 800 transacciones/año al comienzo. No crear por ahora sucursales ni superadministrador, pero usar identificadores estables y límites claros para facilitar esa evolución.
 - Aplicación siempre conectada. Desarrollo y comprobaciones locales. Producción única en OVHcloud VPS-1. Monorepositorio privado actual; Angular, Spring Boot y PostgreSQL mediante Docker Compose en el mismo VPS, con proxy HTTPS y frontend y /api bajo el mismo origen.
-- Elegir al iniciar versiones estables soportadas de Java LTS, Spring Boot y PostgreSQL; documentarlas y fijarlas. Usar Spring Web, Validation, Security, Spring Session JDBC, PostgreSQL, Flyway y Actuator. Toda evolución de base de datos va por migraciones. No poner credenciales en Git, imagen o código.
+- Continuar desde la base local ya creada en backend/ con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6; revisar actualizaciones y compatibilidad antes de producción. Usar Spring Web, Validation, Security, Spring Session JDBC, PostgreSQL, Flyway y Actuator. Toda evolución de base de datos va por migraciones. No poner credenciales en Git, imagen o código.
 - En producción cargar categorías y longitudes actuales, pero cero stock y ningún registro de demostración. El frontend en memoria es referencia visual y funcional, no base de datos para migrar.
 
 MODELO Y OPERACIONES
