@@ -83,6 +83,10 @@
 .profile-details div { display: flex; justify-content: space-between; gap: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
 .profile-details dt { color: #777; }
 .profile-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.password-form { display: grid; gap: 14px; border-top: 1px solid var(--color-border); padding-top: 18px; }
+.password-form h3 { margin: 0; font-size: 15px; }
+.password-required { margin: 0; padding: 14px; border-radius: 8px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; line-height: 1.5; }
+.password-success { margin: 0; color: var(--color-primary); font-weight: 700; }
 .muted {
   color: #888;
   font-size: 11px;
@@ -131,6 +135,7 @@
   .settings-card h2 { font-size: 19px; }
   .muted, .theme-preview strong, .theme-preview small, .inline-hint { font-size: 14px; }
   .profile-data, .profile-details { font-size: 15px; }
+  .password-form h3 { font-size: 17px; }
   .backup-download-controls { display: none; }
   .backup-mobile-note { display: block; }
 }

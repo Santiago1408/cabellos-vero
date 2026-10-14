@@ -1,15 +1,18 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DemoStore, categoryLabel, dateLabel, lineValue, money, operationEffectiveDate, unitPriceLabel, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, dateLabel, eventLineValue, lineValue, money, operationEvents, unitPriceLabel, weight } from '../../data/demo-store';
 
 type Movement = {
   kind: 'purchase' | 'sale';
   id: string;
+  eventId: string;
+  at: string;
   date: string;
   party: string;
   quantity: number;
   unitPrice: number;
+  amount: number;
 };
 
 @Component({ selector: 'app-product-detail', standalone: true, imports: [RouterLink], templateUrl: './product-detail.html',
@@ -29,15 +32,17 @@ export class ProductDetail {
     const productId = this.product()?.id;
     if (!productId) return [];
     return [
-      ...this.store.orders().filter(order => order.status === 'Confirmado')
-        .flatMap(order => order.items.filter(item => item.productId === productId)
-          .map(item => ({ kind: 'purchase' as const, id: order.id, date: operationEffectiveDate(order),
-            party: order.supplier, quantity: item.quantity, unitPrice: item.unitPrice }))),
-      ...this.store.sales().filter(sale => sale.status === 'Confirmado')
-        .flatMap(sale => sale.items.filter(item => item.productId === productId)
-          .map(item => ({ kind: 'sale' as const, id: sale.id, date: operationEffectiveDate(sale),
-            party: sale.customer, quantity: item.quantity, unitPrice: item.unitPrice }))),
-    ].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+      ...this.store.orders().flatMap(order => operationEvents(order).flatMap(event => event.items
+        .filter(part => part.productId === productId).map(part => ({ kind: 'purchase' as const,
+          id: order.id, eventId: event.id, at: event.at, date: event.at.slice(0, 10), party: order.supplier, quantity: part.quantity,
+          unitPrice: order.items.find(item => item.productId === part.productId)?.unitPrice ?? 0,
+          amount: eventLineValue(order, event, part.productId) })))),
+      ...this.store.sales().flatMap(sale => operationEvents(sale).flatMap(event => event.items
+        .filter(part => part.productId === productId).map(part => ({ kind: 'sale' as const,
+          id: sale.id, eventId: event.id, at: event.at, date: event.at.slice(0, 10), party: sale.customer, quantity: part.quantity,
+          unitPrice: sale.items.find(item => item.productId === part.productId)?.unitPrice ?? 0,
+          amount: eventLineValue(sale, event, part.productId) })))),
+    ].sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id));
   });
   readonly purchasedWeight = computed(() => this.movements()
     .filter(movement => movement.kind === 'purchase')

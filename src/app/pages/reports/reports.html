@@ -1,13 +1,13 @@
 <div class="page-header">
   <div>
     <h1>Reportes</h1>
-    <p>Resultados calculados según la fecha de recepción o entrega de compras y ventas confirmadas.</p>
+    <p>Resultados calculados según cada recepción o entrega realizada, incluso en operaciones pendientes.</p>
   </div>
   <span class="period-pill page-period">Últimos 6 meses en los gráficos</span>
 </div>
 <div class="reports-grid">
   <section class="card report-overview">
-    <div class="card-heading"><h2>Acumulado de ventas confirmadas</h2></div>
+    <div class="card-heading"><h2>Acumulado de entregas</h2></div>
     <div class="report-primary-metrics">
       <div><strong>{{ money(revenue()) }}</strong><span>Ingresos</span></div>
       <div><strong>{{ money(costs()) }}</strong><span>Costo del cabello vendido</span></div>
@@ -15,7 +15,7 @@
     </div>
     <div class="report-secondary-metrics">
       <div><strong>{{ money(stockValue()) }}</strong><span>Valor del stock al costo</span></div>
-      <div><strong>{{ store.confirmedSales().length }}</strong><span>Ventas confirmadas</span></div>
+      <div><strong>{{ store.confirmedSales().length }}</strong><span>Ventas con entregas</span></div>
     </div>
     <p class="report-note">El margen bruto resta el costo del cabello; no incluye otros gastos. El saldo inicial usa costos ficticios del prototipo.</p>
   </section>
@@ -26,17 +26,17 @@
       <tbody>
         @for (category of topCategories(); track category.name) {
           <tr><td class="mobile-title">{{ categoryLabel(category.name) }}</td><td class="mobile-value" data-label="Vendido">{{ weight(category.sold) }}</td><td class="mobile-hide">{{ category.percent }}%</td></tr>
-        } @empty { <tr><td colspan="3" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }
+        } @empty { <tr><td colspan="3" class="empty-table">Todavía no hay entregas registradas.</td></tr> }
       </tbody>
     </table></div>
   </section>
   <section class="card revenue-chart-card">
-    <div class="card-heading"><h2>Compras, ventas y margen bruto por mes</h2><span class="period-pill">Operaciones confirmadas</span></div>
+    <div class="card-heading"><h2>Compras, ventas y margen bruto por mes</h2><span class="period-pill">Movimientos realizados</span></div>
     <div class="line-chart">
       <div class="line-y-axis">@for (label of axisLabels(); track $index) { <span>{{ label }}</span> }</div>
       <div class="line-plot">
         <div class="line-grid"><span></span><span></span><span></span><span></span><span></span></div>
-        <svg viewBox="0 0 1000 240" preserveAspectRatio="none" aria-label="Gráfico mensual de compras confirmadas, ventas confirmadas y margen bruto">
+        <svg viewBox="0 0 1000 240" preserveAspectRatio="none" aria-label="Gráfico mensual de recepciones, entregas y margen bruto">
           <polyline [attr.points]="purchasePoints()" fill="none" stroke="var(--color-primary)" stroke-width="4" vector-effect="non-scaling-stroke" />
           <polyline [attr.points]="salesPoints()" fill="none" stroke="var(--color-chart-secondary)" stroke-width="4" vector-effect="non-scaling-stroke" />
           <polyline [attr.points]="profitPoints()" fill="none" stroke="#477b98" stroke-width="4" vector-effect="non-scaling-stroke" />
@@ -49,7 +49,7 @@
   <section class="card table-card monthly-card">
     <div class="card-heading"><h2>{{ periodHeading() }}</h2><label class="report-period-select">Periodo <select class="btn btn-outline filter-select" aria-label="Periodo del reporte" [ngModel]="period()" (ngModelChange)="setPeriod($event)"><option value="days">Días · últimos 30</option><option value="weeks">Semanas · últimas 12</option><option value="months">Meses · últimos 6</option></select></label></div>
     <div class="table-scroll"><table class="mobile-list-table period-list">
-      <thead><tr><th>{{ periodColumn() }}</th><th>Compras confirmadas</th><th>Ingresos por ventas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead>
+      <thead><tr><th>{{ periodColumn() }}</th><th>Compras recibidas</th><th>Ingresos por entregas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead>
       <tbody>@for (row of periodRows(); track row.key) {
         <tr><td class="mobile-title">{{ row.label }}</td><td class="mobile-meta" data-label="Compras">{{ money(row.purchases) }}</td><td class="mobile-value" data-label="Ventas">{{ money(row.sales) }}</td><td class="mobile-hide period-cost" data-label="Costo del cabello">{{ money(row.costs) }}</td><td class="mobile-meta period-margin" data-label="Margen bruto" [class.negative]="row.profit < 0">{{ money(row.profit) }}</td></tr>
       }</tbody>
@@ -62,7 +62,7 @@
       <tbody>
         @for (product of topProducts(); track product.id) {
           <tr><td class="mobile-title"><a class="table-primary" [routerLink]="['/inventario', product.id]">{{ productName(product.category, product.length) }}</a></td><td class="mobile-meta" data-label="En stock">{{ weight(product.quantity) }}</td><td class="mobile-value" data-label="Vendido">{{ weight(product.soldWeight) }}</td><td class="mobile-hide">{{ money(product.revenue) }}</td></tr>
-        } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }
+        } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay entregas registradas.</td></tr> }
       </tbody>
     </table></div>
   </section>

@@ -29,6 +29,7 @@ export class Auth {
     }
     this.error.set('');
     this.password = '';
-    this.router.navigateByUrl(this.store.role() === 'admin' ? '/dashboard' : '/inventario');
+    this.router.navigateByUrl(this.store.role() === 'admin' ? '/dashboard'
+      : this.store.mustChangePassword() ? '/configuracion' : '/inventario');
   }
 }

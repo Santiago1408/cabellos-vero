@@ -2,9 +2,14 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { DemoStore } from './demo-store';
 
-export const requireSession: CanActivateFn = () => {
+export const requireSession: CanActivateFn = (_route, state) => {
   const store = inject(DemoStore);
-  return store.role() ? true : inject(Router).createUrlTree(['/ingresar']);
+  const router = inject(Router);
+  if (!store.role()) return router.createUrlTree(['/ingresar']);
+  if (store.mustChangePassword() && state.url.split('?')[0] !== '/configuracion') {
+    return router.createUrlTree(['/configuracion']);
+  }
+  return true;
 };
 
 export const requireAdmin: CanActivateFn = () => {
@@ -16,5 +21,5 @@ export const requireAdmin: CanActivateFn = () => {
 export const guestOnly: CanActivateFn = () => {
   const store = inject(DemoStore);
   if (!store.role()) return true;
-  return inject(Router).createUrlTree([store.role() === 'admin' ? '/dashboard' : '/inventario']);
+  return inject(Router).createUrlTree([store.role() === 'admin' ? '/dashboard' : store.mustChangePassword() ? '/configuracion' : '/inventario']);
 };

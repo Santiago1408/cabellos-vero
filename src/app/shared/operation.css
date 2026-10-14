@@ -8,6 +8,7 @@
 .line-heading { margin-top: 4px; }
 .line-heading h3 { margin: 0; font-size: 13px; }
 .line-heading .btn { white-space: nowrap; }
+.movement-edit-note { margin: -5px 0 0; color: var(--color-muted); font-size: 12px; }
 .operation-line { border: 1px solid var(--color-border); border-radius: 9px; padding: 14px; }
 .line-title { margin-bottom: 12px; font-size: 12px; color: #333; }
 .line-remove { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--color-delete) 30%, white); border-radius: 6px; background: color-mix(in srgb, var(--color-delete) 6%, white); color: var(--color-delete); cursor: pointer; }
@@ -42,6 +43,26 @@
 .detail-meta { justify-content: flex-start; flex-wrap: wrap; color: #666; font-size: 11px; }
 .detail-meta strong { color: #333; }
 .detail-content table { width: 100%; }
+.fulfillment-progress { margin: -8px 0 0; padding: 11px 13px; border-radius: 8px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; font-size: 13px; }
+.fulfillment-form { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: 9px; }
+.fulfillment-form > .btn { justify-self: start; }
+.movement-history { display: grid; gap: 8px; }
+.movement-history h3 { margin: 0 0 2px; font-size: 14px; }
+.movement-entry { display: flex; justify-content: space-between; gap: 12px; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: 7px; font-size: 12px; }
+.movement-date { display: grid; gap: 3px; }
+.movement-date small { color: var(--color-muted); }
+.movement-entry.movement-voided, .payment-entry.payment-voided { background: #f7f7f7; color: var(--color-muted); }
+.movement-entry.movement-voided > span, .payment-entry.payment-voided strong { color: var(--color-delete); }
+.operation-payments { display: grid; gap: 10px; padding-top: 15px; border-top: 1px solid var(--color-border); }
+.operation-payments h3 { margin: 0; font-size: 15px; }
+.payment-balance { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; padding: 11px 13px; border-radius: 8px; background: #f6f6f6; font-size: 12px; }
+.payment-balance strong { color: var(--color-primary); }
+.payment-entry { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: 7px; }
+.payment-entry > div { display: grid; gap: 3px; }
+.payment-entry span { color: #666; font-size: 12px; }
+.payment-form { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: 9px; }
+.payment-history { color: #666; font-size: 12px; }
+.payment-history p { margin: 7px 0 0; }
 @media (max-width: 600px) {
   .line-heading { align-items: flex-start; flex-direction: column; }
   .operation-line { padding: 11px; }
@@ -51,8 +72,12 @@
   .operation-list .mobile-actions.operation-actions-cell { width: 100%; min-width: 0; }
   .operation-list.mobile-list-table tr.operation-pending td { background: transparent; box-shadow: none; }
   .line-heading h3, .line-title, .operation-total, .detail-meta { font-size: 15px; }
+  .movement-edit-note { font-size: 14px; }
   .line-remove { width: 44px; height: 44px; }
   .line-remove app-icon { width: 21px; height: 21px; }
   .line-subtotal, .modified-note { font-size: 14px; }
   .detail-content .mobile-detail-table { min-width: 0; }
+  .fulfillment-progress, .movement-entry { font-size: 15px; }
+  .movement-entry { flex-wrap: wrap; }
+  .payment-balance, .payment-entry span, .payment-history { font-size: 14px; }
 }

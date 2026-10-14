@@ -1,8 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { DemoStore, HairCategory, HairLength, HairLine, OperationStatus, Order, categoryLabel, dateLabel, downloadCsv, lineValue, modifiedLabel, operationName, operationValue, operationWeight, productName, todayLocal, unitPriceLabel, weight, money } from '../../data/demo-store';
-import { sumMoney } from '../../data/money';
+import { DemoStore, Fulfillment, HairCategory, HairLength, HairLine, OperationPayment, OperationPaymentMethod, OperationStatus, Order, businessTime, categoryLabel, dateLabel, downloadCsv, eventValue, eventWeight, fulfilledQuantity, fulfilledWeight, fulfillmentSummary, lineValue, modifiedLabel, money, movementAt, operationBalance, operationEvents, operationName, operationPaid, operationPayableTotal, operationValue, operationWeight, productName, remainingQuantity, todayLocal, unitPriceLabel, weight } from '../../data/demo-store';
+import { hasTwoDecimalPlaces, sumMoney } from '../../data/money';
 import { Icon } from '../../shared/icon/icon';
 import { OperationHistory } from '../../shared/operation-history/operation-history';
 
@@ -23,6 +23,16 @@ export class Orders {
   readonly lineValue = lineValue;
   readonly unitPriceLabel = unitPriceLabel;
   readonly operationWeight = operationWeight;
+  readonly operationEvents = operationEvents;
+  readonly fulfilledQuantity = fulfilledQuantity;
+  readonly remainingQuantity = remainingQuantity;
+  readonly fulfilledWeight = fulfilledWeight;
+  readonly eventValue = eventValue;
+  readonly eventWeight = eventWeight;
+  readonly fulfillmentSummary = fulfillmentSummary;
+  readonly operationPaid = operationPaid;
+  readonly operationBalance = operationBalance;
+  readonly operationPayableTotal = operationPayableTotal;
   readonly productName = productName;
   readonly categoryLabel = categoryLabel;
   readonly page = signal(1);
@@ -31,12 +41,24 @@ export class Orders {
   readonly detailId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('detalle'));
   readonly error = signal('');
   readonly detailError = signal('');
+  readonly correctionError = signal('');
   readonly cancelPrompt = signal(false);
   confirmationDate = todayLocal();
+  confirmationTime = businessTime();
+  receiptQuantities: Record<string, number> = {};
+  correctionEventId: string | null = null;
+  correctionDate = todayLocal();
+  correctionTime = businessTime();
+  correctionQuantities: Record<string, number> = {};
+  correctionReason = '';
+  editReason = '';
+  paymentEditingId: string | null = null;
+  paymentDraft = { date: todayLocal(), amount: 0, method: 'Efectivo' as OperationPaymentMethod, reference: '' };
+  paymentReason = '';
   readonly statusFilter = signal('');
   readonly sortKey = signal<SortKey>('date');
   readonly sortDirection = signal<'asc' | 'desc'>('desc');
-  draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' as OperationStatus };
+  draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), effectiveTime: businessTime(), status: 'Confirmado' as OperationStatus };
   lines: LineDraft[] = [blankLine()];
 
   readonly filtered = computed(() => this.store.orders().filter(order => {
@@ -67,6 +89,10 @@ export class Orders {
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.filtered().length / 7)));
   readonly pageItems = computed(() => this.sorted().slice((Math.min(this.page(), this.pageCount()) - 1) * 7, Math.min(this.page(), this.pageCount()) * 7));
   readonly detail = computed(() => this.store.orders().find(order => order.id === this.detailId()));
+  readonly editingHasReceipts = computed(() => {
+    const order = this.store.orders().find(item => item.id === this.editingId());
+    return !!order && operationEvents(order).length > 0;
+  });
   sortBy(key: SortKey) {
     if (this.sortKey() === key) this.sortDirection.update(direction => direction === 'asc' ? 'desc' : 'asc');
     else { this.sortKey.set(key); this.sortDirection.set('asc'); }
@@ -84,20 +110,46 @@ export class Orders {
   }
   open() {
     this.editingId.set(null);
-    this.draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), status: 'Confirmado' };
+    this.draft = { supplier: '', date: todayLocal(), effectiveDate: todayLocal(), effectiveTime: businessTime(), status: 'Confirmado' };
     this.lines = [blankLine()];
     this.error.set('');
+    this.editReason = '';
     this.modalOpen.set(true);
   }
   openEdit(order: Order) {
     this.detailId.set(null);
     this.editingId.set(order.id);
-    this.draft = { supplier: order.supplier, date: order.date, effectiveDate: order.effectiveDate ?? (order.status === 'Pendiente' ? todayLocal() : order.date), status: order.status };
+    this.draft = { supplier: order.supplier, date: order.date, effectiveDate: order.effectiveDate ?? (order.status === 'Pendiente' ? todayLocal() : order.date),
+      effectiveTime: order.confirmedAt?.slice(11, 16) ?? (order.status === 'Confirmado' ? '00:00' : businessTime()), status: order.status };
     this.lines = order.items.map(item => ({ category: item.category, length: item.length, quantity: item.quantity, unitPrice: item.unitPrice }));
     this.error.set('');
+    this.editReason = '';
     this.modalOpen.set(true);
   }
-  openDetail(id: string) { this.detailError.set(''); this.cancelPrompt.set(false); this.confirmationDate = todayLocal(); this.detailId.set(id); }
+  openDetail(id: string) { this.detailError.set(''); this.correctionError.set(''); this.cancelPrompt.set(false); this.confirmationDate = todayLocal(); this.confirmationTime = businessTime(); this.receiptQuantities = {}; this.correctionEventId = null; this.resetPayment(); this.detailId.set(id); }
+  editReceipt(event: Fulfillment, order: Order) { this.correctionEventId = event.id; this.correctionDate = event.at.slice(0, 10);
+    this.correctionTime = event.at.slice(11, 16); this.correctionQuantities = Object.fromEntries(order.items
+      .map(item => [item.productId, event.items.find(part => part.productId === item.productId)?.quantity ?? 0]));
+    this.correctionReason = ''; this.correctionError.set(''); }
+  saveReceiptCorrection(orderId: string) { const message = this.store.correctFulfillment('purchase', orderId, this.correctionEventId!,
+    this.correctionDate, this.correctionTime, Object.entries(this.correctionQuantities).filter(([, quantity]) => Number(quantity) > 0)
+      .map(([productId, quantity]) => ({ productId, quantity: Number(quantity) })), this.correctionReason);
+    this.correctionError.set(message); if (!message) this.correctionEventId = null; }
+  voidReceipt(orderId: string) { const message = this.store.correctFulfillment('purchase', orderId, this.correctionEventId!,
+    this.correctionDate, this.correctionTime, [], this.correctionReason);
+    this.correctionError.set(message); if (!message) this.correctionEventId = null; }
+  resetPayment() { this.paymentEditingId = null; this.paymentDraft = { date: todayLocal(), amount: 0, method: 'Efectivo', reference: '' }; this.paymentReason = ''; }
+  editPayment(payment: OperationPayment) { this.paymentEditingId = payment.id; this.paymentDraft = {
+    date: payment.date, amount: payment.amount, method: payment.method, reference: payment.reference }; this.paymentReason = ''; }
+  savePayment(orderId: string) {
+    const message = this.paymentEditingId
+      ? this.store.updateOperationPayment('purchase', orderId, this.paymentEditingId, this.paymentDraft, this.paymentReason)
+      : this.store.addOperationPayment('purchase', orderId, this.paymentDraft);
+    this.detailError.set(message);
+    if (!message) this.resetPayment();
+  }
+  voidPayment(orderId: string) { const message = this.store.voidOperationPayment('purchase', orderId, this.paymentEditingId!, this.paymentReason);
+    this.detailError.set(message); if (!message) this.resetPayment(); }
   addLine() { this.lines.push(blankLine()); }
   removeLine(index: number) { if (this.lines.length > 1) this.lines.splice(index, 1); }
   selectCategory(line: LineDraft) { line.length = ''; line.unitPrice = 0; }
@@ -106,7 +158,11 @@ export class Orders {
     line.unitPrice = product?.purchasePrice ?? 0;
   }
   get draftValue() { return sumMoney(this.lines.map(line => lineValue(Number(line.quantity) || 0, Number(line.unitPrice) || 0))); }
-  confirm(id: string) { this.detailError.set(this.store.confirmOrder(id, this.confirmationDate)); }
+  confirm(id: string) { this.detailError.set(this.store.receiveOrder(id, Object.entries(this.receiptQuantities)
+    .filter(([, quantity]) => Number(quantity) > 0).map(([productId, quantity]) => ({ productId, quantity: Number(quantity) })), this.confirmationDate, this.confirmationTime));
+    if (!this.detailError()) this.receiptQuantities = {}; }
+  fillRemaining(order: Order) { this.receiptQuantities = Object.fromEntries(order.items
+    .map(item => [item.productId, remainingQuantity(order, item.productId)])); }
   cancel(id: string) { const message = this.store.cancelOrder(id); this.detailError.set(message); if (!message) this.cancelPrompt.set(false); }
   save() {
     const supplier = this.draft.supplier.trim();
@@ -120,29 +176,37 @@ export class Orders {
       if (!this.store.categories().includes(line.category) || !this.store.lengths().includes(Number(line.length)) || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
         this.error.set('Cada cabello necesita calidad, longitud, peso mayor que cero y precio válido.'); return;
       }
+      if (!hasTwoDecimalPlaces(quantity) || !hasTwoDecimalPlaces(unitPrice)) {
+        this.error.set('El peso y el precio por gramo admiten como máximo dos decimales.'); return;
+      }
       const key = `${line.category}:${Number(line.length)}`;
       if (used.has(key)) { this.error.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return; }
       used.add(key);
       items.push({ productId: product?.id ?? '', category: line.category, length: Number(line.length), quantity, unitPrice });
     }
     if (this.editingId()) {
-      const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined, status: this.draft.status, items });
+      const message = this.store.updateOrder({ id: this.editingId()!, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined,
+        confirmedAt: this.draft.status === 'Confirmado' && !this.editingHasReceipts() ? movementAt(this.draft.effectiveDate, this.draft.effectiveTime) : undefined,
+        status: this.draft.status, items }, 'Edición', this.editReason);
       if (message) { this.error.set(message); return; }
     } else {
       const next = Math.max(1046, ...this.store.orders().map(order => Number(order.id.replace('COMP-', '')) || 0)) + 1;
-      const message = this.store.addOrder({ id: `COMP-${next}`, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined, status: this.draft.status, items });
+      const message = this.store.addOrder({ id: `COMP-${next}`, supplier, date: this.draft.date, effectiveDate: this.draft.status === 'Confirmado' ? this.draft.effectiveDate : undefined,
+        confirmedAt: this.draft.status === 'Confirmado' ? movementAt(this.draft.effectiveDate, this.draft.effectiveTime) : undefined,
+        status: this.draft.status, items });
       if (message) { this.error.set(message); return; }
     }
     this.page.set(1);
     this.modalOpen.set(false);
   }
   export() {
-    downloadCsv('compras-cabello.csv', ['ID compra', 'Compra', 'Fecha de registro', 'Fecha de recepción', 'Proveedor', 'Estado', 'Modificada el', 'Anulada el', 'Línea', 'ID producto', 'Categoría', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe línea Bs', 'Importe compra Bs', 'Historial de cambios JSON'],
+    downloadCsv('compras-cabello.csv', ['ID compra', 'Compra', 'Fecha de registro', 'Fecha de recepción', 'Proveedor', 'Estado', 'Modificada el', 'Anulada el', 'Línea', 'ID producto', 'Categoría', 'Longitud cm', 'Peso acordado g', 'Peso recibido g', 'Peso pendiente g', 'Precio Bs/g', 'Importe línea Bs', 'Importe compra Bs', 'Pagado Bs', 'Saldo Bs', 'Recepciones JSON', 'Pagos JSON', 'Historial de cambios JSON'],
       this.store.orders().flatMap(order => order.items.map((item, index) => [
         order.id, operationName(order.date, order.supplier), order.date, order.effectiveDate ?? '', order.supplier,
         order.status, order.modifiedAt ?? '', order.cancelledAt ?? '', index + 1, item.productId,
-        item.category, item.length, item.quantity, item.unitPrice, lineValue(item.quantity, item.unitPrice),
-        operationValue(order.items), JSON.stringify(order.changeHistory ?? []),
+        item.category, item.length, item.quantity, fulfilledQuantity(order, item.productId), remainingQuantity(order, item.productId),
+        item.unitPrice, lineValue(item.quantity, item.unitPrice), operationValue(order.items), operationPaid(order), operationBalance(order),
+        JSON.stringify(operationEvents(order)), JSON.stringify(order.payments ?? []), JSON.stringify(order.changeHistory ?? []),
       ])));
   }
 }

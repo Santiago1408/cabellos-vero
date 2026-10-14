@@ -3,12 +3,13 @@
     <button class="mobile-scrim" aria-label="Cerrar menú" (click)="mobileOpen.set(false)"></button>
   }
   <aside class="sidebar" [class.sidebar-open]="mobileOpen()">
-    <a class="brand" [routerLink]="store.role() === 'admin' ? '/dashboard' : '/inventario'" (click)="mobileOpen.set(false)">
+    <a class="brand" [routerLink]="store.role() === 'admin' ? '/dashboard' : store.mustChangePassword() ? '/configuracion' : '/inventario'" (click)="mobileOpen.set(false)">
       <span class="brand-mark">MC<span class="brand-mark-dot"></span></span
       ><span>La Magia del <strong>Cabello</strong></span>
     </a>
-    <div class="sidebar-caption">MENÚ PRINCIPAL</div>
-    <nav class="nav-list" aria-label="Navegación principal">
+    @if (!store.mustChangePassword()) {
+      <div class="sidebar-caption">MENÚ PRINCIPAL</div>
+      <nav class="nav-list" aria-label="Navegación principal">
       @if (store.role() === 'admin') {
         <a routerLink="/dashboard" routerLinkActive="active" (click)="mobileOpen.set(false)"
           ><app-icon name="home" /> <span>Inicio</span></a>
@@ -35,7 +36,8 @@
         <a routerLink="/empleados" routerLinkActive="active" (click)="mobileOpen.set(false)"
           ><app-icon name="users" /> <span>Empleados</span></a>
       }
-    </nav>
+      </nav>
+    }
     <div class="sidebar-bottom">
       <a routerLink="/configuracion" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="settings" /> <span>Configuración</span></a

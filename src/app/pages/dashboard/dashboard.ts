@@ -1,6 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DemoStore, dateLabel, debtBalance, money, operationEffectiveDate, operationValue, todayLocal, weight } from '../../data/demo-store';
+import { DemoStore, dateLabel, debtBalance, eventDate, eventValue, money, operationEvents, pendingValue, todayLocal, weight } from '../../data/demo-store';
 import { Icon } from '../../shared/icon/icon';
 import { sumMoney } from '../../data/money';
 
@@ -10,16 +10,17 @@ export class Dashboard {
   readonly money = money;
   readonly weight = weight;
   readonly dateLabel = dateLabel;
-  readonly operationValue = operationValue;
+  readonly pendingValue = pendingValue;
   readonly currentMonth = todayLocal().slice(0, 7);
   readonly todayLabel = new Intl.DateTimeFormat('es-BO', { dateStyle: 'long' }).format(new Date());
-  readonly monthSales = computed(() => this.store.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(this.currentMonth)));
-  readonly revenue = computed(() => sumMoney(this.monthSales().map(sale => operationValue(sale.items))));
-  readonly costs = computed(() => sumMoney(this.monthSales().map(sale => this.store.saleCost(sale.id))));
+  readonly monthSales = computed(() => this.store.sales().flatMap(sale => operationEvents(sale)
+    .filter(event => eventDate(event).startsWith(this.currentMonth)).map(event => ({ sale, event }))));
+  readonly revenue = computed(() => sumMoney(this.monthSales().map(({ sale, event }) => eventValue(sale, event))));
+  readonly costs = computed(() => sumMoney(this.store.fifo().allocations.filter(allocation =>
+    this.monthSales().some(({ event }) => event.id === allocation.saleEventId)).map(allocation => allocation.cost)));
   readonly profit = computed(() => sumMoney([this.revenue(), -this.costs()]));
-  readonly purchaseValue = computed(() => sumMoney(this.store.orders()
-    .filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(this.currentMonth))
-    .map(order => operationValue(order.items))));
+  readonly purchaseValue = computed(() => sumMoney(this.store.orders().flatMap(order => operationEvents(order)
+    .filter(event => eventDate(event).startsWith(this.currentMonth)).map(event => eventValue(order, event)))));
   readonly stockWeight = computed(() => this.store.products().reduce((sum, product) => sum + product.quantity, 0));
   readonly lowProducts = computed(() => this.store.managedProducts().filter(product => product.threshold > 0
     && this.store.sellableWeight(product.id) <= product.threshold).slice(0, 3));

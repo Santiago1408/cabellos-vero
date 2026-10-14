@@ -27,10 +27,10 @@
   </section>
   <section class="card movements-card">
     <div class="card-heading">
-      <div><h2>Historial de movimientos</h2><p>{{ movements().length }} {{ movements().length === 1 ? 'operación confirmada' : 'operaciones confirmadas' }} · más recientes primero</p></div>
+      <div><h2>Historial de movimientos</h2><p>{{ movements().length }} {{ movements().length === 1 ? 'movimiento realizado' : 'movimientos realizados' }} · más recientes primero</p></div>
     </div>
     <ol class="movement-list">
-      @for (movement of movements(); track movement.kind + movement.id) {
+      @for (movement of movements(); track movement.eventId + movement.kind) {
         <li class="movement-item" [class.movement-in]="movement.kind === 'purchase'" [class.movement-out]="movement.kind === 'sale'">
           <div class="movement-head">
             <span class="movement-type">{{ movement.kind === 'purchase' ? 'Entrada · compra' : 'Salida · venta' }}</span>
@@ -43,7 +43,7 @@
             </div>
             <strong class="movement-weight">{{ movement.kind === 'purchase' ? '+' : '−' }}{{ weight(movement.quantity) }}</strong>
           </div>
-          <div class="movement-details"><span>Precio {{ unitPriceLabel(movement.unitPrice) }}/g</span><span>Importe {{ money(lineValue(movement.quantity, movement.unitPrice)) }}</span></div>
+          <div class="movement-details"><span>Precio {{ unitPriceLabel(movement.unitPrice) }}/g</span><span>Importe {{ money(movement.amount) }}</span></div>
         </li>
       }
       @if (openingWeight() > 0) {
@@ -54,10 +54,10 @@
         </li>
       }
       @if (movements().length === 0 && openingWeight() === 0) {
-        <li class="empty-movements">Aún no hay movimientos confirmados de este cabello.</li>
+        <li class="empty-movements">Aún no hay movimientos de este cabello.</li>
       }
     </ol>
-    <p class="balance-note">Las compras pendientes y ventas reservadas se muestran por separado en Inventario y no cambian el stock físico.</p>
+    <p class="balance-note">Solo las cantidades aún por recibir o entregar se muestran como pendientes; los movimientos parciales ya realizados sí cambian el stock físico.</p>
   </section>
 } @else {
   <div class="card empty-state">No encontramos este cabello. <a routerLink="/inventario">Volver al inventario</a></div>

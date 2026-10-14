@@ -8,6 +8,7 @@
             <strong>{{ change.reason }}</strong>
             <time [attr.datetime]="change.at">{{ modifiedLabel(change.at) }}</time>
           </div>
+          @if (change.note) { <p class="history-note">Motivo: {{ change.note }}</p> }
           <div class="history-comparison">
             <section class="history-snapshot" aria-label="Valores anteriores">
               <h4>Antes</h4>
@@ -15,6 +16,7 @@
                 <div><dt>{{ partyLabel }}</dt><dd>{{ change.before.party }}</dd></div>
                 <div><dt>Fecha</dt><dd>{{ dateLabel(change.before.date) }}</dd></div>
                 <div><dt>{{ effectiveDateLabel }}</dt><dd>{{ change.before.effectiveDate ? dateLabel(change.before.effectiveDate) : '—' }}</dd></div>
+                @if (change.before.confirmedAt) { <div><dt>Hora efectiva</dt><dd>{{ modifiedLabel(change.before.confirmedAt) }}</dd></div> }
                 <div><dt>Estado</dt><dd>{{ change.before.status }}</dd></div>
               </dl>
               <ul>
@@ -30,6 +32,7 @@
                 <div><dt>{{ partyLabel }}</dt><dd>{{ change.after.party }}</dd></div>
                 <div><dt>Fecha</dt><dd>{{ dateLabel(change.after.date) }}</dd></div>
                 <div><dt>{{ effectiveDateLabel }}</dt><dd>{{ change.after.effectiveDate ? dateLabel(change.after.effectiveDate) : '—' }}</dd></div>
+                @if (change.after.confirmedAt) { <div><dt>Hora efectiva</dt><dd>{{ modifiedLabel(change.after.confirmedAt) }}</dd></div> }
                 <div><dt>Estado</dt><dd>{{ change.after.status }}</dd></div>
               </dl>
               <ul>

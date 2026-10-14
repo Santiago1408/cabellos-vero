@@ -19,6 +19,9 @@ export const amountCents = (quantity: number, unitPrice: number) => {
 
 export const lineValue = (quantity: number, unitPrice: number) => amountCents(quantity, unitPrice) / 100;
 
+export const hasTwoDecimalPlaces = (value: number) =>
+  Number.isFinite(value) && Number(value.toFixed(2)) === value;
+
 export const sumMoney = (values: Iterable<number>) => {
   let cents = 0;
   for (const value of values) cents += amountCents(value, 1);

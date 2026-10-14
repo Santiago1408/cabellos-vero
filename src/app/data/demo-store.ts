@@ -1,12 +1,12 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { calculateFifo, openingLots } from './fifo';
-import { amountCents, lineValue, sumMoney } from './money';
+import { amountCents, hasTwoDecimalPlaces, lineValue, sumMoney } from './money';
 
 export { lineValue } from './money';
 
 export type Role = 'admin' | 'employee';
 export type EmployeeSnapshot = { fullName: string; username: string; ci: string; birthDate: string; phone: string; active: boolean };
-export type EmployeeChange = { at: string; action: 'Creación' | 'Edición' | 'Desactivación' | 'Reactivación' | 'Contraseña restablecida'; before?: EmployeeSnapshot; after: EmployeeSnapshot };
+export type EmployeeChange = { at: string; action: 'Creación' | 'Edición' | 'Desactivación' | 'Reactivación' | 'Contraseña restablecida' | 'Contraseña cambiada'; before?: EmployeeSnapshot; after: EmployeeSnapshot };
 export type Employee = EmployeeSnapshot & { id: string; createdAt: string; modifiedAt?: string; changes: EmployeeChange[] };
 export type EmployeeInput = Omit<EmployeeSnapshot, 'active'> & { password: string };
 export const demoAdminCredentials = { username: 'admin', password: 'CabelloDemo2026!' } as const;
@@ -33,10 +33,18 @@ export type Product = {
 export type Supplier = { id: string; name: string; phone: string; city: string; address: string; mapsUrl: string; modifiedAt?: string };
 export type OperationStatus = 'Pendiente' | 'Confirmado' | 'Anulada';
 export type HairLine = { productId: string; category: HairCategory; length: HairLength; quantity: number; unitPrice: number };
-export type OperationSnapshot = { party: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[] };
-export type OperationChange = { at: string; reason: 'Edición' | 'Confirmación' | 'Anulación' | 'Proveedor actualizado'; before: OperationSnapshot; after: OperationSnapshot };
-export type Order = { id: string; supplier: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
-export type Sale = { id: string; customer: string; date: string; effectiveDate?: string; status: OperationStatus; items: HairLine[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
+export type FulfillmentSnapshot = { at: string; items: { productId: string; quantity: number }[] };
+export type FulfillmentChange = { at: string; reason: string; before: FulfillmentSnapshot; after: FulfillmentSnapshot };
+export type Fulfillment = FulfillmentSnapshot & { id: string; recordedAt?: string; voidedAt?: string; changes?: FulfillmentChange[] };
+export type OperationPaymentMethod = 'Efectivo' | 'QR' | 'Transferencia' | 'Otro';
+export type OperationPaymentSnapshot = { date: string; amount: number; method: OperationPaymentMethod; reference: string };
+export type OperationPaymentState = OperationPaymentSnapshot & { voided: boolean };
+export type OperationPaymentChange = { at: string; reason: string; before: OperationPaymentState; after: OperationPaymentState };
+export type OperationPayment = OperationPaymentSnapshot & { id: string; voidedAt?: string; changes?: OperationPaymentChange[] };
+export type OperationSnapshot = { party: string; date: string; effectiveDate?: string; confirmedAt?: string; status: OperationStatus; items: HairLine[] };
+export type OperationChange = { at: string; reason: 'Edición' | 'Confirmación' | 'Anulación' | 'Proveedor actualizado'; note?: string; before: OperationSnapshot; after: OperationSnapshot };
+export type Order = { id: string; supplier: string; date: string; effectiveDate?: string; confirmedAt?: string; status: OperationStatus; items: HairLine[]; fulfillments?: Fulfillment[]; payments?: OperationPayment[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
+export type Sale = { id: string; customer: string; date: string; effectiveDate?: string; confirmedAt?: string; status: OperationStatus; items: HairLine[]; fulfillments?: Fulfillment[]; payments?: OperationPayment[]; modifiedAt?: string; cancelledAt?: string; changeHistory?: OperationChange[] };
 export type SaleShortage = { product: Product; requested: number; physical: number; pending: number; missing: number };
 export type SaleResult = { kind: 'saved'; status: OperationStatus }
   | { kind: 'needs-pending'; product: Product; available: number; pending: number }
@@ -98,14 +106,15 @@ const operationSnapshot = (item: Order | Sale): OperationSnapshot => ({
   party: 'supplier' in item ? item.supplier : item.customer,
   date: item.date,
   effectiveDate: item.status === 'Confirmado' ? operationEffectiveDate(item) : undefined,
+  confirmedAt: item.status === 'Confirmado' && !item.fulfillments?.length ? item.confirmedAt : undefined,
   status: item.status,
   items: item.items.map(line => ({ ...line })),
 });
 
-const operationChange = (before: Order | Sale, after: Order | Sale, reason: OperationChange['reason'], at: string): OperationChange | null => {
+const operationChange = (before: Order | Sale, after: Order | Sale, reason: OperationChange['reason'], at: string, note?: string): OperationChange | null => {
   const previous = operationSnapshot(before);
   const next = operationSnapshot(after);
-  return JSON.stringify(previous) === JSON.stringify(next) ? null : { at, reason, before: previous, after: next };
+  return JSON.stringify(previous) === JSON.stringify(next) ? null : { at, reason, note, before: previous, after: next };
 };
 
 const paymentSnapshot = (payment: DebtPayment): DebtPaymentSnapshot => ({
@@ -152,6 +161,7 @@ const initialDebts: Debt[] = [
 @Injectable({ providedIn: 'root' })
 export class DemoStore {
   private readonly employeePasswords = new Map<string, string>();
+  private readonly temporaryPasswordIds = signal<ReadonlySet<string>>(new Set());
   readonly employees = signal<Employee[]>([]);
   readonly session = signal<{ role: Role; employeeId?: string } | null>(null);
   readonly currentEmployee = computed(() => this.employees().find(item => item.id === this.session()?.employeeId && item.active));
@@ -163,6 +173,10 @@ export class DemoStore {
   readonly adminDisplayName = signal('Administrador');
   readonly displayName = computed(() => this.role() === 'admin' ? this.adminDisplayName() : this.currentEmployee()?.fullName ?? '');
   readonly currentUsername = computed(() => this.role() === 'admin' ? demoAdminCredentials.username : this.currentEmployee()?.username ?? '');
+  readonly mustChangePassword = computed(() => {
+    const employee = this.role() === 'employee' ? this.currentEmployee() : undefined;
+    return !!employee && this.temporaryPasswordIds().has(employee.id);
+  });
   readonly products = signal<Product[]>(initialProducts);
   readonly categories = signal<HairCategory[]>([...hairCategories]);
   readonly lengths = signal<HairLength[]>([...hairLengths]);
@@ -182,9 +196,9 @@ export class DemoStore {
     return last ? new Date(Date.parse(last) + this.backupIntervalDays() * 24 * 60 * 60 * 1000).toISOString() : null;
   });
   readonly initialLots = openingLots(initialProducts, initialOrders, initialSales);
-  readonly confirmedSales = computed(() => this.sales().filter(sale => sale.status === 'Confirmado'));
+  readonly confirmedSales = computed(() => this.sales().filter(sale => fulfilledWeight(sale) > 0));
   readonly managedProducts = computed(() => this.products().filter(product => product.quantity > 0
-    || this.orders().some(order => order.status === 'Confirmado' && order.items.some(item => item.productId === product.id))));
+    || this.orders().some(order => fulfilledQuantity(order, product.id) > 0)));
   readonly fifo = computed(() => calculateFifo(this.initialLots, this.orders(), this.sales()));
   private saveBackupReminder() {
     if (typeof localStorage === 'undefined') return;
@@ -256,6 +270,7 @@ export class DemoStore {
     };
     employee.changes.push({ at: now, action: 'Creación', after: employeeSnapshot(employee) });
     this.employeePasswords.set(id, input.password);
+    this.temporaryPasswordIds.update(ids => new Set([...ids, id]));
     this.employees.update(items => [employee, ...items]);
     return '';
   }
@@ -300,34 +315,57 @@ export class DemoStore {
     const snapshot = employeeSnapshot(previous);
     const change: EmployeeChange = { at, action: 'Contraseña restablecida', before: snapshot, after: snapshot };
     this.employeePasswords.set(id, password);
+    this.temporaryPasswordIds.update(ids => new Set([...ids, id]));
     this.employees.update(items => items.map(item => item.id === id
       ? { ...item, modifiedAt: at, changes: [...item.changes, change] } : item));
     return '';
   }
+  changeOwnEmployeePassword(currentPassword: string, newPassword: string) {
+    const employee = this.role() === 'employee' ? this.currentEmployee() : undefined;
+    if (!employee) return 'Debes iniciar sesión como empleado para cambiar tu contraseña.';
+    if (this.employeePasswords.get(employee.id) !== currentPassword) return 'La contraseña actual no es correcta.';
+    if (newPassword.length < 8) return 'La nueva contraseña debe tener al menos 8 caracteres.';
+    if (newPassword === currentPassword) return 'La nueva contraseña debe ser diferente de la actual.';
+    const at = new Date().toISOString();
+    const snapshot = employeeSnapshot(employee);
+    const change: EmployeeChange = { at, action: 'Contraseña cambiada', before: snapshot, after: snapshot };
+    this.employeePasswords.set(employee.id, newPassword);
+    this.temporaryPasswordIds.update(ids => {
+      const next = new Set(ids);
+      next.delete(employee.id);
+      return next;
+    });
+    this.employees.update(items => items.map(item => item.id === employee.id
+      ? { ...item, modifiedAt: at, changes: [...item.changes, change] } : item));
+    return '';
+  }
   readonly monthlySummaries = computed<MonthlySummary[]>(() => {
-    const now = new Date();
-    const costsBySale = new Map<string, number>();
-    for (const allocation of this.fifo().allocations) costsBySale.set(allocation.saleId,
-      sumMoney([costsBySale.get(allocation.saleId) ?? 0, allocation.cost]));
+    const [year, month] = todayLocal().split('-').map(Number);
+    const costsByEvent = new Map<string, number>();
+    for (const allocation of this.fifo().allocations) costsByEvent.set(allocation.saleEventId,
+      sumMoney([costsByEvent.get(allocation.saleEventId) ?? 0, allocation.cost]));
     return Array.from({ length: 6 }, (_, index) => {
-      const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const purchases = this.orders().filter(order => order.status === 'Confirmado' && operationEffectiveDate(order).startsWith(key))
-        .map(order => operationValue(order.items));
-      const sales = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
-        .map(sale => operationValue(sale.items));
-      const costs = this.confirmedSales().filter(sale => operationEffectiveDate(sale).startsWith(key))
-        .map(sale => costsBySale.get(sale.id) ?? 0);
+      const date = new Date(Date.UTC(year, month - 1 - 5 + index, 1));
+      const key = date.toISOString().slice(0, 7);
+      const purchases = this.orders().flatMap(order => operationEvents(order)
+        .filter(event => eventDate(event).startsWith(key)).map(event => eventValue(order, event)));
+      const sales = this.sales().flatMap(sale => operationEvents(sale)
+        .filter(event => eventDate(event).startsWith(key)).map(event => eventValue(sale, event)));
+      const costs = this.sales().flatMap(sale => operationEvents(sale)
+        .filter(event => eventDate(event).startsWith(key)).map(event => costsByEvent.get(event.id) ?? 0));
       const purchaseTotal = sumMoney(purchases);
       const saleTotal = sumMoney(sales);
       const costTotal = sumMoney(costs);
-      return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short' }).format(date),
+      return { key, label: new Intl.DateTimeFormat('es-BO', { month: 'short', timeZone: 'UTC' }).format(date),
         purchases: purchaseTotal, sales: saleTotal, costs: costTotal, profit: sumMoney([saleTotal, -costTotal]) };
     });
   });
   saleCost(saleId: string) { return sumMoney(this.fifo().allocations.filter(item => item.saleId === saleId).map(item => item.cost)); }
-  productSold(productId: string) { return this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0); }
-  productRevenue(productId: string) { return sumMoney(this.confirmedSales().flatMap(sale => sale.items).filter(item => item.productId === productId).map(item => lineValue(item.quantity, item.unitPrice))); }
+  productSold(productId: string) { return this.sales().reduce((sum, sale) => roundWeight(sum + fulfilledQuantity(sale, productId)), 0); }
+  productRevenue(productId: string) { return sumMoney(this.sales().map(sale => {
+    const line = sale.items.find(item => item.productId === productId);
+    return line ? lineValue(fulfilledQuantity(sale, productId), line.unitPrice) : 0;
+  })); }
 
   addCategory(value: string) {
     const category = value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-BO');
@@ -420,9 +458,10 @@ export class DemoStore {
   }
   addOrder(item: Order) {
     if (item.status === 'Anulada') return 'Una compra nueva debe crearse como pendiente o confirmada.';
-    const dateError = this.effectiveDateError(item);
-    if (dateError) return dateError;
     const prepared = this.prepareOrder(item);
+    if (prepared.order.status === 'Confirmado') prepared.order.confirmedAt ??= movementAt(operationEffectiveDate(prepared.order));
+    const dateError = this.effectiveDateError(prepared.order);
+    if (dateError) return dateError;
     if (prepared.added.length) this.products.update(items => [...items, ...prepared.added]);
     if (prepared.order.status === 'Confirmado') this.applyPurchase(prepared.order.items);
     this.orders.update(items => [prepared.order, ...items]);
@@ -435,7 +474,8 @@ export class DemoStore {
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
-    const saved = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const saved = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined,
+      confirmedAt: status === 'Confirmado' ? (item.confirmedAt ?? movementAt(item.effectiveDate ?? item.date)) : undefined };
     const dateError = this.effectiveDateError(saved);
     if (dateError) return { kind: 'error', message: dateError };
     if (status === 'Confirmado') {
@@ -446,24 +486,50 @@ export class DemoStore {
     this.sales.update(items => [saved, ...items]);
     return { kind: 'saved', status };
   }
-  updateOrder(item: Order, reason: OperationChange['reason'] = 'Edición') {
+  updateOrder(item: Order, reason: OperationChange['reason'] = 'Edición', note = '') {
     const previous = this.orders().find(order => order.id === item.id);
     if (!previous) return 'No encontramos la compra que deseas editar.';
+    if (reason === 'Edición' && !note.trim()) return 'Escribe el motivo de la edición.';
     if (previous.status === 'Anulada') return 'Una compra anulada no se puede editar.';
     if (item.status === 'Anulada') return 'Usa la acción Anular para cancelar una compra pendiente.';
+    if (fulfilledWeight(previous) > 0 && previous.status === 'Confirmado' && item.status !== 'Confirmado')
+      return 'Una compra con cabello recibido no puede volver a pendiente.';
+    if (previous.status === 'Pendiente' && previous.fulfillments?.length && item.status === 'Confirmado')
+      return 'Completa las cantidades pendientes desde el detalle de la compra.';
+    if (previous.status === 'Confirmado' && fulfilledWeight(previous) > 0
+      && (item.effectiveDate ?? item.date) !== operationEffectiveDate(previous))
+      return 'La fecha de un movimiento realizado se corrige desde su propio historial.';
     const dateError = this.effectiveDateError(item);
     if (dateError) return dateError;
     const prepared = this.prepareOrder(item);
-    const updated = { ...prepared.order, effectiveDate: item.status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const updated = { ...prepared.order, fulfillments: previous.fulfillments, payments: previous.payments,
+      confirmedAt: previous.fulfillments?.length || item.status !== 'Confirmado' ? undefined
+        : (item.confirmedAt ?? previous.confirmedAt ?? (previous.status === 'Confirmado'
+          ? undefined : movementAt(item.effectiveDate ?? item.date))),
+      effectiveDate: item.status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    for (const line of previous.items) {
+      const done = fulfilledQuantity(previous, line.productId);
+      if (done > this.lineWeight(updated.items, line.productId))
+        return `No puedes reducir ${productName(line.category, line.length)} por debajo de ${weight(done)} ya recibidos.`;
+    }
+    if (fulfilledWeight(previous) > 0 && previous.status === 'Confirmado'
+      && updated.items.some(line => line.quantity !== fulfilledQuantity(previous, line.productId)))
+      return 'No puedes cambiar el peso de una compra totalmente recibida.';
+    if (previous.fulfillments?.some(event => eventDate(event) < updated.date))
+      return 'La fecha de compra no puede ser posterior a una recepción ya registrada.';
+    if (previous.payments?.some(payment => payment.date < updated.date))
+      return 'La fecha de compra no puede ser posterior a un pago ya registrado.';
+    if (operationValue(updated.items) < operationPaid(previous))
+      return `El total de la compra no puede ser menor que ${money(operationPaid(previous))} ya pagados.`;
     const modifiedAt = new Date().toISOString();
-    const change = operationChange(previous, updated, reason, modifiedAt);
+    const change = operationChange(previous, updated, reason, modifiedAt, note.trim() || undefined);
     if (!change) return '';
     for (const product of [...this.products(), ...prepared.added]) {
-      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
-      const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
+      const oldQuantity = fulfilledQuantity(previous, product.id);
+      const newQuantity = fulfilledQuantity(updated, product.id);
       const physical = product.quantity + newQuantity - oldQuantity;
-      const oldPending = previous.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0;
-      const newPending = updated.status === 'Pendiente' ? this.lineWeight(updated.items, product.id) : 0;
+      const oldPending = previous.status === 'Pendiente' ? remainingQuantity(previous, product.id) : 0;
+      const newPending = updated.status === 'Pendiente' ? remainingQuantity(updated, product.id) : 0;
       const incoming = this.pendingPurchaseWeight(product.id) + newPending - oldPending;
       if (physical < 0) return `No puedes reducir esta compra: faltaría stock físico de ${product.name}.`;
       if (physical + incoming < this.pendingSaleWeight(product.id)) return `Este cambio dejaría sin respaldo reservas de ${product.name}.`;
@@ -472,8 +538,8 @@ export class DemoStore {
     const shortage = calculateFifo(this.initialLots, candidateOrders, this.sales()).shortages[0];
     if (shortage) return this.fifoShortageMessage(shortage.productId, shortage.quantity);
     this.products.update(products => [...products, ...prepared.added].map(product => {
-      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
-      const newQuantity = updated.status === 'Confirmado' ? this.lineWeight(updated.items, product.id) : 0;
+      const oldQuantity = fulfilledQuantity(previous, product.id);
+      const newQuantity = fulfilledQuantity(updated, product.id);
       return { ...product, quantity: product.quantity + newQuantity - oldQuantity };
     }));
     this.orders.update(orders => orders.map(order => order.id === item.id
@@ -483,7 +549,39 @@ export class DemoStore {
   confirmOrder(id: string, effectiveDate = todayLocal()) {
     const order = this.orders().find(item => item.id === id);
     if (!order || order.status !== 'Pendiente') return 'La compra ya no está pendiente.';
-    return this.updateOrder({ ...order, status: 'Confirmado', effectiveDate }, 'Confirmación');
+    return this.receiveOrder(id, order.items.map(item => ({ productId: item.productId,
+      quantity: remainingQuantity(order, item.productId) })).filter(item => item.quantity > 0), effectiveDate);
+  }
+  receiveOrder(id: string, items: Fulfillment['items'], effectiveDate = todayLocal(), effectiveTime = businessTime()) {
+    const order = this.orders().find(item => item.id === id);
+    if (!order || order.status !== 'Pendiente') return 'La compra ya no está pendiente.';
+    const dateError = this.movementDateError(order.date, effectiveDate, effectiveTime);
+    if (dateError) return dateError;
+    if (!items.length) return 'Ingresa al menos una cantidad recibida.';
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (seen.has(item.productId) || !order.items.some(line => line.productId === item.productId)
+        || !hasTwoDecimalPlaces(item.quantity) || item.quantity <= 0
+        || item.quantity > remainingQuantity(order, item.productId))
+        return 'Las cantidades recibidas deben ser mayores a cero y no superar lo pendiente de cada cabello.';
+      seen.add(item.productId);
+    }
+    const event: Fulfillment = { id: `${id}-REC-${String((order.fulfillments?.length ?? 0) + 1).padStart(4, '0')}`,
+      at: movementAt(effectiveDate, effectiveTime), recordedAt: new Date().toISOString(), items: items.map(item => ({ ...item })) };
+    const complete = order.items.every(line => remainingQuantity(order, line.productId)
+      <= (items.find(item => item.productId === line.productId)?.quantity ?? 0));
+    const nextEvents = [...(order.fulfillments ?? []), event].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+    const updated: Order = { ...order, status: complete ? 'Confirmado' : 'Pendiente',
+      effectiveDate: complete ? eventDate(nextEvents.at(-1)!) : undefined,
+      fulfillments: nextEvents };
+    const shortage = calculateFifo(this.initialLots, this.orders().map(entry => entry.id === id ? updated : entry), this.sales()).shortages[0];
+    if (shortage) return this.fifoShortageMessage(shortage.productId, shortage.quantity);
+    this.applyPurchase(eventLines(updated, event));
+    const recordedAt = event.recordedAt!;
+    const change = operationChange(order, updated, 'Confirmación', recordedAt);
+    this.orders.update(entries => entries.map(entry => entry.id === id ? { ...updated, modifiedAt: recordedAt,
+      changeHistory: change ? [...(order.changeHistory ?? []), change] : order.changeHistory } : entry));
+    return '';
   }
   cancelOrder(id: string) {
     const order = this.orders().find(item => item.id === id);
@@ -492,14 +590,14 @@ export class DemoStore {
     for (const item of order.items) {
       const product = this.products().find(product => product.id === item.productId);
       const remaining = (product?.quantity ?? 0) + this.pendingPurchaseWeight(item.productId)
-        - this.lineWeight(order.items, item.productId) - this.pendingSaleWeight(item.productId);
+        - remainingQuantity(order, item.productId) - this.pendingSaleWeight(item.productId);
       if (remaining < -0.000001) {
-        let backing = (product?.quantity ?? 0) + this.pendingPurchaseWeight(item.productId) - this.lineWeight(order.items, item.productId);
+        let backing = (product?.quantity ?? 0) + this.pendingPurchaseWeight(item.productId) - remainingQuantity(order, item.productId);
         const sales = this.sales().filter(sale => sale.status === 'Pendiente' && sale.items.some(line => line.productId === item.productId))
           .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
         const uncovered: string[] = [];
         for (const sale of sales) {
-          const quantity = this.lineWeight(sale.items, item.productId);
+          const quantity = remainingQuantity(sale, item.productId);
           if (quantity > backing + 0.000001) uncovered.push(`${sale.id} · ${sale.customer} (${weight(quantity - Math.max(0, backing))})`);
           backing -= quantity;
         }
@@ -507,6 +605,8 @@ export class DemoStore {
       }
     }
     if (affected.length) return `No se puede anular esta compra porque dejaría reservas sin respaldo. ${affected.join('. ')}`;
+    if (operationPaid(order) > fulfilledValue(order))
+      return 'No se puede anular el saldo pendiente mientras los pagos superen el valor recibido.';
     const cancelledAt = new Date().toISOString();
     const cancelled = { ...order, status: 'Anulada' as const };
     const change = operationChange(order, cancelled, 'Anulación', cancelledAt);
@@ -514,30 +614,52 @@ export class DemoStore {
       ? { ...cancelled, cancelledAt, changeHistory: change ? [...(order.changeHistory ?? []), change] : order.changeHistory } : entry));
     return '';
   }
-  updateSale(item: Sale, usePending = false, reason: OperationChange['reason'] = 'Edición'): SaleResult | { kind: 'error'; message: string } {
+  updateSale(item: Sale, usePending = false, reason: OperationChange['reason'] = 'Edición', note = ''): SaleResult | { kind: 'error'; message: string } {
     const previous = this.sales().find(sale => sale.id === item.id);
     if (!previous) return { kind: 'error', message: 'No encontramos la venta que deseas editar.' };
+    if (reason === 'Edición' && !note.trim()) return { kind: 'error', message: 'Escribe el motivo de la edición.' };
     if (previous.status === 'Anulada') return { kind: 'error', message: 'Una venta anulada no se puede editar.' };
     if (item.status === 'Anulada') return { kind: 'error', message: 'Usa la acción Anular para cancelar una venta pendiente.' };
+    if (previous.status === 'Confirmado' && item.status !== 'Confirmado')
+      return { kind: 'error', message: 'Una venta con cabello entregado no puede volver a pendiente.' };
+    if (previous.status === 'Pendiente' && previous.fulfillments?.length && item.status === 'Confirmado')
+      return { kind: 'error', message: 'Completa las cantidades pendientes desde el detalle de la venta.' };
+    if (previous.status === 'Confirmado' && fulfilledWeight(previous) > 0
+      && (item.effectiveDate ?? item.date) !== operationEffectiveDate(previous))
+      return { kind: 'error', message: 'La fecha de un movimiento realizado se corrige desde su propio historial.' };
+    for (const line of previous.items) if (fulfilledQuantity(previous, line.productId)
+      > this.lineWeight(item.items, line.productId))
+      return { kind: 'error', message: `No puedes reducir ${productName(line.category, line.length)} por debajo de la cantidad ya entregada.` };
+    if (fulfilledWeight(previous) > 0 && previous.status === 'Confirmado'
+      && item.items.some(line => line.quantity !== fulfilledQuantity(previous, line.productId)))
+      return { kind: 'error', message: 'No puedes cambiar el peso de una venta totalmente entregada.' };
+    if (previous.fulfillments?.some(event => eventDate(event) < item.date))
+      return { kind: 'error', message: 'La fecha de venta no puede ser posterior a una entrega ya registrada.' };
+    if (previous.payments?.some(payment => payment.date < item.date))
+      return { kind: 'error', message: 'La fecha de venta no puede ser posterior a un cobro ya registrado.' };
+    if (operationValue(item.items) < operationPaid(previous))
+      return { kind: 'error', message: `El total de la venta no puede ser menor que ${money(operationPaid(previous))} ya cobrados.` };
     const assessment = this.assessSale(item.items, previous);
     if (assessment.kind === 'error') return assessment;
     if (assessment.kind === 'insufficient') return assessment;
     if (assessment.kind === 'needs-pending' && !usePending) return assessment;
     const status = assessment.kind === 'needs-pending' ? 'Pendiente' : item.status;
-    const updated = { ...item, status, effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
+    const updated = { ...item, status, fulfillments: previous.fulfillments, payments: previous.payments,
+      confirmedAt: previous.fulfillments?.length || status !== 'Confirmado' ? undefined
+        : (item.confirmedAt ?? previous.confirmedAt ?? (previous.status === 'Confirmado'
+          ? undefined : movementAt(item.effectiveDate ?? item.date))),
+      effectiveDate: status === 'Confirmado' ? item.effectiveDate ?? item.date : undefined };
     const dateError = this.effectiveDateError(updated);
     if (dateError) return { kind: 'error', message: dateError };
     const modifiedAt = new Date().toISOString();
-    const change = operationChange(previous, updated, reason, modifiedAt);
+    const change = operationChange(previous, updated, reason, modifiedAt, note.trim() || undefined);
     if (!change) return { kind: 'saved', status };
-    if (status === 'Confirmado') {
-      const candidateSales = this.sales().map(sale => sale.id === item.id ? updated : sale);
-      const shortage = calculateFifo(this.initialLots, this.orders(), candidateSales).shortages[0];
-      if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
-    }
+    const candidateSales = this.sales().map(sale => sale.id === item.id ? updated : sale);
+    const shortage = calculateFifo(this.initialLots, this.orders(), candidateSales).shortages[0];
+    if (shortage) return { kind: 'error', message: this.fifoShortageMessage(shortage.productId, shortage.quantity) };
     this.products.update(products => products.map(product => {
-      const oldQuantity = previous.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0;
-      const newQuantity = status === 'Confirmado' ? this.lineWeight(item.items, product.id) : 0;
+      const oldQuantity = fulfilledQuantity(previous, product.id);
+      const newQuantity = fulfilledQuantity(updated, product.id);
       return { ...product, quantity: product.quantity + oldQuantity - newQuantity, sold: product.sold - oldQuantity + newQuantity };
     }));
     this.sales.update(sales => sales.map(sale => sale.id === item.id
@@ -545,19 +667,17 @@ export class DemoStore {
     return { kind: 'saved', status };
   }
   pendingPurchaseWeight(productId: string) {
-    return this.orders().filter(order => order.status === 'Pendiente')
-      .flatMap(order => order.items).filter(item => item.productId === productId)
-      .reduce((sum, item) => sum + item.quantity, 0);
+    return roundWeight(this.orders().filter(order => order.status === 'Pendiente')
+      .reduce((sum, order) => sum + remainingQuantity(order, productId), 0));
   }
   pendingSaleWeight(productId: string) {
-    return this.sales().filter(sale => sale.status === 'Pendiente')
-      .flatMap(sale => sale.items).filter(item => item.productId === productId)
-      .reduce((sum, item) => sum + item.quantity, 0);
+    return roundWeight(this.sales().filter(sale => sale.status === 'Pendiente')
+      .reduce((sum, sale) => sum + remainingQuantity(sale, productId), 0));
   }
   sellableWeight(productId: string) {
     const product = this.products().find(item => item.id === productId);
     if (!product) return 0;
-    return Math.max(0, Math.min(product.quantity, product.quantity + this.pendingPurchaseWeight(productId) - this.pendingSaleWeight(productId)));
+    return Math.max(0, product.quantity - this.pendingSaleWeight(productId));
   }
   reservableWeight(productId: string) {
     const product = this.products().find(item => item.id === productId);
@@ -569,16 +689,128 @@ export class DemoStore {
   confirmSale(id: string, effectiveDate = todayLocal()) {
     const sale = this.sales().find(item => item.id === id);
     if (!sale || sale.status !== 'Pendiente') return 'La venta ya no está pendiente.';
-    for (const item of sale.items) {
+    return this.deliverSale(id, sale.items.map(item => ({ productId: item.productId,
+      quantity: remainingQuantity(sale, item.productId) })).filter(item => item.quantity > 0), effectiveDate);
+  }
+  deliverSale(id: string, items: Fulfillment['items'], effectiveDate = todayLocal(), effectiveTime = businessTime()) {
+    const sale = this.sales().find(item => item.id === id);
+    if (!sale || sale.status !== 'Pendiente') return 'La venta ya no está pendiente.';
+    const dateError = this.movementDateError(sale.date, effectiveDate, effectiveTime);
+    if (dateError) return dateError;
+    if (!items.length) return 'Ingresa al menos una cantidad entregada.';
+    const seen = new Set<string>();
+    for (const item of items) {
+      const line = sale.items.find(entry => entry.productId === item.productId);
+      if (seen.has(item.productId) || !line || !hasTwoDecimalPlaces(item.quantity) || item.quantity <= 0
+        || item.quantity > remainingQuantity(sale, item.productId))
+        return 'Las cantidades entregadas deben ser mayores a cero y no superar lo pendiente de cada cabello.';
+      seen.add(item.productId);
       const product = this.products().find(entry => entry.id === item.productId);
-      if (!product || product.quantity < item.quantity) return `Aún no hay stock físico suficiente de ${productName(item.category, item.length)} para confirmar esta venta.`;
+      const earlier = this.sales().filter(entry => entry.status === 'Pendiente' && entry.id !== id
+        && (entry.date < sale.date || entry.date === sale.date && entry.id < sale.id))
+        .reduce((sum, entry) => sum + remainingQuantity(entry, item.productId), 0);
+      if (!product || item.quantity > Math.max(0, product.quantity - earlier))
+        return `Aún no hay stock físico suficiente de ${productName(line.category, line.length)} para entregar ${weight(item.quantity)}; hay ${weight(Math.max(0, (product?.quantity ?? 0) - earlier))} disponibles para esta reserva.`;
     }
-    const result = this.updateSale({ ...sale, status: 'Confirmado', effectiveDate }, false, 'Confirmación');
-    return result.kind === 'saved' ? '' : result.kind === 'error' ? result.message : 'Esta venta aún depende de stock pendiente.';
+    const event: Fulfillment = { id: `${id}-ENT-${String((sale.fulfillments?.length ?? 0) + 1).padStart(4, '0')}`,
+      at: movementAt(effectiveDate, effectiveTime), recordedAt: new Date().toISOString(), items: items.map(item => ({ ...item })) };
+    const complete = sale.items.every(line => remainingQuantity(sale, line.productId)
+      <= (items.find(item => item.productId === line.productId)?.quantity ?? 0));
+    const nextEvents = [...(sale.fulfillments ?? []), event].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+    const updated: Sale = { ...sale, status: complete ? 'Confirmado' : 'Pendiente',
+      effectiveDate: complete ? eventDate(nextEvents.at(-1)!) : undefined,
+      fulfillments: nextEvents };
+    const shortage = calculateFifo(this.initialLots, this.orders(), this.sales().map(entry => entry.id === id ? updated : entry)).shortages[0];
+    if (shortage) return this.fifoShortageMessage(shortage.productId, shortage.quantity);
+    this.applySale(eventLines(updated, event));
+    const recordedAt = event.recordedAt!;
+    const change = operationChange(sale, updated, 'Confirmación', recordedAt);
+    this.sales.update(entries => entries.map(entry => entry.id === id ? { ...updated, modifiedAt: recordedAt,
+      changeHistory: change ? [...(sale.changeHistory ?? []), change] : sale.changeHistory } : entry));
+    return '';
+  }
+  correctFulfillment(kind: 'purchase' | 'sale', id: string, eventId: string,
+    date: string, time: string, items: Fulfillment['items'], reason: string) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede corregir movimientos.';
+    if (!reason.trim()) return 'Escribe el motivo de la corrección.';
+    const operation = kind === 'purchase' ? this.orders().find(item => item.id === id)
+      : this.sales().find(item => item.id === id);
+    const original = operation && operationEvents(operation).find(event => event.id === eventId);
+    if (!operation || !original) return 'No encontramos el movimiento.';
+    if (original.voidedAt) return 'Este movimiento ya fue anulado.';
+    const dateError = items.length ? this.movementDateError(operation.date, date, time) : '';
+    if (dateError) return dateError;
+    const seen = new Set<string>();
+    for (const item of items) {
+      const line = operation.items.find(entry => entry.productId === item.productId);
+      const old = original.items.find(entry => entry.productId === item.productId)?.quantity ?? 0;
+      if (!line || seen.has(item.productId) || !hasTwoDecimalPlaces(item.quantity) || item.quantity <= 0
+        || item.quantity > roundWeight(line.quantity - fulfilledQuantity(operation, item.productId) + old))
+        return 'La corrección debe respetar el peso acordado y lo ya realizado en otros movimientos.';
+      seen.add(item.productId);
+    }
+    const before: FulfillmentSnapshot = { at: original.at, items: original.items.map(item => ({ ...item })) };
+    const after: FulfillmentSnapshot = { at: items.length ? movementAt(date, time) : original.at,
+      items: items.map(item => ({ ...item })) };
+    if (JSON.stringify(before) === JSON.stringify(after)) return '';
+    const changedAt = new Date().toISOString();
+    const corrected: Fulfillment = { ...original, ...after, voidedAt: items.length ? undefined : changedAt,
+      changes: [...(original.changes ?? []),
+      { at: changedAt, reason: reason.trim(), before, after }] };
+    const fulfillments = operationEvents(operation).map(event => event.id === eventId ? corrected : event)
+      .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+    const completed = operation.items.every(line => roundWeight(fulfillments.flatMap(event => event.items)
+      .filter(item => item.productId === line.productId).reduce((sum, item) => sum + item.quantity, 0)) === line.quantity);
+    const status: OperationStatus = operation.status === 'Anulada' ? 'Anulada' : completed ? 'Confirmado' : 'Pendiente';
+    const candidate = { ...operation, fulfillments, status, confirmedAt: undefined,
+      effectiveDate: status === 'Confirmado' ? eventDate(fulfillments.at(-1)!) : undefined };
+    if (operationPaid(operation) > operationPayableTotal(candidate))
+      return 'La corrección dejaría el valor realizado por debajo de lo ya pagado.';
+    for (const product of this.products()) {
+      const old = original.items.find(item => item.productId === product.id)?.quantity ?? 0;
+      const next = after.items.find(item => item.productId === product.id)?.quantity ?? 0;
+      const physical = roundWeight(product.quantity + (kind === 'purchase' ? next - old : old - next));
+      if (physical < 0) return `La corrección dejaría stock físico negativo de ${product.name}.`;
+      if (kind === 'purchase') {
+        const incoming = this.pendingPurchaseWeight(product.id)
+          - (operation.status === 'Pendiente' ? remainingQuantity(operation, product.id) : 0)
+          + (status === 'Pendiente' ? remainingQuantity(candidate, product.id) : 0);
+        if (roundWeight(physical + incoming) < this.pendingSaleWeight(product.id))
+          return `La corrección dejaría reservas sin respaldo de ${product.name}.`;
+      } else {
+        const reserved = this.pendingSaleWeight(product.id)
+          - (operation.status === 'Pendiente' ? remainingQuantity(operation, product.id) : 0)
+          + (status === 'Pendiente' ? remainingQuantity(candidate, product.id) : 0);
+        if (roundWeight(physical + this.pendingPurchaseWeight(product.id)) < reserved)
+          return `La corrección dejaría reservas sin respaldo de ${product.name}.`;
+      }
+    }
+    const fifo = kind === 'purchase'
+      ? calculateFifo(this.initialLots, this.orders().map(item => item.id === id ? candidate as Order : item), this.sales())
+      : calculateFifo(this.initialLots, this.orders(), this.sales().map(item => item.id === id ? candidate as Sale : item));
+    const shortage = fifo.shortages[0];
+    if (shortage) return this.fifoShortageMessage(shortage.productId, shortage.quantity);
+    this.products.update(products => products.map(product => {
+      const old = original.items.find(item => item.productId === product.id)?.quantity ?? 0;
+      const next = after.items.find(item => item.productId === product.id)?.quantity ?? 0;
+      const delta = next - old;
+      return kind === 'purchase' ? { ...product, quantity: roundWeight(product.quantity + delta) }
+        : { ...product, quantity: roundWeight(product.quantity - delta), sold: roundWeight(product.sold + delta) };
+    }));
+    const change = operationChange(operation, candidate, 'Edición', changedAt, reason.trim());
+    if (kind === 'purchase') this.orders.update(entries => entries.map(entry => entry.id === id
+      ? { ...candidate as Order, modifiedAt: changedAt,
+        changeHistory: change ? [...(operation.changeHistory ?? []), change] : operation.changeHistory } : entry));
+    else this.sales.update(entries => entries.map(entry => entry.id === id
+      ? { ...candidate as Sale, modifiedAt: changedAt,
+        changeHistory: change ? [...(operation.changeHistory ?? []), change] : operation.changeHistory } : entry));
+    return '';
   }
   cancelSale(id: string) {
     const sale = this.sales().find(item => item.id === id);
     if (!sale || sale.status !== 'Pendiente') return 'Solo se pueden anular ventas pendientes.';
+    if (operationPaid(sale) > fulfilledValue(sale))
+      return 'No se puede anular el saldo pendiente mientras los cobros superen el valor entregado.';
     const cancelledAt = new Date().toISOString();
     const cancelled = { ...sale, status: 'Anulada' as const };
     const change = operationChange(sale, cancelled, 'Anulación', cancelledAt);
@@ -593,6 +825,20 @@ export class DemoStore {
     if (item.date > todayLocal()) return 'Una operación con fecha futura debe quedar pendiente hasta que se realice.';
     if (effectiveDate > todayLocal()) return 'No se puede confirmar una compra o venta con fecha efectiva futura.';
     if (effectiveDate < item.date) return 'La fecha efectiva no puede ser anterior a la fecha de compra o reserva.';
+    if (item.confirmedAt) {
+      if (item.confirmedAt.slice(0, 10) !== effectiveDate) return 'La fecha y hora efectivas deben corresponder al mismo día.';
+      const timeError = this.movementDateError(item.date, effectiveDate, item.confirmedAt.slice(11, 16));
+      if (timeError) return timeError;
+    }
+    return '';
+  }
+  private movementDateError(operationDate: string, date: string, time: string) {
+    const parsed = new Date(`${date}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime())
+      || parsed.toISOString().slice(0, 10) !== date || date < operationDate || date > todayLocal())
+      return 'La fecha del movimiento debe estar entre la fecha de la operación y hoy.';
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return 'Ingresa una hora válida para el movimiento.';
+    if (date === todayLocal() && time > businessTime()) return 'La hora del movimiento no puede estar en el futuro.';
     return '';
   }
   private fifoShortageMessage(productId: string, missing: number) {
@@ -612,12 +858,14 @@ export class DemoStore {
       if (used.has(product.id)) return { kind: 'error', message: 'Cada tipo de cabello debe aparecer una sola vez en la venta.' };
       used.add(product.id);
       const pending = this.pendingPurchaseWeight(product.id);
-      const reserved = this.pendingSaleWeight(product.id) - (previous?.status === 'Pendiente' ? this.lineWeight(previous.items, product.id) : 0);
-      const physical = product.quantity + (previous?.status === 'Confirmado' ? this.lineWeight(previous.items, product.id) : 0);
-      const available = Math.max(0, Math.min(physical, physical + pending - reserved));
+      const reserved = this.pendingSaleWeight(product.id) - (previous?.status === 'Pendiente' ? remainingQuantity(previous, product.id) : 0);
+      const priorDone = previous ? fulfilledQuantity(previous, product.id) : 0;
+      const physical = product.quantity;
+      const requested = roundWeight(item.quantity - priorDone);
+      const available = Math.max(0, physical - reserved);
       const backed = Math.max(0, physical + pending - reserved);
-      if (item.quantity > backed) shortages.push({ product, requested: item.quantity, physical: available, pending: Math.max(0, backed - available), missing: item.quantity - backed });
-      else if (item.quantity > available && !pendingRequired) pendingRequired = { kind: 'needs-pending', product, available, pending };
+      if (requested > backed) shortages.push({ product, requested, physical: available, pending: Math.max(0, backed - available), missing: requested - backed });
+      else if (requested > available && !pendingRequired) pendingRequired = { kind: 'needs-pending', product, available, pending };
     }
     if (shortages.length) return { kind: 'insufficient', shortages };
     return pendingRequired ?? { kind: 'ready' };
@@ -628,14 +876,88 @@ export class DemoStore {
   private applyPurchase(items: HairLine[]) {
     this.products.update(products => products.map(product => {
       const quantity = items.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
-      return quantity ? { ...product, quantity: product.quantity + quantity } : product;
+      return quantity ? { ...product, quantity: roundWeight(product.quantity + quantity) } : product;
     }));
   }
   private applySale(items: HairLine[]) {
     this.products.update(products => products.map(product => {
       const quantity = items.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
-      return quantity ? { ...product, quantity: product.quantity - quantity, sold: product.sold + quantity } : product;
+      return quantity ? { ...product, quantity: roundWeight(product.quantity - quantity), sold: roundWeight(product.sold + quantity) } : product;
     }));
+  }
+  private paymentError(operation: Order | Sale, date: string, amount: number, maximum: number) {
+    const parsed = new Date(`${date}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime())
+      || parsed.toISOString().slice(0, 10) !== date || date < operation.date || date > todayLocal())
+      return 'La fecha del pago debe estar entre la fecha de la operación y hoy.';
+    if (!hasTwoDecimalPlaces(amount) || amount <= 0) return 'El importe debe ser mayor a cero y tener como máximo dos decimales.';
+    if (amountCents(amount, 1) > amountCents(maximum, 1)) return `El pago no puede superar ${money(maximum)}.`;
+    return '';
+  }
+  addOperationPayment(kind: 'purchase' | 'sale', id: string, input: OperationPaymentSnapshot) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede registrar pagos.';
+    if (!['Efectivo', 'QR', 'Transferencia', 'Otro'].includes(input.method)) return 'Selecciona un método de pago válido.';
+    const operation = kind === 'purchase' ? this.orders().find(item => item.id === id)
+      : this.sales().find(item => item.id === id);
+    if (!operation) return 'No encontramos la operación.';
+    const error = this.paymentError(operation, input.date, input.amount, operationBalance(operation));
+    if (error) return error;
+    const next = (operation.payments?.length ?? 0) + 1;
+    const payment: OperationPayment = { ...input, amount: amountCents(input.amount, 1) / 100,
+      reference: input.reference.trim(), id: `${id}-PAG-${String(next).padStart(4, '0')}` };
+    const modifiedAt = new Date().toISOString();
+    if (kind === 'purchase') this.orders.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt, payments: [...(item.payments ?? []), payment] } : item));
+    else this.sales.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt, payments: [...(item.payments ?? []), payment] } : item));
+    return '';
+  }
+  updateOperationPayment(kind: 'purchase' | 'sale', id: string, paymentId: string,
+    input: OperationPaymentSnapshot, reason: string) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede corregir pagos.';
+    if (!reason.trim()) return 'Escribe el motivo de la corrección del pago.';
+    if (!['Efectivo', 'QR', 'Transferencia', 'Otro'].includes(input.method)) return 'Selecciona un método de pago válido.';
+    const operation = kind === 'purchase' ? this.orders().find(item => item.id === id)
+      : this.sales().find(item => item.id === id);
+    const payment = operation?.payments?.find(item => item.id === paymentId);
+    if (!operation || !payment) return 'No encontramos el pago.';
+    if (payment.voidedAt) return 'Un pago anulado no se puede corregir.';
+    const maximum = sumMoney([operationBalance(operation), payment.amount]);
+    const error = this.paymentError(operation, input.date, input.amount, maximum);
+    if (error) return error;
+    const before: OperationPaymentState = { date: payment.date, amount: payment.amount,
+      method: payment.method, reference: payment.reference, voided: false };
+    const after: OperationPaymentState = { ...input, amount: amountCents(input.amount, 1) / 100,
+      reference: input.reference.trim(), voided: false };
+    if (JSON.stringify(before) === JSON.stringify(after)) return '';
+    const at = new Date().toISOString();
+    const updated: OperationPayment = { ...payment, date: after.date, amount: after.amount,
+      method: after.method, reference: after.reference, changes: [...(payment.changes ?? []),
+      { at, reason: reason.trim(), before, after }] };
+    if (kind === 'purchase') this.orders.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt: at, payments: item.payments?.map(entry => entry.id === paymentId ? updated : entry) } : item));
+    else this.sales.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt: at, payments: item.payments?.map(entry => entry.id === paymentId ? updated : entry) } : item));
+    return '';
+  }
+  voidOperationPayment(kind: 'purchase' | 'sale', id: string, paymentId: string, reason: string) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede anular pagos.';
+    if (!reason.trim()) return 'Escribe el motivo de la anulación del pago.';
+    const operation = kind === 'purchase' ? this.orders().find(item => item.id === id)
+      : this.sales().find(item => item.id === id);
+    const payment = operation?.payments?.find(item => item.id === paymentId);
+    if (!operation || !payment) return 'No encontramos el pago.';
+    if (payment.voidedAt) return 'Este pago ya fue anulado.';
+    const at = new Date().toISOString();
+    const before: OperationPaymentState = { date: payment.date, amount: payment.amount,
+      method: payment.method, reference: payment.reference, voided: false };
+    const updated: OperationPayment = { ...payment, voidedAt: at, changes: [...(payment.changes ?? []),
+      { at, reason: reason.trim(), before, after: { ...before, voided: true } }] };
+    if (kind === 'purchase') this.orders.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt: at, payments: item.payments?.map(entry => entry.id === paymentId ? updated : entry) } : item));
+    else this.sales.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt: at, payments: item.payments?.map(entry => entry.id === paymentId ? updated : entry) } : item));
+    return '';
   }
   addDebt(item: Debt) { this.debts.update(items => [item, ...items]); }
   updateDebt(item: Debt) {
@@ -655,7 +977,7 @@ export class DemoStore {
       || parsedDate.toISOString().slice(0, 10) !== date || date < debt.date || date > todayLocal()) {
       return 'La fecha del pago debe ser válida y estar entre la fecha de registro y hoy.';
     }
-    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 0.000001) {
+    if (!hasTwoDecimalPlaces(amount) || amount <= 0) {
       return 'Ingresa un importe mayor a cero con un máximo de dos decimales.';
     }
     if (amountCents(amount, 1) > amountCents(maximum, 1)) return `El abono no puede superar ${money(maximum)}.`;
@@ -709,20 +1031,74 @@ export class DemoStore {
 }
 
 export const money = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
-export const unitPriceLabel = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 12 }).format(value)}`;
-export const weight = (grams: number) => grams >= 1000 ? `${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(grams / 1000)} kg` : `${new Intl.NumberFormat('es-BO').format(grams)} g`;
+export const unitPriceLabel = (value: number) => `Bs. ${new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+export const weight = (grams: number) => `${new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(grams)} g`;
 export const categoryLabel = (value: HairCategory) => value.charAt(0).toUpperCase() + value.slice(1);
 export const productName = (category: HairCategory, length: HairLength) => `Cabello ${category} ${length} cm`;
 export const operationName = (date: string, party: string) => `${dateLabel(date)} · ${party}`;
-export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => sum + item.quantity, 0);
+export const operationWeight = (items: HairLine[]) => items.reduce((sum, item) => roundWeight(sum + item.quantity), 0);
+export const roundWeight = (quantity: number) => Math.round(quantity * 100) / 100;
 export const operationValue = (items: HairLine[]) => sumMoney(items.map(item => lineValue(item.quantity, item.unitPrice)));
 export const operationEffectiveDate = (item: Order | Sale) => item.effectiveDate ?? item.date;
-export const todayLocal = () => {
+export const operationEvents = (operation: Order | Sale): Fulfillment[] => operation.fulfillments ?? (
+  operation.status === 'Confirmado' ? [{ id: `${operation.id}-completo`, at: operation.confirmedAt
+    ? `${operationEffectiveDate(operation)}T${operation.confirmedAt.slice(11)}` : `${operationEffectiveDate(operation)}T00:00:00-04:00`,
+    items: operation.items.map(item => ({ productId: item.productId, quantity: item.quantity })) }] : []);
+export const fulfilledQuantity = (operation: Order | Sale, productId: string) => operationEvents(operation)
+  .flatMap(event => event.items).filter(item => item.productId === productId)
+  .reduce((sum, item) => roundWeight(sum + item.quantity), 0);
+export const remainingQuantity = (operation: Order | Sale, productId: string) =>
+  Math.max(0, roundWeight(operation.items.filter(item => item.productId === productId).reduce((sum, item) => sum + item.quantity, 0)
+    - fulfilledQuantity(operation, productId)));
+export const fulfilledWeight = (operation: Order | Sale) => operationEvents(operation)
+  .flatMap(event => event.items).reduce((sum, item) => roundWeight(sum + item.quantity), 0);
+export const eventWeight = (event: Fulfillment) => event.items.reduce((sum, item) => roundWeight(sum + item.quantity), 0);
+export const fulfillmentSummary = (operation: Order | Sale, items: Fulfillment['items']) => items.map(part => {
+  const line = operation.items.find(item => item.productId === part.productId);
+  return `${line ? productName(line.category, line.length) : part.productId}: ${weight(part.quantity)}`;
+}).join(' · ') || 'Sin cantidades';
+export const fulfilledValue = (operation: Order | Sale) => sumMoney(operation.items.map(item =>
+  lineValue(fulfilledQuantity(operation, item.productId), item.unitPrice)));
+export const pendingValue = (operation: Order | Sale) => operation.status === 'Pendiente'
+  ? sumMoney([operationValue(operation.items), -fulfilledValue(operation)]) : 0;
+export const operationPayableTotal = (operation: Order | Sale) => operation.status === 'Anulada'
+  ? fulfilledValue(operation) : operationValue(operation.items);
+export const operationPaid = (operation: Order | Sale) => sumMoney((operation.payments ?? [])
+  .filter(payment => !payment.voidedAt).map(payment => payment.amount));
+export const operationBalance = (operation: Order | Sale) => Math.max(0,
+  sumMoney([operationPayableTotal(operation), -operationPaid(operation)]));
+export const eventLines = (operation: Order | Sale, event: Fulfillment): HairLine[] => event.items.flatMap(part => {
+  const line = operation.items.find(item => item.productId === part.productId);
+  return line ? [{ ...line, quantity: part.quantity }] : [];
+});
+export const eventLineValue = (operation: Order | Sale, event: Fulfillment, productId: string) => {
+  const earlier = operationEvents(operation).slice(0, operationEvents(operation).findIndex(item => item.id === event.id));
+  const part = event.items.find(item => item.productId === productId);
+  const line = operation.items.find(item => item.productId === productId);
+  if (!part || !line) return 0;
+  const before = earlier.flatMap(item => item.items).filter(item => item.productId === productId)
+    .reduce((sum, item) => sum + item.quantity, 0);
+  return sumMoney([lineValue(before + part.quantity, line.unitPrice), -lineValue(before, line.unitPrice)]);
+};
+export const eventValue = (operation: Order | Sale, event: Fulfillment) => sumMoney(event.items
+  .map(part => eventLineValue(operation, event, part.productId)));
+export const eventDate = (event: Fulfillment) => event.at.slice(0, 10);
+export const businessTime = () => {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/La_Paz', hourCycle: 'h23',
+    hour: '2-digit', minute: '2-digit' }).formatToParts(now);
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '00';
+  return `${part('hour')}:${part('minute')}`;
+};
+export const movementAt = (date: string, time = businessTime()) => `${date}T${time}:00-04:00`;
+export const todayLocal = () => {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/La_Paz', year: 'numeric',
+    month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '00';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 };
 export const dateLabel = (value: string) => value ? new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)) : '—';
-export const modifiedLabel = (value: string) => new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+export const modifiedLabel = (value: string) => new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/La_Paz' }).format(new Date(value));
 export const stockStatus = (product: Product) => product.quantity === 0 ? 'Agotado' : product.quantity <= product.threshold ? 'Stock bajo' : 'Disponible';
 export const debtPaid = (debt: Debt) => sumMoney(debt.payments.filter(payment => !payment.voidedAt).map(payment => payment.amount));
 export const debtBalance = (debt: Debt) => Math.max(0, sumMoney([debt.total, -debtPaid(debt)]));

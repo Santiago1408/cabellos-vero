@@ -21,7 +21,7 @@ export function downloadCompleteBackup(store: DemoStore) {
   };
 
   add('manifest', 'backup', {
-    format: 'la-magia-del-cabello-csv', version: 1, exportedAt: new Date().toISOString(),
+    format: 'la-magia-del-cabello-csv', version: 2, exportedAt: new Date().toISOString(),
     currency: 'BOB', weightUnit: 'g', businessTimeZone: 'America/La_Paz', counts,
     note: 'Los empleados se exportan sin contraseñas y las sesiones activas no se incluyen.',
   });

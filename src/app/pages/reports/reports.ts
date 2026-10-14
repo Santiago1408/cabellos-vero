@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DemoStore, categoryLabel, money, operationValue, productName, todayLocal, weight } from '../../data/demo-store';
+import { DemoStore, categoryLabel, eventValue, money, operationEvents, productName, todayLocal, weight } from '../../data/demo-store';
 import { ReportPeriod, summarizePeriods } from '../../data/report-periods';
 import { Icon } from '../../shared/icon/icon';
 import { sumMoney } from '../../data/money';
@@ -21,7 +21,8 @@ export class Reports {
   readonly periodHeading = computed(() => ({ days: 'Resultados diarios', weeks: 'Resultados semanales', months: 'Resultados mensuales' })[this.period()]);
   readonly periodColumn = computed(() => ({ days: 'Día', weeks: 'Semana', months: 'Mes' })[this.period()]);
   setPeriod(value: ReportPeriod) { this.period.set(value); }
-  readonly revenue = computed(() => sumMoney(this.store.confirmedSales().map(sale => operationValue(sale.items))));
+  readonly revenue = computed(() => sumMoney(this.store.sales().flatMap(sale => operationEvents(sale)
+    .map(event => eventValue(sale, event)))));
   readonly costs = computed(() => sumMoney(this.store.fifo().allocations.map(item => item.cost)));
   readonly profit = computed(() => sumMoney([this.revenue(), -this.costs()]));
   readonly stockValue = computed(() => this.store.fifo().remainingValue);
@@ -30,8 +31,11 @@ export class Reports {
   })).filter(product => product.soldWeight > 0).sort((a, b) => b.soldWeight - a.soldWeight).slice(0, 5));
   readonly topCategories = computed(() => {
     const totals = new Map<string, number>();
-    for (const sale of this.store.confirmedSales()) for (const item of sale.items)
-      totals.set(item.category, (totals.get(item.category) ?? 0) + item.quantity);
+    for (const sale of this.store.sales()) for (const event of operationEvents(sale))
+      for (const part of event.items) {
+        const line = sale.items.find(item => item.productId === part.productId);
+        if (line) totals.set(line.category, (totals.get(line.category) ?? 0) + part.quantity);
+      }
     const all = [...totals.values()].reduce((sum, quantity) => sum + quantity, 0);
     return [...totals].sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([name, sold]) => ({ name, sold, percent: all ? Math.round(sold / all * 100) : 0 }));

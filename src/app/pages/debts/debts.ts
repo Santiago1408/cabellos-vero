@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Debt, DebtChange, DebtPayment, DemoStore, dateLabel, debtBalance, debtPaid, debtStatus, downloadCsv, modifiedLabel, money, todayLocal } from '../../data/demo-store';
-import { sumMoney } from '../../data/money';
+import { hasTwoDecimalPlaces, sumMoney } from '../../data/money';
 import { Icon } from '../../shared/icon/icon';
 
 type SortKey = 'party' | 'kind' | 'total' | 'paid' | 'balance' | 'dueDate' | 'status';
@@ -85,6 +85,7 @@ export class Debts {
   save(){
     if(!this.draft.party.trim()||!this.draft.phone.trim()||!this.draft.date||!this.draft.dueDate){this.error.set('Completa la persona o empresa, teléfono y fechas.');return;}
     if(!Number.isFinite(this.draft.total)||this.draft.total<=0){this.error.set('El monto original debe ser mayor a cero.');return;}
+    if(!hasTwoDecimalPlaces(this.draft.total)){this.error.set('El monto original admite como máximo dos decimales.');return;}
     if(debtPaid(this.draft)>this.draft.total){this.error.set('El monto original no puede ser menor que los pagos ya registrados.');return;}
     if(this.draft.payments.some(payment=>payment.date<this.draft.date)){this.error.set('La fecha de registro no puede ser posterior a un abono registrado, incluso si fue anulado.');return;}
     if(this.editingId()) this.store.updateDebt({...this.draft,id:this.editingId()});

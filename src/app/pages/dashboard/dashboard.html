@@ -6,10 +6,10 @@
   <section class="card dash-panel sales-panel">
     <div class="card-heading"><h2>Resultados del mes</h2><a routerLink="/reportes" class="text-link">Ver reportes <app-icon name="arrow" /></a></div>
     <div class="metric-row four">
-      <div class="metric"><span class="metric-icon"><app-icon name="chart" /></span><strong>{{ money(revenue()) }}</strong><small>Ingresos por ventas confirmadas</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="chart" /></span><strong>{{ money(revenue()) }}</strong><small>Ingresos por cabello entregado</small></div>
       <div class="metric"><span class="metric-icon"><app-icon name="package" /></span><strong>{{ money(costs()) }}</strong><small>Costo del cabello vendido</small></div>
       <div class="metric"><span class="metric-icon"><app-icon name="arrow" /></span><strong>{{ money(profit()) }}</strong><small>Margen bruto</small></div>
-      <div class="metric"><span class="metric-icon"><app-icon name="truck" /></span><strong>{{ money(purchaseValue()) }}</strong><small>Compras confirmadas</small></div>
+      <div class="metric"><span class="metric-icon"><app-icon name="truck" /></span><strong>{{ money(purchaseValue()) }}</strong><small>Cabello recibido</small></div>
     </div>
   </section>
   <section class="card dash-panel inventory-panel">
@@ -20,7 +20,7 @@
     <div class="quick-counts"><a routerLink="/pedidos"><strong>{{ pendingOrdersCount() }}</strong> compras pendientes</a><a routerLink="/ventas"><strong>{{ pendingSalesCount() }}</strong> ventas reservadas</a></div>
   </section>
   <section class="card chart-card">
-    <div class="card-heading"><h2>Compras y ventas confirmadas</h2><span class="period-pill">Últimos 6 meses</span></div>
+    <div class="card-heading"><h2>Compras recibidas y ventas entregadas</h2><span class="period-pill">Últimos 6 meses</span></div>
     <div class="bar-chart">
       <div class="chart-gridlines">@for (label of chartLabels(); track $index) { <span>{{ label }}</span> }</div>
       <div class="bar-columns">
@@ -41,12 +41,12 @@
     <div class="card-heading"><h2>Movimientos por confirmar</h2></div>
     <div class="pending-group"><h3>Compras pendientes</h3>
       @for (order of pendingOrders(); track order.id) {
-        <a routerLink="/pedidos" [queryParams]="{ detalle: order.id }" class="pending-link"><span>{{ order.supplier }}<small>{{ dateLabel(order.date) }}</small></span><strong>{{ money(operationValue(order.items)) }}</strong></a>
+        <a routerLink="/pedidos" [queryParams]="{ detalle: order.id }" class="pending-link"><span>{{ order.supplier }}<small>{{ dateLabel(order.date) }} · saldo pendiente</small></span><strong>{{ money(pendingValue(order)) }}</strong></a>
       } @empty { <p class="empty-pending">No hay compras pendientes.</p> }
     </div>
     <div class="pending-group"><h3>Ventas reservadas</h3>
       @for (sale of pendingSales(); track sale.id) {
-        <a routerLink="/ventas" [queryParams]="{ detalle: sale.id }" class="pending-link"><span>{{ sale.customer }}<small>{{ dateLabel(sale.date) }}</small></span><strong>{{ money(operationValue(sale.items)) }}</strong></a>
+        <a routerLink="/ventas" [queryParams]="{ detalle: sale.id }" class="pending-link"><span>{{ sale.customer }}<small>{{ dateLabel(sale.date) }} · saldo pendiente</small></span><strong>{{ money(pendingValue(sale)) }}</strong></a>
       } @empty { <p class="empty-pending">No hay ventas reservadas.</p> }
     </div>
   </section>
@@ -63,7 +63,7 @@
       <thead><tr><th>Cabello</th><th>Peso vendido</th><th>En stock</th><th>Ingresos reales</th></tr></thead>
       <tbody>@for (product of topProducts(); track product.id) {
         <tr><td class="mobile-title"><a [routerLink]="['/inventario', product.id]" class="table-primary">{{ product.name }}</a></td><td class="mobile-value" data-label="Vendido">{{ weight(product.soldWeight) }}</td><td class="mobile-meta" data-label="En stock">{{ weight(product.quantity) }}</td><td class="mobile-hide">{{ money(product.revenue) }}</td></tr>
-      } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay ventas confirmadas.</td></tr> }</tbody>
+      } @empty { <tr><td colspan="4" class="empty-table">Todavía no hay entregas registradas.</td></tr> }</tbody>
     </table></div>
   </section>
   <section class="card low-stock-card">

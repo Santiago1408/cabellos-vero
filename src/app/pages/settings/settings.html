@@ -12,7 +12,10 @@
       <p class="profile-data">Usuario: <strong>{{ store.currentUsername() }}</strong></p>
       <button type="button" class="btn btn-primary" (click)="saveAdminName()">Guardar nombre</button>
     } @else if (store.currentEmployee(); as employee) {
-      <p class="muted">Tus datos son de consulta. Solicita cualquier cambio al administrador.</p>
+      @if (store.mustChangePassword()) {
+        <p class="password-required" role="status">La contraseña asignada por el administrador es temporal. Cámbiala para acceder al sistema.</p>
+      }
+      <p class="muted">Tus datos personales son de consulta. Solicita cualquier cambio al administrador.</p>
       <dl class="profile-details">
         <div><dt>Nombre completo</dt><dd>{{ employee.fullName }}</dd></div>
         <div><dt>Usuario</dt><dd>{{ employee.username }}</dd></div>
@@ -20,6 +23,21 @@
         <div><dt>Fecha de nacimiento</dt><dd>{{ dateLabel(employee.birthDate) }}</dd></div>
         <div><dt>Celular</dt><dd>{{ employee.phone }}</dd></div>
       </dl>
+      <form class="password-form" (ngSubmit)="saveEmployeePassword()">
+        <h3>{{ store.mustChangePassword() ? 'Crear nueva contraseña' : 'Cambiar contraseña' }}</h3>
+        <label class="field-label">Contraseña actual
+          <input class="field-input" type="password" name="currentPassword" autocomplete="current-password" [(ngModel)]="currentPassword" required />
+        </label>
+        <label class="field-label">Nueva contraseña
+          <input class="field-input" type="password" name="newPassword" autocomplete="new-password" [(ngModel)]="newPassword" required minlength="8" />
+        </label>
+        <label class="field-label">Confirmar nueva contraseña
+          <input class="field-input" type="password" name="confirmNewPassword" autocomplete="new-password" [(ngModel)]="confirmNewPassword" required />
+        </label>
+        @if (passwordError()) { <p class="form-error" role="alert">{{ passwordError() }}</p> }
+        @if (passwordSuccess()) { <p class="password-success" role="status">Contraseña actualizada.</p> }
+        <button type="submit" class="btn btn-primary">Guardar contraseña</button>
+      </form>
     }
   </section>
   @if (store.role() === 'admin') {

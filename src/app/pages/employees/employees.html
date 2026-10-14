@@ -68,11 +68,11 @@
           <label class="field-label">Celular<input class="field-input" type="tel" name="phone" [(ngModel)]="draft.phone" required /></label>
           <label class="field-label">Usuario<input class="field-input" name="username" [(ngModel)]="draft.username" autocomplete="off" required /></label>
           @if (!editingId()) {
-            <label class="field-label">Contraseña inicial<input class="field-input" type="password" name="password" [(ngModel)]="draft.password" autocomplete="new-password" minlength="8" required /></label>
+            <label class="field-label">Contraseña temporal<input class="field-input" type="password" name="password" [(ngModel)]="draft.password" autocomplete="new-password" minlength="8" required /></label>
           }
         </div>
         @if (editingId()) { <p class="inline-hint">Para cambiar la contraseña, usa «Restablecer contraseña» desde el detalle.</p> }
-        @else { <p class="inline-hint">Usa una contraseña de prueba de al menos 8 caracteres. Esta cuenta solo existe en memoria.</p> }
+        @else { <p class="inline-hint">Usa una contraseña de prueba de al menos 8 caracteres. El empleado deberá cambiarla en su primer ingreso. Esta cuenta solo existe en memoria.</p> }
         @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
         <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="closeForm()">Cancelar</button><button type="submit" class="btn btn-primary">{{ editingId() ? 'Guardar cambios' : 'Crear empleado' }}</button></div>
       </form>
@@ -110,7 +110,7 @@
             @for (change of detailHistory(); track $index) {
               <li>
                 <div class="employee-history-heading"><strong>{{ change.action }}</strong><time [attr.datetime]="change.at">{{ modifiedLabel(change.at) }}</time></div>
-                @if (change.action === 'Contraseña restablecida') { <p>La contraseña no se muestra en el historial.</p> }
+                @if (change.action === 'Contraseña restablecida' || change.action === 'Contraseña cambiada') { <p>La contraseña no se muestra en el historial.</p> }
                 @for (row of changeRows(change); track row.label) {
                   <div class="employee-history-row"><span>{{ row.label }}</span><span><small>Antes</small>{{ row.before }}</span><span><small>Después</small>{{ row.after }}</span></div>
                 }
@@ -141,8 +141,8 @@
     <section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Restablecer contraseña" (click)="$event.stopPropagation()">
       <div class="modal-header"><h2>Restablecer contraseña</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="closeReset()"><app-icon name="close" /></button></div>
       <form class="modal-form" (ngSubmit)="resetPassword()" novalidate>
-        <p class="inline-hint">Nueva contraseña de prueba para <strong>{{ employee.fullName }}</strong>.</p>
-        <label class="field-label">Nueva contraseña<input class="field-input" type="password" name="newPassword" [(ngModel)]="newPassword" autocomplete="new-password" minlength="8" required /></label>
+        <p class="inline-hint">Contraseña temporal para <strong>{{ employee.fullName }}</strong>. Deberá cambiarla al iniciar sesión para acceder al sistema.</p>
+        <label class="field-label">Contraseña temporal<input class="field-input" type="password" name="newPassword" [(ngModel)]="newPassword" autocomplete="new-password" minlength="8" required /></label>
         <label class="field-label">Repetir contraseña<input class="field-input" type="password" name="confirmPassword" [(ngModel)]="confirmPassword" autocomplete="new-password" minlength="8" required /></label>
         @if (actionError()) { <p class="form-error" role="alert">{{ actionError() }}</p> }
         <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="closeReset()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar contraseña</button></div>
