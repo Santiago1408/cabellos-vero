@@ -100,7 +100,7 @@ export class Suppliers {
     this.page.set(1);
   }
   export() {
-    downloadCsv('proveedores-cabello.csv', ['Proveedor', 'Teléfono', 'Ciudad', 'Dirección', 'Enlace de Google Maps'],
-      this.sorted().map(supplier => [supplier.name, supplier.phone, supplier.city, supplier.address, supplier.mapsUrl]));
+    downloadCsv('proveedores-cabello.csv', ['ID proveedor', 'Proveedor', 'Teléfono', 'Ciudad', 'Dirección', 'Enlace de Google Maps', 'Modificado el'],
+      this.store.suppliers().map(supplier => [supplier.id, supplier.name, supplier.phone, supplier.city, supplier.address, supplier.mapsUrl, supplier.modifiedAt ?? '']));
   }
 }

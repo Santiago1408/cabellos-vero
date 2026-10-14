@@ -137,7 +137,12 @@ export class Orders {
     this.modalOpen.set(false);
   }
   export() {
-    downloadCsv('compras-cabello.csv', ['Compra', 'Fecha de compra', 'Fecha de recepción', 'Proveedor', 'Calidad', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe Bs', 'Estado'],
-      this.sorted().flatMap(order => order.items.map(item => [operationName(order.date, order.supplier), order.date, order.status === 'Confirmado' ? order.effectiveDate ?? order.date : '', order.supplier, categoryLabel(item.category), item.length, item.quantity, item.unitPrice, lineValue(item.quantity, item.unitPrice), order.status])));
+    downloadCsv('compras-cabello.csv', ['ID compra', 'Compra', 'Fecha de registro', 'Fecha de recepción', 'Proveedor', 'Estado', 'Modificada el', 'Anulada el', 'Línea', 'ID producto', 'Categoría', 'Longitud cm', 'Peso g', 'Precio Bs/g', 'Importe línea Bs', 'Importe compra Bs', 'Historial de cambios JSON'],
+      this.store.orders().flatMap(order => order.items.map((item, index) => [
+        order.id, operationName(order.date, order.supplier), order.date, order.effectiveDate ?? '', order.supplier,
+        order.status, order.modifiedAt ?? '', order.cancelledAt ?? '', index + 1, item.productId,
+        item.category, item.length, item.quantity, item.unitPrice, lineValue(item.quantity, item.unitPrice),
+        operationValue(order.items), JSON.stringify(order.changeHistory ?? []),
+      ])));
   }
 }

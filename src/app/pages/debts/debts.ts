@@ -124,5 +124,5 @@ export class Debts {
     this.paymentActionError.set(message);
     if(!message)this.voidPromptId.set(null);
   }
-  export(){downloadCsv('deudas-efectivo.csv',['Código','Persona o empresa','Teléfono','Tipo','Monto original Bs.','Pagado Bs.','Saldo Bs.','Abonos vigentes','Abonos anulados','Fecha','Vencimiento','Estado','Notas'],this.sorted().map(d=>[d.id,d.party,d.phone,d.kind,d.total,debtPaid(d),debtBalance(d),d.payments.filter(payment=>!payment.voidedAt).length,d.payments.filter(payment=>!!payment.voidedAt).length,d.date,d.dueDate,debtStatus(d),d.notes]));}
+  export(){downloadCsv('deudas-efectivo.csv',['Código','Persona o empresa','Teléfono','Tipo','Monto original Bs.','Pagado Bs.','Saldo Bs.','Abonos vigentes','Abonos anulados','Fecha','Vencimiento','Estado','Notas','Abonos e historial JSON','Historial de deuda JSON'],this.store.debts().map(d=>[d.id,d.party,d.phone,d.kind,d.total,debtPaid(d),debtBalance(d),d.payments.filter(payment=>!payment.voidedAt).length,d.payments.filter(payment=>!!payment.voidedAt).length,d.date,d.dueDate,debtStatus(d),d.notes,JSON.stringify(d.payments),JSON.stringify(d.changeHistory??[])]));}
 }

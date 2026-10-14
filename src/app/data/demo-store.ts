@@ -682,10 +682,15 @@ export const debtStatus = (debt: Debt): DebtStatus => {
   if (debt.dueDate && debt.dueDate < todayLocal()) return 'Vencida';
   return debtPaid(debt) > 0 ? 'Parcial' : 'Pendiente';
 };
-export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+export function csvContent(headers: string[], rows: (string | number)[][]) {
   const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const content = [headers, ...rows].map(row => row.map(escape).join(';')).join('\n');
-  const url = URL.createObjectURL(new Blob(['\ufeff', content], { type: 'text/csv;charset=utf-8' }));
+  return `\ufeff${[headers, ...rows].map(row => row.map(escape).join(';')).join('\n')}`;
+}
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  downloadBlob(filename, new Blob([csvContent(headers, rows)], { type: 'text/csv;charset=utf-8' }));
 }

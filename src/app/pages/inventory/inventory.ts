@@ -107,6 +107,9 @@ export class Inventory {
     this.error.set(message);
     if (!message) { if (this.length() === length) this.length.set(''); this.page.set(1); }
   }
-  export() { downloadCsv('inventario-cabellos.csv', ['Categoría', 'Longitud cm', 'Stock g', 'Por recibir g', 'Reservado g', 'Disponible hoy g', 'Reserva adicional g'],
-    this.filtered().map(p => [categoryLabel(p.category), p.length, p.quantity, this.pendingPurchase(p.id), this.reserved(p.id), this.immediate(p.id), this.additional(p.id)])); }
+  export() { downloadCsv('inventario-cabellos.csv', ['ID producto', 'Nombre', 'Categoría', 'Longitud cm', 'Unidad', 'Stock g', 'Por recibir g', 'Reservado g', 'Disponible hoy g', 'Reserva adicional g', 'Lote inicial g', 'Coste lote inicial Bs/g', 'Vendido acumulado g', 'Precio referencia compra Bs/g', 'Precio referencia venta Bs/g', 'Umbral g', 'Color heredado', 'Calidad heredada', 'Proveedor heredado'],
+    this.store.products().map(p => {
+      const opening = this.store.initialLots.find(lot => lot.productId === p.id);
+      return [p.id, p.name, p.category, p.length, p.unit, p.quantity, this.pendingPurchase(p.id), this.reserved(p.id), this.immediate(p.id), this.additional(p.id), opening?.quantity ?? 0, opening?.unitCost ?? 0, p.sold, p.purchasePrice, p.salePrice, p.threshold, p.color, p.quality, p.supplier];
+    })); }
 }
