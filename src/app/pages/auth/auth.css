@@ -84,55 +84,15 @@
 .auth-card .field-input {
   height: 46px;
 }
-.auth-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-  color: #777;
-}
-.auth-options label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.auth-options input {
-  accent-color: var(--color-primary);
-}
-.auth-options a {
-  color: var(--color-primary);
-  font-weight: 700;
-}
 .auth-submit {
   height: 46px;
   font-size: 12px;
 }
-.demo-divider {
-  text-align: center;
-  margin: 27px 0 14px;
-  color: #aaa;
-  font-size: 9px;
-  letter-spacing: 1.3px;
-  font-weight: 750;
-}
-.demo-login-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.demo-login-buttons .btn {
-  white-space: normal;
-}
-.auth-switch {
-  text-align: center;
-  font-size: 11px;
-  color: #888;
-  margin: 28px 0 0;
-}
-.auth-switch a {
-  color: var(--color-primary);
-  font-weight: 750;
-}
+.demo-login { margin-top: 25px; padding: 15px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-subtle); font-size: 12px; color: #555; }
+.demo-login strong { color: #333; }
+.demo-login p { margin: 10px 0; line-height: 1.8; }
+.demo-login code { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.demo-login small { display: block; color: #777; line-height: 1.5; }
 
 /* Rules for this component view. */
 @media (max-width: 720px) {
@@ -159,8 +119,7 @@
     font-size: 11px;
   }
   .auth-card h2 { font-size: 30px; }
-  .auth-intro, .auth-options, .auth-switch, .demo-divider { font-size: 14px; }
-  .auth-options input { width: 18px; height: 18px; }
+  .auth-intro, .demo-login { font-size: 14px; }
   .auth-submit { min-height: 48px; font-size: 15px; }
-  .demo-login-buttons .btn { min-height: 48px; font-size: 14px; }
+  .demo-login code { font-size: 14px; }
 }

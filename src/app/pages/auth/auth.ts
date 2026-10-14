@@ -1,25 +1,34 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DemoStore } from '../../data/demo-store';
+import { Router } from '@angular/router';
+import { DemoStore, demoAdminCredentials } from '../../data/demo-store';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   templateUrl: './auth.html',
-  styleUrl: './auth.css'
+  styleUrl: './auth.css',
 })
 export class Auth {
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
   readonly store = inject(DemoStore);
-  readonly showHint = signal(false);
-  name = '';
-  email = '';
+  readonly demoAdmin = demoAdminCredentials;
+  readonly error = signal('');
+  username = '';
   password = '';
-  signup = false;
-  constructor() { this.signup = this.route.snapshot.routeConfig?.path === 'registro'; }
-  submit() { if (this.password.length < 8 || !this.email.includes('@')) return; this.store.displayName.set(this.name || this.email.split('@')[0]); this.enter('admin'); }
-  enter(role: 'admin' | 'user') { this.store.role.set(role); this.router.navigateByUrl('/dashboard'); }
+
+  submit() {
+    if (!this.username.trim() || !this.password) {
+      this.error.set('Ingresa tu usuario y contraseña.');
+      return;
+    }
+    if (!this.store.login(this.username, this.password)) {
+      this.error.set('Usuario o contraseña incorrectos, o cuenta desactivada.');
+      return;
+    }
+    this.error.set('');
+    this.password = '';
+    this.router.navigateByUrl(this.store.role() === 'admin' ? '/dashboard' : '/inventario');
+  }
 }

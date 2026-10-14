@@ -1,6 +1,6 @@
 # La Magia del Cabello · Prototipo de compra y venta de cabello
 
-Prototipo navegable en Angular con componentes standalone, TypeScript y Tailwind CSS. Administra un catálogo de cabello por categoría, longitud y peso para un negocio de una sola tienda.
+Prototipo navegable en Angular con componentes standalone y TypeScript. Administra un catálogo de cabello por categoría, longitud y peso para un negocio de una sola tienda.
 
 ## Ejecutar
 
@@ -9,12 +9,12 @@ npm install
 npm start
 ```
 
-Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el acceso, visitar `/ingresar`; allí se puede entrar como administrador o usuario de demostración.
+Abrir `http://localhost:4200/ingresar`. La cuenta fija de demostración del administrador usa `admin` / `CabelloDemo2026!`. Desde Empleados, el administrador puede crear cuentas de prueba para ingresar con usuario y contraseña.
 
 ## Pantallas
 
-- Inicio, inventario, detalle de cabello, proveedores, compras, ventas, deudas, reportes y configuración.
-- Ingreso y registro de demostración.
+- Inicio, inventario, detalle de cabello, proveedores, compras, ventas, deudas, empleados, reportes y configuración.
+- Ingreso de demostración con cuenta de administrador y empleados creados en memoria.
 - Catálogo de combinaciones de categoría y longitud con precios de compra/venta, color, calidad y existencias en gramos.
 - Manejo de cuentas por cobrar y por pagar, edición de deudas, abonos, filtros y exportación CSV.
 - Formularios modales para productos, proveedores, compras y ventas; edición de movimientos, filtros, ordenación, paginación y exportación CSV.
@@ -28,7 +28,7 @@ Abrir `http://localhost:4200`. La portada muestra el tablero. Para presentar el 
 - `src/app/data/demo-store.ts`: modelos, datos iniciales y estado en memoria.
 - `src/styles.css`: estilos compartidos y paleta global.
 
-Los cambios de datos viven solo en memoria y se reinician al recargar. Los roles permiten mostrar las diferencias de interfaz, sin autenticación ni autorización de servidor. Los gráficos de Inicio y Reportes se calculan a partir de compras y ventas confirmadas; los meses sin movimientos muestran cero. El stock inicial de demostración se trata como lotes iniciales con los costos ficticios existentes. El costo de cada venta y el valor del inventario se calculan por FIFO.
+Los cambios de datos y las cuentas de empleados viven solo en memoria y se reinician al recargar. El acceso y las contraseñas de esta versión son únicamente para la demostración; la autenticación y autorización reales deberán implementarse en el backend. Los empleados pueden consultar Inventario, Compras, Ventas, Reportes y su perfil. Las demás secciones son exclusivas del administrador. Los gráficos de Inicio y Reportes se calculan a partir de compras y ventas confirmadas; los meses sin movimientos muestran cero. El stock inicial de demostración se trata como lotes iniciales con los costos ficticios existentes. El costo de cada venta y el valor del inventario se calculan por lotes, empezando por el más antiguo.
 
 Las compras confirmadas suman stock físico y las ventas confirmadas lo descuentan. Las compras pendientes permanecen como stock por recibir; las ventas pendientes reservan capacidad. Cuando una venta requiere cabello por recibir, el sistema pide confirmación y la registra como pendiente hasta que la compra se confirme.
 

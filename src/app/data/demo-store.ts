@@ -4,7 +4,12 @@ import { amountCents, lineValue, sumMoney } from './money';
 
 export { lineValue } from './money';
 
-export type Role = 'admin' | 'user';
+export type Role = 'admin' | 'employee';
+export type EmployeeSnapshot = { fullName: string; username: string; ci: string; birthDate: string; phone: string; active: boolean };
+export type EmployeeChange = { at: string; action: 'Creación' | 'Edición' | 'Desactivación' | 'Reactivación' | 'Contraseña restablecida'; before?: EmployeeSnapshot; after: EmployeeSnapshot };
+export type Employee = EmployeeSnapshot & { id: string; createdAt: string; modifiedAt?: string; changes: EmployeeChange[] };
+export type EmployeeInput = Omit<EmployeeSnapshot, 'active'> & { password: string };
+export const demoAdminCredentials = { username: 'admin', password: 'CabelloDemo2026!' } as const;
 export const hairCategories = ['normal', 'choco', 'tinturado', 'premium', 'elite'] as const;
 export const hairLengths = [38, 40, 45, 50, 55, 60, 70, 80, 90, 100] as const;
 export type HairCategory = string;
@@ -98,6 +103,11 @@ const debtSnapshot = (debt: Debt): DebtSnapshot => ({
   date: debt.date, dueDate: debt.dueDate, notes: debt.notes,
 });
 
+const employeeSnapshot = (employee: Employee): EmployeeSnapshot => ({
+  fullName: employee.fullName, username: employee.username, ci: employee.ci,
+  birthDate: employee.birthDate, phone: employee.phone, active: employee.active,
+});
+
 const initialOrders: Order[] = [
   { id: 'COMP-1046', supplier: 'Acopio Cochabamba', date: '2026-09-25', status: 'Confirmado', items: [demoLine('CAB-001', 1800, 2.2), demoLine('CAB-002', 250, 2.8)] },
   { id: 'COMP-1045', supplier: 'Select Hair Bolivia', date: '2026-09-24', status: 'Pendiente', items: [demoLine('CAB-008', 1200, 6.8)] },
@@ -127,6 +137,18 @@ const initialDebts: Debt[] = [
 
 @Injectable({ providedIn: 'root' })
 export class DemoStore {
+  private readonly employeePasswords = new Map<string, string>();
+  readonly employees = signal<Employee[]>([]);
+  readonly session = signal<{ role: Role; employeeId?: string } | null>(null);
+  readonly currentEmployee = computed(() => this.employees().find(item => item.id === this.session()?.employeeId && item.active));
+  readonly role = computed<Role | null>(() => {
+    const session = this.session();
+    if (session?.role === 'admin') return 'admin';
+    return session?.role === 'employee' && this.currentEmployee() ? 'employee' : null;
+  });
+  readonly adminDisplayName = signal('Administrador');
+  readonly displayName = computed(() => this.role() === 'admin' ? this.adminDisplayName() : this.currentEmployee()?.fullName ?? '');
+  readonly currentUsername = computed(() => this.role() === 'admin' ? demoAdminCredentials.username : this.currentEmployee()?.username ?? '');
   readonly products = signal<Product[]>(initialProducts);
   readonly categories = signal<HairCategory[]>([...hairCategories]);
   readonly lengths = signal<HairLength[]>([...hairLengths]);
@@ -135,8 +157,6 @@ export class DemoStore {
   readonly sales = signal<Sale[]>(initialSales);
   readonly debts = signal<Debt[]>(initialDebts);
   readonly query = signal('');
-  readonly role = signal<Role>('admin');
-  readonly displayName = signal('Vero');
   readonly storeName = signal('La Magia del Cabello');
   readonly storeAddress = signal('Av. Principal 123, La Paz, Bolivia');
   readonly storePhone = signal('70123456');
@@ -145,6 +165,96 @@ export class DemoStore {
   readonly managedProducts = computed(() => this.products().filter(product => product.quantity > 0
     || this.orders().some(order => order.status === 'Confirmado' && order.items.some(item => item.productId === product.id))));
   readonly fifo = computed(() => calculateFifo(this.initialLots, this.orders(), this.sales()));
+  login(username: string, password: string) {
+    const normalized = username.trim().toLocaleLowerCase('es-BO');
+    if (normalized === demoAdminCredentials.username && password === demoAdminCredentials.password) {
+      this.session.set({ role: 'admin' });
+      return true;
+    }
+    const employee = this.employees().find(item => item.active && item.username.toLocaleLowerCase('es-BO') === normalized);
+    if (!employee || this.employeePasswords.get(employee.id) !== password) return false;
+    this.session.set({ role: 'employee', employeeId: employee.id });
+    return true;
+  }
+  logout() { this.session.set(null); }
+  renameAdmin(value: string) {
+    if (this.role() !== 'admin' || !value.trim()) return;
+    this.adminDisplayName.set(value.trim());
+  }
+  private employeeError(input: Omit<EmployeeInput, 'password'>, editingId?: string) {
+    if (!input.fullName.trim() || !input.username.trim() || !input.ci.trim() || !input.birthDate || !input.phone.trim()) {
+      return 'Completa el nombre, usuario, CI, fecha de nacimiento y celular.';
+    }
+    if (/\s/.test(input.username.trim())) return 'El nombre de usuario no puede contener espacios.';
+    if (this.employees().some(item => item.id !== editingId && item.username.toLocaleLowerCase('es-BO') === input.username.trim().toLocaleLowerCase('es-BO'))
+      || input.username.trim().toLocaleLowerCase('es-BO') === demoAdminCredentials.username) return 'Ese nombre de usuario ya está en uso.';
+    if (this.employees().some(item => item.id !== editingId && item.ci.toLocaleLowerCase('es-BO') === input.ci.trim().toLocaleLowerCase('es-BO'))) return 'Ese CI ya está registrado.';
+    const birthDate = new Date(`${input.birthDate}T12:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.birthDate) || Number.isNaN(birthDate.getTime())
+      || birthDate.toISOString().slice(0, 10) !== input.birthDate || input.birthDate > todayLocal()) return 'Ingresa una fecha de nacimiento válida, no posterior a hoy.';
+    return '';
+  }
+  addEmployee(input: EmployeeInput) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede gestionar empleados.';
+    const error = this.employeeError(input);
+    if (error) return error;
+    if (input.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
+    const id = `EMP-${String(Math.max(0, ...this.employees().map(item => Number(item.id.split('-')[1]) || 0)) + 1).padStart(3, '0')}`;
+    const now = new Date().toISOString();
+    const employee: Employee = {
+      id, fullName: input.fullName.trim(), username: input.username.trim(), ci: input.ci.trim(),
+      birthDate: input.birthDate, phone: input.phone.trim(), active: true, createdAt: now, changes: [],
+    };
+    employee.changes.push({ at: now, action: 'Creación', after: employeeSnapshot(employee) });
+    this.employeePasswords.set(id, input.password);
+    this.employees.update(items => [employee, ...items]);
+    return '';
+  }
+  updateEmployee(id: string, input: Omit<EmployeeInput, 'password'>) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede gestionar empleados.';
+    const previous = this.employees().find(item => item.id === id);
+    if (!previous) return 'No encontramos al empleado.';
+    const error = this.employeeError(input, id);
+    if (error) return error;
+    const after: EmployeeSnapshot = {
+      fullName: input.fullName.trim(), username: input.username.trim(), ci: input.ci.trim(),
+      birthDate: input.birthDate, phone: input.phone.trim(), active: previous.active,
+    };
+    const before = employeeSnapshot(previous);
+    if (JSON.stringify(before) === JSON.stringify(after)) return '';
+    const at = new Date().toISOString();
+    const change: EmployeeChange = { at, action: 'Edición', before, after };
+    this.employees.update(items => items.map(item => item.id === id
+      ? { ...item, ...after, modifiedAt: at, changes: [...item.changes, change] } : item));
+    return '';
+  }
+  setEmployeeActive(id: string, active: boolean) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede gestionar empleados.';
+    const previous = this.employees().find(item => item.id === id);
+    if (!previous) return 'No encontramos al empleado.';
+    if (previous.active === active) return active ? 'La cuenta ya está activa.' : 'La cuenta ya está desactivada.';
+    const at = new Date().toISOString();
+    const before = employeeSnapshot(previous);
+    const after = { ...before, active };
+    const change: EmployeeChange = { at, action: active ? 'Reactivación' : 'Desactivación', before, after };
+    this.employees.update(items => items.map(item => item.id === id
+      ? { ...item, active, modifiedAt: at, changes: [...item.changes, change] } : item));
+    return '';
+  }
+  resetEmployeePassword(id: string, password: string) {
+    if (this.role() !== 'admin') return 'Solo el administrador puede gestionar empleados.';
+    const previous = this.employees().find(item => item.id === id);
+    if (!previous) return 'No encontramos al empleado.';
+    if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
+    if (this.employeePasswords.get(id) === password) return 'La nueva contraseña debe ser diferente de la actual.';
+    const at = new Date().toISOString();
+    const snapshot = employeeSnapshot(previous);
+    const change: EmployeeChange = { at, action: 'Contraseña restablecida', before: snapshot, after: snapshot };
+    this.employeePasswords.set(id, password);
+    this.employees.update(items => items.map(item => item.id === id
+      ? { ...item, modifiedAt: at, changes: [...item.changes, change] } : item));
+    return '';
+  }
   readonly monthlySummaries = computed<MonthlySummary[]>(() => {
     const now = new Date();
     const costsBySale = new Map<string, number>();

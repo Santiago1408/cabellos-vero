@@ -3,41 +3,45 @@
     <button class="mobile-scrim" aria-label="Cerrar menú" (click)="mobileOpen.set(false)"></button>
   }
   <aside class="sidebar" [class.sidebar-open]="mobileOpen()">
-    <a class="brand" routerLink="/dashboard" (click)="mobileOpen.set(false)">
+    <a class="brand" [routerLink]="store.role() === 'admin' ? '/dashboard' : '/inventario'" (click)="mobileOpen.set(false)">
       <span class="brand-mark">MC<span class="brand-mark-dot"></span></span
       ><span>La Magia del <strong>Cabello</strong></span>
     </a>
     <div class="sidebar-caption">MENÚ PRINCIPAL</div>
     <nav class="nav-list" aria-label="Navegación principal">
-      <a routerLink="/dashboard" routerLinkActive="active" (click)="mobileOpen.set(false)"
-        ><app-icon name="home" /> <span>Inicio</span></a
-      >
+      @if (store.role() === 'admin') {
+        <a routerLink="/dashboard" routerLinkActive="active" (click)="mobileOpen.set(false)"
+          ><app-icon name="home" /> <span>Inicio</span></a>
+      }
       <a routerLink="/inventario" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="box" /> <span>Inventario</span></a
       >
       <a routerLink="/reportes" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="chart" /> <span>Reportes</span></a
       >
-      <a routerLink="/proveedores" routerLinkActive="active" (click)="mobileOpen.set(false)"
-        ><app-icon name="users" /> <span>Proveedores</span></a
-      >
+      @if (store.role() === 'admin') {
+        <a routerLink="/proveedores" routerLinkActive="active" (click)="mobileOpen.set(false)"
+          ><app-icon name="users" /> <span>Proveedores</span></a>
+      }
       <a routerLink="/pedidos" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="truck" /> <span>Compras</span></a
       >
       <a routerLink="/ventas" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="store" /> <span>Ventas</span></a
       >
-      <a routerLink="/deudas" routerLinkActive="active" (click)="mobileOpen.set(false)"
-        ><app-icon name="wallet" /> <span>Deudas</span></a
-      >
+      @if (store.role() === 'admin') {
+        <a routerLink="/deudas" routerLinkActive="active" (click)="mobileOpen.set(false)"
+          ><app-icon name="wallet" /> <span>Deudas</span></a>
+        <a routerLink="/empleados" routerLinkActive="active" (click)="mobileOpen.set(false)"
+          ><app-icon name="users" /> <span>Empleados</span></a>
+      }
     </nav>
     <div class="sidebar-bottom">
       <a routerLink="/configuracion" routerLinkActive="active" (click)="mobileOpen.set(false)"
         ><app-icon name="settings" /> <span>Configuración</span></a
       >
-      <a routerLink="/ingresar" (click)="mobileOpen.set(false)"
-        ><app-icon name="logout" /> <span>Cerrar sesión</span></a
-      >
+      <button type="button" class="sidebar-logout" (click)="logout()"
+        ><app-icon name="logout" /> <span>Cerrar sesión</span></button>
     </div>
   </aside>
   <div class="main-wrap">
@@ -51,13 +55,15 @@
       </button>
       <div class="topbar-right">
         <span class="demo-badge">DEMO</span>
-        <button
-          class="icon-button notification-button"
-          aria-label="Notificaciones"
-          (click)="notifications.set(!notifications())"
-        >
-          <app-icon name="bell" /><span class="notification-dot"></span>
-        </button>
+        @if (store.role() === 'admin') {
+          <button
+            class="icon-button notification-button"
+            aria-label="Notificaciones"
+            (click)="notifications.set(!notifications())"
+          >
+            <app-icon name="bell" /><span class="notification-dot"></span>
+          </button>
+        }
         <button
           class="profile-button"
           (click)="profileOpen.set(!profileOpen())"
@@ -66,11 +72,11 @@
           <span class="avatar">{{ initials }}</span
           ><span class="profile-copy"
             ><strong>{{ store.displayName() }}</strong
-            ><small>{{ store.role() === 'admin' ? 'Administrador' : 'Usuario' }}</small></span
+            ><small>{{ store.role() === 'admin' ? 'Administrador' : 'Empleado' }}</small></span
           ><span class="profile-caret">⌄</span>
         </button>
       </div>
-      @if (notifications()) {
+      @if (notifications() && store.role() === 'admin') {
         <div class="top-popover notice-popover">
           <strong>Notificaciones</strong>
           <p>
@@ -85,10 +91,9 @@
       @if (profileOpen()) {
         <div class="top-popover profile-popover">
           <strong>{{ store.displayName() }}</strong>
-          <p>Rol de demostración</p>
-          <button (click)="setRole('admin')">Administrador</button
-          ><button (click)="setRole('user')">Usuario</button
-          ><a routerLink="/ingresar" (click)="profileOpen.set(false)">Cerrar sesión</a>
+          <p>{{ store.role() === 'admin' ? 'Administrador' : 'Empleado' }} · {{ store.currentUsername() }}</p>
+          <a routerLink="/configuracion" (click)="profileOpen.set(false)">Ver perfil</a>
+          <button type="button" (click)="logout()">Cerrar sesión</button>
         </div>
       }
     </header>

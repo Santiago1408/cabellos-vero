@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DemoStore, debtStatus } from '../../data/demo-store';
 import { Icon } from '../icon/icon';
 
@@ -12,11 +12,17 @@ import { Icon } from '../icon/icon';
 })
 export class Shell {
   readonly store = inject(DemoStore);
+  private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
   readonly notifications = signal(false);
   readonly profileOpen = signal(false);
-  get initials() { return this.store.displayName().split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase(); }
+  get initials() { return this.store.displayName().split(' ').filter(Boolean).map(x => x[0]).slice(0, 2).join('').toUpperCase(); }
   get lowStockCount() { return this.store.managedProducts().filter(p => p.threshold > 0 && this.store.sellableWeight(p.id) <= p.threshold).length; }
   get overdueDebtCount() { return this.store.debts().filter(d => debtStatus(d) === 'Vencida').length; }
-  setRole(role: 'admin' | 'user') { this.store.role.set(role); this.profileOpen.set(false); }
+  logout() {
+    this.profileOpen.set(false);
+    this.mobileOpen.set(false);
+    this.store.logout();
+    this.router.navigateByUrl('/ingresar');
+  }
 }

@@ -29,7 +29,8 @@
   gap: 5px;
 }
 .nav-list a,
-.sidebar-bottom a {
+.sidebar-bottom a,
+.sidebar-bottom button {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -43,8 +44,10 @@
     background 0.2s,
     color 0.2s;
 }
+.sidebar-bottom button { width: 100%; border: 0; background: transparent; font-family: inherit; text-align: left; cursor: pointer; }
 .nav-list a:hover,
-.sidebar-bottom a:hover {
+.sidebar-bottom a:hover,
+.sidebar-bottom button:hover {
   background: var(--color-subtle);
   color: var(--color-primary);
 }
@@ -286,7 +289,7 @@
   .icon-button { width: 44px; height: 44px; }
   .icon-button app-icon { width: 22px; height: 22px; }
   .avatar { width: 40px; height: 40px; font-size: 14px; }
-  .nav-list a, .sidebar-bottom a { min-height: 52px; font-size: 15px; }
+  .nav-list a, .sidebar-bottom a, .sidebar-bottom button { min-height: 52px; font-size: 15px; }
   .nav-list app-icon, .sidebar-bottom app-icon { width: 22px; height: 22px; }
 }
 @media (max-width: 480px) {
