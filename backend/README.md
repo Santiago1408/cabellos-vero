@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación y gestión de empleados. Las operaciones del negocio todavía no están implementadas; sus rutas HTTP siguen denegadas.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados y catálogos de cabello. Las operaciones del negocio todavía no están implementadas; sus rutas HTTP siguen denegadas.
 
 ## Requisitos locales
 
@@ -77,6 +77,19 @@ Estas rutas requieren una sesión de **administrador**. Todas las escrituras req
 | `POST /api/employees/{id}/reset-password` | Genera una nueva clave temporal, cierra sus sesiones, obliga a cambiarla en el próximo ingreso y exige `reason`. |
 
 Las tres últimas acciones reciben JSON como `{"reason":"Corrección solicitada por el administrador"}`. La edición envía todos los datos del empleado más `reason`. Los usuarios y CI no se pueden repetir; las contraseñas nunca aparecen en el historial. La clave temporal generada tiene 20 caracteres y debe cambiarse en `POST /api/auth/password` antes de llamar a cualquier otra ruta protegida. Si falta o es inválido el token CSRF, la API responde `403`; si la sesión es de empleado, estas rutas responden `403`.
+
+## Catálogos de cabello
+
+`GET /api/catalog/categories` y `GET /api/catalog/lengths` permiten consultar las categorías y longitudes actuales con cualquier sesión válida. Se puede consultar una opción individual añadiendo `/{code}` o `/{centimeters}`. El administrador puede modificarlas con las siguientes rutas; todas las escrituras requieren el token CSRF:
+
+| Método y ruta | Cuerpo JSON | Resultado |
+| --- | --- | --- |
+| `POST /api/catalog/categories` | `{"displayName":"Nueva categoría"}` | `201`, devuelve `code` estable y `displayName`. |
+| `DELETE /api/catalog/categories/{code}` | Ninguno | `204` si se quitó. |
+| `POST /api/catalog/lengths` | `{"centimeters":65}` | `201`, devuelve la longitud. |
+| `DELETE /api/catalog/lengths/{centimeters}` | Ninguno | `204` si se quitó. |
+
+No se admiten nombres de categoría repetidos aunque cambien mayúsculas o espacios exteriores, longitudes repetidas ni valores no positivos. Debe quedar al menos una categoría y una longitud. Las futuras tablas de operaciones referenciarán estos catálogos mediante claves foráneas; esas referencias impedirán eliminar opciones ya usadas. Agregar una opción no crea stock ni combinaciones vacías en Inventario.
 
 ## Qué sigue
 

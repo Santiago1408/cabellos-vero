@@ -3,6 +3,7 @@ package bo.lamagiadelcabello.backend;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -36,6 +37,8 @@ class SecurityConfiguration {
                 .requestMatchers("/api/auth/csrf", "/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/password").authenticated()
                 .requestMatchers("/api/employees", "/api/employees/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/catalog/**").authenticated()
+                .requestMatchers("/api/catalog/**").hasRole("ADMIN")
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, error) -> {
