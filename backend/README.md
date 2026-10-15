@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas, entregas parciales que descuentan lotes físicos, ventas inmediatas en una sola solicitud, cobros y correcciones o anulaciones de entregas. Los reportes siguen pendientes.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores, compras, ventas e inventario calculado. Los reportes siguen pendientes.
 
 ## Requisitos locales
 
@@ -192,6 +192,21 @@ Para editar una venta, envía la `summary.version` como `expectedVersion`, los d
 
 Para registrar un cobro, envía `requestKey` (UUID único), `paymentDate` (`AAAA-MM-DD`), `amount`, `method` (`CASH`, `QR`, `TRANSFER` u `OTHER`) y `reference` opcional. La fecha no puede ser futura en Bolivia y el importe tiene dos decimales como máximo. Se admiten anticipos hasta el total acordado; en una venta anulada, el límite es el valor entregado. Para corregir el cobro, envía sus datos nuevos más `expectedVersion` y `reason`; para anularlo, solo `expectedVersion` y `reason`. El historial conserva los valores anteriores y nuevos, y un cobro anulado deja de sumarse. La lista y el detalle incluyen `agreedTotal`, `deliveredValue`, `payableTotal`, `paidTotal` y `balance`.
 
+## Inventario
+
+Estas rutas son de solo lectura y están disponibles para administrador y empleados con sesión válida:
+
+| Método y ruta | Uso |
+| --- | --- |
+| `GET /api/inventory` | Una fila por categoría y longitud con compras registradas. |
+| `GET /api/inventory/{categoryCode}/{lengthCm}` | Stock y movimientos físicos del tipo seleccionado. |
+| `GET /api/inventory/pending-purchases` | Líneas de compras todavía por recibir. |
+| `GET /api/inventory/reserved-sales` | Líneas de ventas todavía reservadas. |
+
+Cada fila indica `physicalStock`, `pendingPurchase` y `reservedSale` en gramos. También desglosa cuánto de la reserva se cubre con cabello físico (`reservedFromPhysical`) y cuánto con compras pendientes (`reservedFromPending`), además de `freePhysical` y `freePending`. Una combinación nueva aparece cuando se registra una compra de ese tipo; agregarla solo al catálogo no crea una fila de stock vacío.
+
+El detalle muestra las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, proveedor o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+
 ## Qué sigue
 
-Incorporar inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

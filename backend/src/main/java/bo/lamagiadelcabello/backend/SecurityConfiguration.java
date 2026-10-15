@@ -44,6 +44,7 @@ class SecurityConfiguration {
                 .requestMatchers("/api/purchases", "/api/purchases/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/sales", "/api/sales/**").authenticated()
                 .requestMatchers("/api/sales", "/api/sales/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/inventory", "/api/inventory/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, error) -> {
