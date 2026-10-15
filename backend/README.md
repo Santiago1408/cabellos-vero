@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro y edición de compras. Ventas, pagos, correcciones de recepciones y reportes todavía no están implementados; sus rutas HTTP siguen denegadas.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición y corrección de recepciones de compras. Ventas, pagos y reportes todavía no están implementados; sus rutas HTTP siguen denegadas.
 
 ## Requisitos locales
 
@@ -103,7 +103,7 @@ Todas las rutas `/api/suppliers` requieren una sesión de administrador. `GET /a
 
 Solo `name` y `phone` son obligatorios. `city`, `address` y `mapsUrl` pueden enviarse vacíos u omitirse. El enlace, cuando se registra, debe ser HTTPS de Google Maps. Los nombres no pueden repetirse ignorando mayúsculas. La edición y la eliminación exigen un motivo de 1 a 500 caracteres; el historial guarda actor, fecha y valores anteriores/nuevos. Las compras referencian al proveedor por UUID, muestran su nombre vigente e impiden eliminarlo si ya aparece en una compra.
 
-## Compras: registro y recepciones
+## Compras: registro, edición y recepciones
 
 `GET /api/purchases` y `GET /api/purchases/{id}` permiten consultar compras con una sesión de administrador o empleado. La lista muestra proveedor, fecha, estado, pesos e importes; el detalle añade líneas, progreso recibido, recepciones con fecha/hora real y de registro, e historial. Las escrituras requieren administrador y token CSRF.
 
@@ -112,6 +112,8 @@ Solo `name` y `phone` son obligatorios. `city`, `address` y `mapsUrl` pueden env
 | `POST /api/purchases` | Crea una compra con varias líneas; opcionalmente recibe todo en el mismo registro. |
 | `PUT /api/purchases/{id}` | Edita proveedor, fecha y líneas, con motivo e historial; exige la versión actual. |
 | `POST /api/purchases/{id}/receipts` | Registra una recepción parcial de una o más líneas y crea los lotes físicos correspondientes. |
+| `PUT /api/purchases/{id}/receipts/{receiptId}` | Corrige fecha/hora real y pesos de una recepción, con motivo e historial. |
+| `POST /api/purchases/{id}/receipts/{receiptId}/void` | Anula una recepción errónea sin borrar su rastro. |
 | `POST /api/purchases/{id}/cancel` | Anula solo el saldo pendiente, con `{"reason":"..."}`; conserva las recepciones y lotes existentes. |
 
 Ejemplo de creación pendiente (UUID reales para `requestKey` y `supplierId`, y códigos del catálogo):
@@ -133,8 +135,10 @@ Para crearla ya confirmada, usa `receiveNow: true` y añade `effectiveAt` con fe
 
 Para editar, lee primero el detalle y envía en `PUT` la `summary.version` como `expectedVersion`, junto con `supplierId`, `operationDate`, todas las `lines` que permanecerán y un `reason` de 1 a 500 caracteres. Cada línea existente lleva su `id`; una línea nueva no lo lleva. Omitir una línea sin recepciones la elimina. La respuesta incluye la versión nueva y el historial con los valores anteriores y nuevos. Si otra acción cambió la compra entre la lectura y la edición, se responde `409` y hay que recargar el detalle. No se puede reducir un peso por debajo de lo recibido, quitar o cambiar el tipo de una línea ya recibida, ni cambiar los pesos de una compra confirmada. Al cambiar el precio de una línea recibida se actualiza el costo de sus lotes; cuando se incorporen ventas, esa operación deberá recalcular los márgenes históricos afectados.
 
-El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. La corrección/anulación de recepciones, pagos, ventas y cálculo de márgenes se incorporarán en las siguientes etapas, con las validaciones de stock y de historial acordadas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
+Para corregir una recepción, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. No se cambian las líneas que componen esa recepción; cada peso debe seguir siendo positivo y el total recibido de cada línea no puede superar lo acordado. El momento de registro (`recordedAt`) permanece intacto. La corrección actualiza el lote físico y puede devolver una compra confirmada a pendiente o completar una pendiente. Para anularla, envía `{"expectedVersion": 2, "reason": "Recepción duplicada"}` al endpoint `/void`; el movimiento y sus lotes quedan marcados como anulados, se excluyen del stock efectivo y permanecen en el historial. Una recepción con cabello ya vendido no puede corregirse ni anularse hasta incorporar el recálculo de consumos y márgenes en la etapa de ventas. Las futuras consultas de inventario y asignación de lotes deben filtrar `stock_lot.voided_at IS NULL`.
+
+El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. Los pagos, ventas y cálculo de márgenes se incorporarán en las siguientes etapas, con las validaciones de stock y de historial acordadas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
 
 ## Qué sigue
 
-Completar correcciones de recepciones y pagos de compras; después incorporar ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Completar pagos de compras; después incorporar ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al incorporar ventas se debe extender la corrección de lotes vendidos con recálculo de consumos y márgenes históricos. Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

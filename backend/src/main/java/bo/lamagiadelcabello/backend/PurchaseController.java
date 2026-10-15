@@ -67,6 +67,22 @@ class PurchaseController {
         return detailOf(changed);
     }
 
+    @PutMapping("/{id}/receipts/{receiptId}")
+    Detail correctReceipt(@PathVariable UUID id, @PathVariable UUID receiptId,
+                          @RequestBody CorrectionRequest input, Authentication authentication) {
+        Purchase changed = purchases.correctReceipt(id, receiptId,
+            input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
+    @PostMapping("/{id}/receipts/{receiptId}/void")
+    Detail voidReceipt(@PathVariable UUID id, @PathVariable UUID receiptId,
+                       @RequestBody VoidReceiptRequest input, Authentication authentication) {
+        Purchase changed = purchases.voidReceipt(id, receiptId,
+            input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
     @PutMapping("/{id}")
     Detail edit(@PathVariable UUID id, @RequestBody EditRequest input, Authentication authentication) {
         Purchase changed = purchases.edit(id, input == null ? null : input.toService(), actorId(authentication));
@@ -161,6 +177,21 @@ class PurchaseController {
     record ReceiptLine(UUID lineId, BigDecimal weight) {
         PurchaseService.ReceiptItemInput toService() {
             return new PurchaseService.ReceiptItemInput(lineId, weight);
+        }
+    }
+
+    record CorrectionRequest(Long expectedVersion, OffsetDateTime effectiveAt,
+                             List<ReceiptLine> items, String reason) {
+        PurchaseService.CorrectionInput toService() {
+            return new PurchaseService.CorrectionInput(expectedVersion, effectiveAt,
+                items == null ? null : items.stream()
+                    .map(item -> item == null ? null : item.toService()).toList(), reason);
+        }
+    }
+
+    record VoidReceiptRequest(Long expectedVersion, String reason) {
+        PurchaseService.VoidReceiptInput toService() {
+            return new PurchaseService.VoidReceiptInput(expectedVersion, reason);
         }
     }
 

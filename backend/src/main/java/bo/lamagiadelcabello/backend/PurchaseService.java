@@ -11,6 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import bo.lamagiadelcabello.backend.PurchaseRepository.Purchase;
 import bo.lamagiadelcabello.backend.PurchaseRepository.PurchaseLine;
+import bo.lamagiadelcabello.backend.PurchaseRepository.Receipt;
+import bo.lamagiadelcabello.backend.PurchaseRepository.ReceiptItem;
+import bo.lamagiadelcabello.backend.PurchaseRepository.StockLot;
 
 @Service
 class PurchaseService {
@@ -227,6 +231,116 @@ class PurchaseService {
         }
     }
 
+    Purchase correctReceipt(UUID purchaseId, UUID receiptId, CorrectionInput raw, UUID actorId) {
+        CorrectionInput input = validateCorrection(raw);
+        return transactions.execute(status -> {
+            Purchase before = lockedPurchaseAtVersion(purchaseId, input.expectedVersion());
+            Receipt receipt = activeReceipt(purchaseId, receiptId);
+            List<PurchaseLine> oldLines = purchases.lines(purchaseId);
+            List<ReceiptItem> oldItems = purchases.receiptItems(receiptId);
+            List<StockLot> lots = purchases.stockLotsForReceiptForUpdate(receiptId);
+            Map<UUID, ReceiptItem> itemByLine = new HashMap<>();
+            Map<UUID, StockLot> lotByLine = new HashMap<>();
+            for (ReceiptItem item : oldItems) itemByLine.put(item.purchaseLineId(), item);
+            for (StockLot lot : lots) lotByLine.put(lot.purchaseLineId(), lot);
+            Set<UUID> requested = new HashSet<>();
+            for (ReceiptItemInput item : input.items()) requested.add(item.lineId());
+            if (!requested.equals(itemByLine.keySet()) || lots.size() != oldItems.size()) {
+                throw problem(HttpStatus.BAD_REQUEST,
+                    "La corrección debe incluir exactamente las líneas originales de la recepción.");
+            }
+
+            Map<UUID, PurchaseLine> purchaseLineById = new HashMap<>();
+            for (PurchaseLine line : oldLines) purchaseLineById.put(line.id(), line);
+            boolean changed = !receipt.effectiveAt().equals(input.effectiveAt().toInstant());
+            boolean hasSoldHair = false;
+            for (ReceiptItemInput item : input.items()) {
+                ReceiptItem original = itemByLine.get(item.lineId());
+                StockLot lot = lotByLine.get(item.lineId());
+                if (lot == null || lot.voidedAt() != null) {
+                    throw problem(HttpStatus.CONFLICT, "El lote de esta recepción ya no está disponible.");
+                }
+                BigDecimal consumed = lot.originalWeight().subtract(lot.remainingWeight());
+                if (consumed.signum() > 0) hasSoldHair = true;
+                if (item.weight().compareTo(consumed) < 0) {
+                    throw problem(HttpStatus.CONFLICT,
+                        "No puedes reducir esta recepción por debajo de " + consumed
+                            + " g ya vendidos de ese lote.");
+                }
+                PurchaseLine line = purchaseLineById.get(item.lineId());
+                BigDecimal afterReceived = line.receivedWeight()
+                    .subtract(original.weight()).add(item.weight());
+                if (afterReceived.compareTo(line.agreedWeight()) > 0) {
+                    throw problem(HttpStatus.CONFLICT,
+                        "La corrección de " + line.categoryName() + " " + line.lengthCm()
+                            + " cm supera los " + line.agreedWeight() + " g acordados.");
+                }
+                if (item.weight().compareTo(original.weight()) != 0) changed = true;
+            }
+            if (!changed) throw problem(HttpStatus.BAD_REQUEST, "No hay cambios en la recepción.");
+            if (hasSoldHair) {
+                throw problem(HttpStatus.CONFLICT,
+                    "Esta recepción ya tiene cabello vendido; la corrección requiere recalcular consumos y márgenes.");
+            }
+
+            String oldValues = snapshotMovementJson(before, oldLines, receipt, oldItems);
+            if (!receipt.effectiveAt().equals(input.effectiveAt().toInstant())) {
+                purchases.updateReceiptTime(receiptId, input.effectiveAt().toInstant());
+            }
+            for (ReceiptItemInput item : input.items()) {
+                ReceiptItem original = itemByLine.get(item.lineId());
+                if (item.weight().compareTo(original.weight()) == 0) continue;
+                StockLot lot = lotByLine.get(item.lineId());
+                BigDecimal consumed = lot.originalWeight().subtract(lot.remainingWeight());
+                purchases.updateReceiptItem(original.id(), item.weight());
+                purchases.updateStockLotWeight(lot.id(), item.weight(), item.weight().subtract(consumed));
+            }
+            List<PurchaseLine> afterLines = purchases.lines(purchaseId);
+            purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
+            Purchase after = get(purchaseId);
+            purchases.addHistory(purchaseId, "RECEIPT_CORRECTED", actorId, input.reason(),
+                oldValues, snapshotMovementJson(after, afterLines,
+                    purchases.findReceiptById(receiptId).orElseThrow(), purchases.receiptItems(receiptId)));
+            return after;
+        });
+    }
+
+    Purchase voidReceipt(UUID purchaseId, UUID receiptId, VoidReceiptInput raw, UUID actorId) {
+        if (raw == null || raw.expectedVersion() == null || raw.expectedVersion() < 0) {
+            throw problem(HttpStatus.BAD_REQUEST, "Indica la versión actual de la compra.");
+        }
+        String reason = validateReason(raw.reason());
+        return transactions.execute(status -> {
+            Purchase before = lockedPurchaseAtVersion(purchaseId, raw.expectedVersion());
+            Receipt receipt = activeReceipt(purchaseId, receiptId);
+            List<PurchaseLine> oldLines = purchases.lines(purchaseId);
+            List<ReceiptItem> oldItems = purchases.receiptItems(receiptId);
+            List<StockLot> lots = purchases.stockLotsForReceiptForUpdate(receiptId);
+            if (lots.size() != oldItems.size()) {
+                throw problem(HttpStatus.CONFLICT,
+                    "Los lotes de esta recepción están incompletos; no se puede anular.");
+            }
+            for (StockLot lot : lots) {
+                if (lot.voidedAt() != null) {
+                    throw problem(HttpStatus.CONFLICT, "Un lote de esta recepción ya fue anulado.");
+                }
+                if (lot.originalWeight().compareTo(lot.remainingWeight()) != 0) {
+                    throw problem(HttpStatus.CONFLICT,
+                        "No puedes anular una recepción cuyo cabello ya se vendió.");
+                }
+            }
+            String oldValues = snapshotMovementJson(before, oldLines, receipt, oldItems);
+            purchases.voidReceipt(receiptId);
+            List<PurchaseLine> afterLines = purchases.lines(purchaseId);
+            purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
+            Purchase after = get(purchaseId);
+            purchases.addHistory(purchaseId, "RECEIPT_VOIDED", actorId, reason,
+                oldValues, snapshotMovementJson(after, afterLines,
+                    purchases.findReceiptById(receiptId).orElseThrow(), oldItems));
+            return after;
+        });
+    }
+
     Purchase cancel(UUID purchaseId, String rawReason, UUID actorId) {
         String reason = validateReason(rawReason);
         return transactions.execute(status -> {
@@ -289,8 +403,36 @@ class PurchaseService {
         else purchases.touch(purchaseId);
         Purchase after = get(purchaseId);
         purchases.addHistory(purchaseId, "RECEIPT_RECORDED", actorId, null,
-            oldValues, snapshotJson(after, afterLines));
+            oldValues, snapshotMovementJson(after, afterLines,
+                purchases.findReceiptById(receiptId).orElseThrow(), purchases.receiptItems(receiptId)));
         return after;
+    }
+
+    private Purchase lockedPurchaseAtVersion(UUID purchaseId, long expectedVersion) {
+        Purchase purchase = purchases.findByIdForUpdate(purchaseId)
+            .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "Compra no encontrada."));
+        if (purchase.version() != expectedVersion) {
+            throw problem(HttpStatus.CONFLICT,
+                "La compra cambió desde que la abriste. Recarga el detalle antes de continuar.");
+        }
+        return purchase;
+    }
+
+    private Receipt activeReceipt(UUID purchaseId, UUID receiptId) {
+        Receipt receipt = purchases.findReceiptById(receiptId)
+            .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "Recepción no encontrada."));
+        if (!receipt.purchaseId().equals(purchaseId)) {
+            throw problem(HttpStatus.NOT_FOUND, "Recepción no encontrada en esta compra.");
+        }
+        if (receipt.voidedAt() != null) {
+            throw problem(HttpStatus.CONFLICT, "La recepción ya fue anulada.");
+        }
+        return receipt;
+    }
+
+    private static boolean isCompleted(List<PurchaseLine> lines) {
+        return lines.stream().allMatch(line ->
+            line.receivedWeight().compareTo(line.agreedWeight()) == 0);
     }
 
     private Purchase sameRequest(Purchase existing, String fingerprint) {
@@ -369,6 +511,25 @@ class PurchaseService {
         return new EditInput(raw.expectedVersion(), raw.supplierId(), raw.operationDate(), lines, reason);
     }
 
+    private CorrectionInput validateCorrection(CorrectionInput raw) {
+        if (raw == null || raw.expectedVersion() == null || raw.expectedVersion() < 0
+            || raw.effectiveAt() == null || raw.items() == null || raw.items().isEmpty()
+            || raw.items().size() > 100) {
+            throw problem(HttpStatus.BAD_REQUEST,
+                "Indica la versión actual, fecha y hora real, y todas las líneas de la recepción.");
+        }
+        validateEffectiveAt(raw.effectiveAt());
+        String reason = validateReason(raw.reason());
+        Set<UUID> seen = new HashSet<>();
+        List<ReceiptItemInput> items = raw.items().stream().map(item -> {
+            if (item == null || item.lineId() == null || !seen.add(item.lineId())) {
+                throw problem(HttpStatus.BAD_REQUEST, "Cada línea recibida debe aparecer una sola vez.");
+            }
+            return new ReceiptItemInput(item.lineId(), positiveTwoDecimals(item.weight(), "peso recibido"));
+        }).toList();
+        return new CorrectionInput(raw.expectedVersion(), raw.effectiveAt(), items, reason);
+    }
+
     private static void validateEffectiveAt(OffsetDateTime effectiveAt) {
         if (effectiveAt.toInstant().isAfter(Instant.now().plusSeconds(300))) {
             throw problem(HttpStatus.BAD_REQUEST, "La recepción no puede tener fecha y hora futuras.");
@@ -416,6 +577,24 @@ class PurchaseService {
         ));
     }
 
+    private String snapshotMovementJson(Purchase purchase, List<PurchaseLine> lines,
+                                        Receipt receipt, List<ReceiptItem> items) {
+        Map<String, Object> movement = new LinkedHashMap<>();
+        movement.put("id", receipt.id().toString());
+        movement.put("effectiveAt", receipt.effectiveAt().toString());
+        movement.put("recordedAt", receipt.recordedAt().toString());
+        movement.put("voidedAt", receipt.voidedAt() == null ? null : receipt.voidedAt().toString());
+        movement.put("items", items.stream().map(item -> Map.of(
+            "receiptItemId", item.id().toString(),
+            "lineId", item.purchaseLineId().toString(),
+            "weight", item.weight()
+        )).toList());
+        return json.writeValueAsString(Map.of(
+            "purchase", json.readTree(snapshotJson(purchase, lines)),
+            "receipt", movement
+        ));
+    }
+
     private String fingerprint(Object value) {
         try {
             byte[] bytes = json.writeValueAsBytes(value);
@@ -438,6 +617,9 @@ class PurchaseService {
                          BigDecimal weight, BigDecimal pricePerGram) {}
     record EditInput(Long expectedVersion, UUID supplierId, LocalDate operationDate,
                      List<EditLineInput> lines, String reason) {}
+    record CorrectionInput(Long expectedVersion, OffsetDateTime effectiveAt,
+                           List<ReceiptItemInput> items, String reason) {}
+    record VoidReceiptInput(Long expectedVersion, String reason) {}
     private record ReceiptFingerprint(UUID purchaseId, ReceiptInput input) {}
 
     static final class PurchaseProblem extends RuntimeException {
