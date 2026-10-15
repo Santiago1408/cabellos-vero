@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores, compras, ventas, inventario y reportes calculados. El frontend aún utiliza datos de demostración.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores, compras, ventas, inventario y reportes calculados. La interfaz principal aún utiliza datos de demostración; `/sistema` inicia la integración con datos reales.
 
 ## Requisitos locales
 
@@ -52,7 +52,7 @@ Si se pierde el acceso, el operador con acceso privado al servidor podrá ejecut
 
 ## Autenticación de la API
 
-El frontend todavía utiliza el prototipo en memoria. Ya se preparó `ApiClient` y `AuthSession` para la integración, pero el formulario y las vistas aún no los consumen. En desarrollo, `npm start` dirige `/api/**` al backend local en `127.0.0.1:8080`, de modo que el navegador mantiene la cookie de sesión en el mismo origen. Estos endpoints se usarán en la siguiente etapa:
+La ruta Angular `/sistema` usa `ApiClient` y `AuthSession` para ingresar con una cuenta real, cambiar una contraseña temporal y consultar catálogos e inventario. El resto del frontend sigue en memoria. En desarrollo, `npm start` escucha en `127.0.0.1:4200` y dirige `/api/**` al backend local en `127.0.0.1:8080`, de modo que el navegador mantiene la cookie de sesión en el mismo origen:
 
 1. `GET /api/auth/csrf` abre una sesión y devuelve `headerName` y `token`. El cliente conserva la cookie `SESSION` y envía el token en ese encabezado para cada solicitud que modifica datos.
 2. `POST /api/auth/login` recibe JSON con `username` y `password`, más la cookie y el encabezado CSRF. Devuelve el identificador, nombre visible, rol y estado de cambio obligatorio. Al ingresar, cambia el identificador de sesión y descarta el token CSRF anterior; el cliente debe solicitar uno nuevo.

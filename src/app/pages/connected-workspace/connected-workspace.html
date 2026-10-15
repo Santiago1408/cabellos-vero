@@ -1,0 +1,91 @@
+<main class="connected-page">
+  <div class="connected-frame">
+    <header class="connected-header">
+      <div>
+        <span class="connected-mark">MC</span>
+        <div><strong>La Magia del Cabello</strong><span>Conexión con datos reales</span></div>
+      </div>
+      <a href="/ingresar">Volver al prototipo</a>
+    </header>
+
+    @if (loading()) {
+      <section class="card connected-panel"><p>Comprobando la sesión…</p></section>
+    } @else if (!session.account()) {
+      <section class="card connected-panel connected-form-panel">
+        <h1>Ingresar al sistema</h1>
+        <p>Utiliza la cuenta creada en PostgreSQL. La información de esta pantalla proviene de la API.</p>
+        <form (ngSubmit)="login()">
+          <label class="field-label">Usuario
+            <input class="field-input" name="username" [(ngModel)]="username" autocomplete="username" required />
+          </label>
+          <label class="field-label">Contraseña
+            <input class="field-input" type="password" name="password" [(ngModel)]="password" autocomplete="current-password" required />
+          </label>
+          @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+          <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Ingresar' }}</button>
+        </form>
+      </section>
+    } @else if (session.account()?.mustChangePassword) {
+      <section class="card connected-panel connected-form-panel">
+        <h1>Cambiar contraseña temporal</h1>
+        <p>Debes crear tu contraseña antes de acceder a los datos.</p>
+        <form (ngSubmit)="changePassword()">
+          <label class="field-label">Contraseña actual
+            <input class="field-input" type="password" name="currentPassword" [(ngModel)]="currentPassword" autocomplete="current-password" required />
+          </label>
+          <label class="field-label">Nueva contraseña
+            <input class="field-input" type="password" name="newPassword" [(ngModel)]="newPassword" autocomplete="new-password" required />
+          </label>
+          <label class="field-label">Confirmar contraseña
+            <input class="field-input" type="password" name="confirmPassword" [(ngModel)]="confirmPassword" autocomplete="new-password" required />
+          </label>
+          @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+          <button type="submit" class="btn btn-primary" [disabled]="busy()">Guardar contraseña</button>
+        </form>
+        <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="logout()">Cerrar sesión</button>
+      </section>
+    } @else {
+      <section class="connected-overview">
+        <div class="connected-title">
+          <div><h1>Datos del negocio</h1><p>Sesión de {{ session.account()?.displayName }} · {{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }}</p></div>
+          <div class="connected-actions">
+            <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="refresh()">Actualizar</button>
+            <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="logout()">Cerrar sesión</button>
+          </div>
+        </div>
+        @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+        @if (!dataLoaded()) {
+          <section class="card connected-panel">
+            <p>No se pudieron cargar los datos. Comprueba que la API siga funcionando y pulsa «Actualizar».</p>
+          </section>
+        } @else {
+        <div class="connected-grid">
+          <section class="card connected-panel">
+            <h2>Categorías <span>{{ categories().length }}</span></h2>
+            <ul>@for (category of categories(); track category.code) { <li>{{ category.displayName }}</li> }</ul>
+          </section>
+          <section class="card connected-panel">
+            <h2>Longitudes <span>{{ lengths().length }}</span></h2>
+            <ul>@for (length of lengths(); track length.centimeters) { <li>{{ length.centimeters }} cm</li> }</ul>
+          </section>
+        </div>
+        <section class="card connected-panel">
+          <h2>Inventario físico <span>{{ stock().length }} tipos con compras</span></h2>
+          @if (stock().length) {
+            <div class="connected-stock-list">
+              @for (item of stock(); track item.categoryCode + '-' + item.lengthCm) {
+                <div class="connected-stock-row">
+                  <strong>{{ item.categoryName }} · {{ item.lengthCm }} cm</strong>
+                  <span>{{ item.physicalStock | number:'1.2-2' }} g en stock</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="connected-empty">Aún no hay compras registradas en PostgreSQL.</p>
+          }
+        </section>
+        }
+      </section>
+    }
+  </div>
+</main>

@@ -11,6 +11,8 @@ npm start
 
 Abrir `http://localhost:4200/ingresar`. La cuenta fija de demostración del administrador usa `admin` / `CabelloDemo2026!`. Desde Empleados, el administrador puede crear cuentas de prueba para ingresar con usuario y contraseña.
 
+`npm start` escucha en `127.0.0.1:4200`. Para la integración gradual con la base real, abrir `http://127.0.0.1:4200/sistema` con la API local en marcha. Esa ruta permite entrar con una cuenta de PostgreSQL y consultar las categorías, longitudes e inventario de la API; el resto de las pantallas sigue siendo el prototipo en memoria. La clave del administrador real se introduce únicamente en ese formulario y nunca en el prototipo.
+
 ## Pantallas
 
 - Inicio, inventario, detalle de cabello, proveedores, compras, ventas, deudas, empleados, reportes y configuración.
