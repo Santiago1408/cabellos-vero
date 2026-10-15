@@ -32,6 +32,44 @@ docker compose --env-file .env.local -f compose.local.yaml down
 
 El volumen `cabello_postgres_local` conserva la base entre reinicios. Las migraciones Flyway crean las categorías y longitudes actuales, con cero operaciones y cero stock, y preparan las tablas de sesiones, cuentas e historial.
 
+## Base local de pruebas aislada
+
+La configuración `compose.test.yaml` levanta otra base y otra API, separadas de las de desarrollo. Usa PostgreSQL en `127.0.0.1:5433`, la API en `127.0.0.1:8081`, un volumen propio y una cookie de sesión diferente. Ninguno de los comandos siguientes debe incluir `down -v`: eso borraría la base de pruebas.
+
+Desde `backend/`, prepara una sola vez el archivo privado de variables:
+
+```bash
+cp -n .env.test.example .env.test
+```
+
+Edita `DB_PASSWORD` en `.env.test` y usa una clave local distinta de la de desarrollo. El archivo está ignorado por Git. En esta máquina ya se creó con una clave aleatoria. Para iniciar la base y la API:
+
+```bash
+sudo docker compose --env-file .env.test -f compose.test.yaml up --build -d
+sudo docker compose --env-file .env.test -f compose.test.yaml ps
+curl --silent --show-error http://127.0.0.1:8081/actuator/health/readiness
+```
+
+Espera unos segundos si la API aún está arrancando. Flyway crea el esquema y el catálogo, sin operaciones. La respuesta de salud debe ser `{"status":"UP"}`. La cuenta de administrador de desarrollo **no** existe en esta base. Créala en una terminal interactiva, con un usuario y contraseña exclusivos de pruebas:
+
+```bash
+sudo docker compose --env-file .env.test -f compose.test.yaml run --rm --no-deps api --spring.main.web-application-type=none --app.admin-command=create
+```
+
+Desde la raíz del repositorio, inicia Angular en otra terminal:
+
+```bash
+npm run start:test
+```
+
+Abre `http://127.0.0.1:4201/sistema`. Ese puerto usa el proxy `src/proxy.test.conf.json`, dirigido a la API de pruebas. `npm start` sigue conectado a la API de desarrollo en el puerto 8080. Para detener los contenedores de pruebas conservando los datos:
+
+```bash
+sudo docker compose --env-file .env.test -f compose.test.yaml down
+```
+
+Esta base permite practicar los flujos sin afectar la base de desarrollo. Por ahora empieza vacía: todavía falta implementar una apertura de inventario para cargar el stock físico anterior al sistema. Su procedimiento previsto está en [stock-inicial.md](../docs/stock-inicial.md).
+
 ## Crear el primer administrador
 
 Con la base de datos en marcha, reconstruye la API después de incorporar el código de cuentas:

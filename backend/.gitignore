@@ -3,6 +3,7 @@ target/
 .env
 .env.*
 !.env.local.example
+!.env.test.example
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
