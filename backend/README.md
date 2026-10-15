@@ -52,7 +52,7 @@ Si se pierde el acceso, el operador con acceso privado al servidor podrá ejecut
 
 ## Autenticación de la API
 
-El frontend todavía utiliza el prototipo en memoria. Estos endpoints son la primera parte del backend y deben usarse desde el mismo origen que el frontend cuando se haga la integración:
+El frontend todavía utiliza el prototipo en memoria. Ya se preparó `ApiClient` y `AuthSession` para la integración, pero el formulario y las vistas aún no los consumen. En desarrollo, `npm start` dirige `/api/**` al backend local en `127.0.0.1:8080`, de modo que el navegador mantiene la cookie de sesión en el mismo origen. Estos endpoints se usarán en la siguiente etapa:
 
 1. `GET /api/auth/csrf` abre una sesión y devuelve `headerName` y `token`. El cliente conserva la cookie `SESSION` y envía el token en ese encabezado para cada solicitud que modifica datos.
 2. `POST /api/auth/login` recibe JSON con `username` y `password`, más la cookie y el encabezado CSRF. Devuelve el identificador, nombre visible, rol y estado de cambio obligatorio. Al ingresar, cambia el identificador de sesión y descarta el token CSRF anterior; el cliente debe solicitar uno nuevo.
