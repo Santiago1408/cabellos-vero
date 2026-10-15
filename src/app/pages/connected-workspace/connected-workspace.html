@@ -49,11 +49,23 @@
         <div class="connected-title">
           <div><h1>Datos del negocio</h1><p>Sesión de {{ session.account()?.displayName }} · {{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }}</p></div>
           <div class="connected-actions">
-            <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="refresh()">Actualizar</button>
+            @if (section() === 'inventory') {
+              <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="refresh()">Actualizar</button>
+            }
             <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="logout()">Cerrar sesión</button>
           </div>
         </div>
+        <nav class="connected-tabs" aria-label="Secciones con datos reales">
+          <button type="button" [class.active]="section() === 'inventory'" (click)="section.set('inventory')">Inventario y tipos</button>
+          @if (session.account()?.role === 'ADMIN') {
+            <button type="button" [class.active]="section() === 'suppliers'" (click)="section.set('suppliers')">Proveedores</button>
+          }
+        </nav>
+        @if (section() === 'suppliers' && session.account()?.role === 'ADMIN') {
+          <app-connected-suppliers />
+        } @else {
         @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+        @if (message()) { <p class="connected-success" role="status">{{ message() }}</p> }
         @if (!dataLoaded()) {
           <section class="card connected-panel">
             <p>No se pudieron cargar los datos. Comprueba que la API siga funcionando y pulsa «Actualizar».</p>
@@ -62,11 +74,39 @@
         <div class="connected-grid">
           <section class="card connected-panel">
             <h2>Categorías <span>{{ categories().length }}</span></h2>
-            <ul>@for (category of categories(); track category.code) { <li>{{ category.displayName }}</li> }</ul>
+            <ul>@for (category of categories(); track category.code) {
+              <li>{{ category.displayName }}
+                @if (session.account()?.role === 'ADMIN') {
+                  <button type="button" class="connected-delete" [disabled]="busy()" [attr.aria-label]="'Quitar ' + category.displayName" (click)="removeCategory(category)"><app-icon name="trash" /></button>
+                }
+              </li>
+            }</ul>
+            @if (session.account()?.role === 'ADMIN') {
+              <form class="connected-inline-form" (ngSubmit)="addCategory()">
+                <label class="field-label">Nueva categoría
+                  <input class="field-input" name="categoryDraft" [(ngModel)]="categoryDraft" maxlength="80" required />
+                </label>
+                <button type="submit" class="btn btn-outline" [disabled]="busy()">Agregar</button>
+              </form>
+            }
           </section>
           <section class="card connected-panel">
             <h2>Longitudes <span>{{ lengths().length }}</span></h2>
-            <ul>@for (length of lengths(); track length.centimeters) { <li>{{ length.centimeters }} cm</li> }</ul>
+            <ul>@for (length of lengths(); track length.centimeters) {
+              <li>{{ length.centimeters }} cm
+                @if (session.account()?.role === 'ADMIN') {
+                  <button type="button" class="connected-delete" [disabled]="busy()" [attr.aria-label]="'Quitar ' + length.centimeters + ' cm'" (click)="removeLength(length)"><app-icon name="trash" /></button>
+                }
+              </li>
+            }</ul>
+            @if (session.account()?.role === 'ADMIN') {
+              <form class="connected-inline-form" (ngSubmit)="addLength()">
+                <label class="field-label">Nueva longitud (cm)
+                  <input class="field-input" type="number" name="lengthDraft" [(ngModel)]="lengthDraft" min="1" step="1" required />
+                </label>
+                <button type="submit" class="btn btn-outline" [disabled]="busy()">Agregar</button>
+              </form>
+            }
           </section>
         </div>
         <section class="card connected-panel">
@@ -84,6 +124,7 @@
             <p class="connected-empty">Aún no hay compras registradas en PostgreSQL.</p>
           }
         </section>
+        }
         }
       </section>
     }

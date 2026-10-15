@@ -4,6 +4,8 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '../../data/api-client';
 import { AuthSession } from '../../data/auth-session';
+import { ConnectedSuppliers } from './connected-suppliers';
+import { Icon } from '../../shared/icon/icon';
 
 type Category = { code: string; displayName: string };
 type Length = { centimeters: number };
@@ -20,7 +22,7 @@ type StockRow = {
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, ConnectedSuppliers, Icon],
   templateUrl: './connected-workspace.html',
   styleUrl: './connected-workspace.css',
 })
@@ -34,6 +36,10 @@ export class ConnectedWorkspace implements OnInit {
   readonly categories = signal<Category[]>([]);
   readonly lengths = signal<Length[]>([]);
   readonly stock = signal<StockRow[]>([]);
+  readonly section = signal<'inventory' | 'suppliers'>('inventory');
+  readonly message = signal('');
+  categoryDraft = '';
+  lengthDraft: number | null = null;
   username = '';
   password = '';
   currentPassword = '';
@@ -109,6 +115,8 @@ export class ConnectedWorkspace implements OnInit {
       this.lengths.set([]);
       this.stock.set([]);
       this.dataLoaded.set(false);
+      this.section.set('inventory');
+      this.message.set('');
       this.username = '';
     } catch (error) {
       this.error.set(this.errorMessage(error));
@@ -121,8 +129,55 @@ export class ConnectedWorkspace implements OnInit {
     if (this.busy()) return;
     this.busy.set(true);
     this.error.set('');
+    this.message.set('');
     try {
       await this.loadData();
+    } catch (error) {
+      this.error.set(this.errorMessage(error));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async addCategory(): Promise<void> {
+    const name = this.categoryDraft.trim();
+    if (!name || this.busy()) return;
+    await this.changeCatalog(() => this.api.write<Category>('POST', '/api/catalog/categories', { displayName: name }),
+      'Categoría agregada.');
+    if (!this.error()) this.categoryDraft = '';
+  }
+
+  async addLength(): Promise<void> {
+    const centimeters = this.lengthDraft;
+    if (!Number.isInteger(centimeters) || !centimeters || centimeters <= 0 || this.busy()) {
+      this.error.set('Indica una longitud entera y positiva en centímetros.');
+      return;
+    }
+    await this.changeCatalog(() => this.api.write<Length>('POST', '/api/catalog/lengths', { centimeters }),
+      'Longitud agregada.');
+    if (!this.error()) this.lengthDraft = null;
+  }
+
+  async removeCategory(category: Category): Promise<void> {
+    if (this.busy() || !confirm(`¿Quitar la categoría «${category.displayName}»?`)) return;
+    await this.changeCatalog(() => this.api.write<void>('DELETE',
+      `/api/catalog/categories/${encodeURIComponent(category.code)}`), 'Categoría quitada.');
+  }
+
+  async removeLength(length: Length): Promise<void> {
+    if (this.busy() || !confirm(`¿Quitar la longitud de ${length.centimeters} cm?`)) return;
+    await this.changeCatalog(() => this.api.write<void>('DELETE',
+      `/api/catalog/lengths/${length.centimeters}`), 'Longitud quitada.');
+  }
+
+  private async changeCatalog(change: () => Promise<unknown>, success: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set('');
+    this.message.set('');
+    try {
+      await change();
+      await this.loadData();
+      this.message.set(success);
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -153,7 +208,10 @@ export class ConnectedWorkspace implements OnInit {
   private errorMessage(error: unknown): string {
     if (!(error instanceof HttpErrorResponse)) return 'No se pudo completar la solicitud. Inténtalo nuevamente.';
     if (error.status === 0) return 'No se pudo conectar con la API. Comprueba que Spring Boot esté funcionando.';
-    if (error.status === 401) return 'Usuario o contraseña incorrectos, o la sesión ha vencido.';
+    if (error.status === 401) {
+      void this.session.restore().catch(() => undefined);
+      return 'Usuario o contraseña incorrectos, o la sesión ha vencido.';
+    }
     if (error.status === 429) return 'Hubo varios intentos fallidos. Espera unos minutos antes de volver a ingresar.';
     if (error.status === 403) return 'La operación fue rechazada. Recarga la página e inténtalo nuevamente.';
     const message = error.error?.error;
