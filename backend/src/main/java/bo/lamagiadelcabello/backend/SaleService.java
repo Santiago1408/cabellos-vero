@@ -39,16 +39,19 @@ class SaleService {
     private final SaleInventoryRepository inventory;
     private final CatalogRepository catalog;
     private final StockAllocationService allocation;
+    private final SalePaymentRepository payments;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
 
     SaleService(SaleRepository sales, SaleInventoryRepository inventory,
                 CatalogRepository catalog, StockAllocationService allocation,
+                SalePaymentRepository payments,
                 TransactionTemplate transactions, ObjectMapper json) {
         this.sales = sales;
         this.inventory = inventory;
         this.catalog = catalog;
         this.allocation = allocation;
+        this.payments = payments;
         this.transactions = transactions;
         this.json = json;
     }
@@ -215,6 +218,8 @@ class SaleService {
                 String oldValues = snapshotJson(before, oldLines);
                 sales.updateHeader(saleId, input.customerName(), input.operationDate(),
                     input.acceptPendingStock());
+                SalePaymentService.requireWithinPayable(payments.totalActive(saleId),
+                    SalePaymentService.payableTotal(before, sales.lines(saleId)));
                 sales.touch(saleId);
                 Sale after = get(saleId);
                 sales.addHistory(saleId, "SALE_UPDATED", actorId, input.reason(),
@@ -242,6 +247,8 @@ class SaleService {
             String oldValues = snapshotJson(before, lines);
             sales.cancel(saleId);
             Sale after = get(saleId);
+            SalePaymentService.requireWithinPayable(payments.totalActive(saleId),
+                SalePaymentService.payableTotal(after, lines));
             sales.addHistory(saleId, "SALE_CANCELED", actorId, reason,
                 oldValues, snapshotJson(after, lines));
             return after;

@@ -28,6 +28,7 @@ import bo.lamagiadelcabello.backend.SaleRepository.SaleLine;
 import bo.lamagiadelcabello.backend.SaleRepository.Delivery;
 import bo.lamagiadelcabello.backend.SaleRepository.DeliveryItem;
 import bo.lamagiadelcabello.backend.SaleRepository.Consumption;
+import bo.lamagiadelcabello.backend.SalePaymentRepository.Payment;
 import bo.lamagiadelcabello.backend.SaleService.SaleProblem;
 
 @RestController
@@ -36,11 +37,17 @@ class SaleController {
 
     private final SaleService sales;
     private final SaleRepository repository;
+    private final SalePaymentRepository paymentRepository;
+    private final SalePaymentService paymentService;
     private final ObjectMapper json;
 
-    SaleController(SaleService sales, SaleRepository repository, ObjectMapper json) {
+    SaleController(SaleService sales, SaleRepository repository,
+                   SalePaymentRepository paymentRepository,
+                   SalePaymentService paymentService, ObjectMapper json) {
         this.sales = sales;
         this.repository = repository;
+        this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
         this.json = json;
     }
 
@@ -92,6 +99,29 @@ class SaleController {
             actorId(authentication)));
     }
 
+    @PostMapping("/{id}/payments")
+    Detail recordPayment(@PathVariable UUID id, @RequestBody PaymentRequest input,
+                         Authentication authentication) {
+        return detailOf(paymentService.create(id,
+            input == null ? null : input.toService(), actorId(authentication)));
+    }
+
+    @PutMapping("/{id}/payments/{paymentId}")
+    Detail correctPayment(@PathVariable UUID id, @PathVariable UUID paymentId,
+                          @RequestBody PaymentCorrectionRequest input,
+                          Authentication authentication) {
+        return detailOf(paymentService.correct(id, paymentId,
+            input == null ? null : input.toService(), actorId(authentication)));
+    }
+
+    @PostMapping("/{id}/payments/{paymentId}/void")
+    Detail voidPayment(@PathVariable UUID id, @PathVariable UUID paymentId,
+                       @RequestBody PaymentVoidRequest input,
+                       Authentication authentication) {
+        return detailOf(paymentService.voidPayment(id, paymentId,
+            input == null ? null : input.toService(), actorId(authentication)));
+    }
+
     @ExceptionHandler(SaleProblem.class)
     ResponseEntity<ErrorView> saleProblem(SaleProblem error) {
         return ResponseEntity.status(error.status())
@@ -107,16 +137,23 @@ class SaleController {
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         BigDecimal delivered = lines.stream().map(SaleLine::deliveredWeight)
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        BigDecimal deliveredValue = lines.stream().map(line -> PurchaseService.lineTotal(
+                line.deliveredWeight(), line.pricePerGram()))
+            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        BigDecimal payable = sale.status().equals("CANCELED") ? deliveredValue : total;
+        BigDecimal paid = paymentRepository.totalActive(sale.id());
         return new Summary(sale.id(), sale.customerName(), sale.operationDate(),
             sale.acceptedPendingStock(), sale.status(), sale.createdAt(),
             sale.confirmedAt(), sale.canceledAt(), sale.updatedAt(), sale.version(),
-            weight, delivered, total);
+            weight, delivered, total, deliveredValue, payable, paid,
+            payable.subtract(paid));
     }
 
     private Detail detailOf(Sale sale) {
         return new Detail(summary(sale), repository.lines(sale.id()).stream()
             .map(LineView::from).toList(), repository.deliveries(sale.id()).stream()
-            .map(this::deliveryView).toList(), repository.history(sale.id()).stream()
+            .map(this::deliveryView).toList(), paymentRepository.list(sale.id()).stream()
+            .map(PaymentView::from).toList(), repository.history(sale.id()).stream()
             .map(this::historyView).toList());
     }
 
@@ -200,14 +237,39 @@ class SaleController {
         }
     }
 
+    record PaymentRequest(UUID requestKey, LocalDate paymentDate, BigDecimal amount,
+                          String method, String reference) {
+        SalePaymentService.CreateInput toService() {
+            return new SalePaymentService.CreateInput(requestKey, paymentDate, amount,
+                method, reference);
+        }
+    }
+
+    record PaymentCorrectionRequest(Long expectedVersion, LocalDate paymentDate,
+                                    BigDecimal amount, String method, String reference,
+                                    String reason) {
+        SalePaymentService.CorrectionInput toService() {
+            return new SalePaymentService.CorrectionInput(expectedVersion, paymentDate,
+                amount, method, reference, reason);
+        }
+    }
+
+    record PaymentVoidRequest(Long expectedVersion, String reason) {
+        SalePaymentService.VoidInput toService() {
+            return new SalePaymentService.VoidInput(expectedVersion, reason);
+        }
+    }
+
     record Summary(UUID id, String customerName, LocalDate operationDate,
                    boolean acceptedPendingStock, String status, Instant createdAt,
                    Instant confirmedAt, Instant canceledAt, Instant updatedAt,
                    long version, BigDecimal agreedWeight, BigDecimal deliveredWeight,
-                   BigDecimal agreedTotal) {}
+                   BigDecimal agreedTotal, BigDecimal deliveredValue,
+                   BigDecimal payableTotal, BigDecimal paidTotal, BigDecimal balance) {}
 
     record Detail(Summary summary, List<LineView> lines,
-                  List<DeliveryView> deliveries, List<HistoryView> history) {}
+                  List<DeliveryView> deliveries, List<PaymentView> payments,
+                  List<HistoryView> history) {}
 
     record LineView(UUID id, String categoryCode, String categoryName, int lengthCm,
                     BigDecimal agreedWeight, BigDecimal deliveredWeight,
@@ -226,6 +288,13 @@ class SaleController {
                         List<DeliveryItemView> items) {}
     record DeliveryItemView(UUID id, UUID lineId, BigDecimal weight,
                             List<ConsumptionView> consumedLots) {}
+    record PaymentView(UUID id, LocalDate paymentDate, BigDecimal amount, String method,
+                       String reference, Instant recordedAt, Instant updatedAt, Instant voidedAt) {
+        static PaymentView from(Payment row) {
+            return new PaymentView(row.id(), row.paymentDate(), row.amount(), row.method(),
+                row.reference(), row.recordedAt(), row.updatedAt(), row.voidedAt());
+        }
+    }
     record ConsumptionView(UUID stockLotId, BigDecimal weight, BigDecimal costPerGram,
                            Instant receivedAt, UUID purchaseId, String supplierName) {
         static ConsumptionView from(Consumption row) {
