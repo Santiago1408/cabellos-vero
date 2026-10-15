@@ -1,6 +1,8 @@
 package bo.lamagiadelcabello.backend;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -8,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HexFormat;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -91,11 +94,9 @@ class BackupService {
     }
 
     Download export() {
-        byte[] bytes = snapshotTransaction.execute(status -> buildCsv());
+        Download snapshot = snapshotTransaction.execute(status -> buildCsv());
         jdbc.update("UPDATE backup_settings SET pending_export_at = now() WHERE id = 1");
-        String fileName = "respaldo-completo-cabello-"
-            + LocalDate.now(BUSINESS_ZONE) + ".csv";
-        return new Download(fileName, bytes);
+        return snapshot;
     }
 
     Settings confirmSaved() {
@@ -111,18 +112,33 @@ class BackupService {
         return settings();
     }
 
-    private byte[] buildCsv() {
+    Download snapshot() { return snapshotTransaction.execute(status -> buildCsv()); }
+
+    String stateDigest() {
+        MessageDigest digest = sha256();
+        for (Source source : SOURCES) {
+            if (source.table().equals("backup_settings")) continue;
+            for (Entry entry : rows(source)) updateDigest(digest, entry);
+        }
+        updateSettingsDigest(digest);
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    static List<String> sourceTables() { return SOURCES.stream().map(Source::table).toList(); }
+
+    private Download buildCsv() {
         List<Entry> entries = new ArrayList<>();
         Map<String, Integer> counts = new LinkedHashMap<>();
+        MessageDigest digest = sha256();
         for (Source source : SOURCES) {
-            String sql = "SELECT " + source.idExpression() + " AS record_id, ("
-                + source.dataExpression() + ")::text AS record_data FROM "
-                + source.table() + " t ORDER BY " + source.idExpression();
-            List<Entry> rows = jdbc.query(sql, (row, number) -> new Entry(source.table(),
-                row.getString("record_id"), row.getString("record_data")));
+            List<Entry> rows = rows(source);
             counts.put(source.table(), rows.size());
             entries.addAll(rows);
+            if (!source.table().equals("backup_settings")) {
+                for (Entry entry : rows) updateDigest(digest, entry);
+            }
         }
+        updateSettingsDigest(digest);
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("format", FORMAT);
         manifest.put("version", VERSION);
@@ -132,12 +148,49 @@ class BackupService {
         manifest.put("weightUnit", "g");
         manifest.put("businessTimeZone", BUSINESS_ZONE.getId());
         manifest.put("counts", counts);
+        String stateDigest = HexFormat.of().formatHex(digest.digest());
+        manifest.put("stateDigest", stateDigest);
         manifest.put("note", "No incluye contraseñas, hashes ni sesiones activas.");
 
         StringBuilder csv = new StringBuilder("\uFEFFTipo de registro;Identificador;Datos completos JSON\r\n");
         row(csv, "manifest", "backup", json.writeValueAsString(manifest));
         for (Entry entry : entries) row(csv, entry.type(), entry.id(), entry.data());
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        String fileName = "respaldo-completo-cabello-"
+            + LocalDate.now(BUSINESS_ZONE) + ".csv";
+        return new Download(fileName, csv.toString().getBytes(StandardCharsets.UTF_8), stateDigest);
+    }
+
+    private List<Entry> rows(Source source) {
+        String sql = "SELECT " + source.idExpression() + " AS record_id, ("
+            + source.dataExpression() + ")::text AS record_data FROM "
+            + source.table() + " t ORDER BY " + source.idExpression();
+        return jdbc.query(sql, (row, number) -> new Entry(source.table(),
+            row.getString("record_id"), row.getString("record_data")));
+    }
+
+    private static void updateDigest(MessageDigest digest, Entry entry) {
+        digest.update(entry.type().getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update(entry.id().getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update(entry.data().getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) '\n');
+    }
+
+    private void updateSettingsDigest(MessageDigest digest) {
+        Integer interval = jdbc.queryForObject(
+            "SELECT interval_days FROM backup_settings WHERE id = 1", Integer.class);
+        digest.update("backup_settings\0".getBytes(StandardCharsets.UTF_8));
+        digest.update("1\0".getBytes(StandardCharsets.UTF_8));
+        digest.update(String.valueOf(interval).getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) '\n');
+    }
+
+    private static MessageDigest sha256() {
+        try { return MessageDigest.getInstance("SHA-256"); }
+        catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 no está disponible.", impossible);
+        }
     }
 
     private static void row(StringBuilder csv, String type, String id, String data) {
@@ -167,5 +220,5 @@ class BackupService {
     private record Entry(String type, String id, String data) {}
     record Settings(int intervalDays, Instant lastConfirmedAt, Instant pendingExportAt,
                     Instant nextReminderAt, boolean due) {}
-    record Download(String fileName, byte[] bytes) {}
+    record Download(String fileName, byte[] bytes, String stateDigest) {}
 }

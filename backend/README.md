@@ -239,6 +239,19 @@ Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/
 
 La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 3, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La versión 2 del archivo generado por el prototipo usa otra estructura; el backend comienza con datos nuevos y no la importa automáticamente.
 
+### Restauración
+
+El administrador prepara una restauración en cuatro pasos. Los archivos se envían como `multipart/form-data` en el campo `file` (máximo 50 MB):
+
+1. `POST /api/backups/restore/preview`: recibe el CSV, valida formato, versión, recuentos, columnas, referencias y saldos mediante una importación de ensayo dentro de una transacción que se revierte. Devuelve `preparationId`, fecha de caducidad (dos horas), cantidades y advertencia. Los datos vigentes quedan intactos.
+2. `POST /api/backups/restore/{preparationId}/pre-backup`: descarga una copia integral del estado actual. La preparación queda asociada a la huella de ese estado.
+3. `POST /api/backups/restore/{preparationId}/confirm-pre-backup`: el administrador confirma que guardó la copia previa en su computadora.
+4. `POST /api/backups/restore/{preparationId}`: envía otra vez el mismo archivo y el campo de formulario `confirmation=RESTAURAR`. Si el estado actual cambió desde la copia previa, rechaza la solicitud y exige repetir el proceso. Si coincide, bloquea las tablas del negocio y las reemplaza en una transacción. Un error revierte todo.
+
+La restauración conserva las credenciales, la obligación vigente de cambiar contraseña y la versión de sesión de las cuentas con el mismo identificador. Una cuenta previamente desactivada continúa desactivada. Una cuenta nueva del archivo recibe una contraseña aleatoria desconocida: el administrador puede restablecer la de un empleado; si el administrador es nuevo, se recupera mediante el comando privado `recover`. No se cierran sesiones por la restauración; cada solicitud vuelve a comprobar la cuenta. Las restauraciones completadas quedan en `restore_event`, fuera de los datos de negocio exportados.
+
+La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+
 ## Qué sigue
 
-Implementar la vista previa y la restauración transaccional del CSV versión 3 según [las decisiones del proyecto](../docs/decisiones-backend.md). El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Conectar el frontend con la API y trasladar los flujos de Configuración y restauración al panel del administrador.
