@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas, entregas parciales que descuentan lotes físicos, ventas inmediatas en una sola solicitud y cobros. Corrección o anulación de entregas y reportes siguen pendientes.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas, entregas parciales que descuentan lotes físicos, ventas inmediatas en una sola solicitud, cobros y correcciones o anulaciones de entregas. Los reportes siguen pendientes.
 
 ## Requisitos locales
 
@@ -150,6 +150,8 @@ El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido
 
 | Método y ruta | Uso |
 | --- | --- |
+| `PUT /api/sales/{id}/deliveries/{deliveryId}` | Corrige fecha/hora real y pesos de una entrega, con motivo e historial. |
+| `POST /api/sales/{id}/deliveries/{deliveryId}/void` | Anula una entrega errónea si el inventario sigue siendo coherente. |
 | `POST /api/sales/{id}/payments` | Registra un cobro o anticipo. |
 | `PUT /api/sales/{id}/payments/{paymentId}` | Corrige un cobro con motivo e historial. |
 | `POST /api/sales/{id}/payments/{paymentId}/void` | Anula un cobro conservando su historial. |
@@ -184,10 +186,12 @@ Para registrar una entrega, envía un UUID único en `requestKey`, la fecha y ho
 
 La entrega no puede exceder lo pendiente ni el stock físico. Además, el stock debe haber existido en la fecha real indicada. El detalle muestra cuánto se entregó, cuánto falta, cuándo se entregó y registró cada movimiento, y de cuáles lotes salió el cabello. La venta pasa a `CONFIRMED` solo cuando se entregan todas las líneas. El mismo `requestKey` evita registrar dos veces un reintento.
 
-Para editar una venta pendiente, envía la `summary.version` como `expectedVersion`, los datos completos de la venta, todas las líneas que permanecerán y `reason` de 1 a 500 caracteres. Las líneas existentes llevan su `id`; las nuevas no. Se puede quitar una línea sin entregas omitiéndola. Una línea ya entregada conserva su tipo y un peso acordado al menos igual al entregado. Se vuelve a comprobar la disponibilidad restante antes de guardar y se responde `409` si otra acción cambió la versión. La anulación libera solo el saldo pendiente; el cabello ya entregado y su historial permanecen. Una edición o anulación se rechaza si deja el importe exigible por debajo de los cobros activos.
+Para corregir una entrega, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. Cada peso debe seguir siendo positivo; ninguna línea puede superar la cantidad acordada. Para anularla, envía `{"expectedVersion": 2, "reason": "Entrega duplicada"}` al endpoint `/void`. La hora de registro original se conserva. Ambos cambios recalculan los lotes consumidos por todas las entregas afectadas según sus fechas reales y vuelven a comprobar reservas y cobros. Si alguna entrega histórica queda sin stock, se rechaza todo con `409`. La corrección puede devolver una venta confirmada a pendiente o completar una pendiente; el detalle conserva el movimiento anulado y sus valores anteriores.
+
+Para editar una venta, envía la `summary.version` como `expectedVersion`, los datos completos, todas las líneas que permanecerán y `reason` de 1 a 500 caracteres. Las líneas existentes llevan su `id`; las nuevas no. En una venta pendiente se puede quitar una línea sin entregas omitiéndola. Una línea ya entregada conserva su tipo y un peso acordado al menos igual al entregado. En una venta confirmada solo se pueden corregir cliente, fecha de operación y precios; no se cambian tipos ni cantidades entregadas. Se vuelve a comprobar la disponibilidad restante de las ventas pendientes antes de guardar y se responde `409` si otra acción cambió la versión. La anulación libera solo el saldo pendiente; el cabello ya entregado y su historial permanecen. Una edición o anulación se rechaza si deja el importe exigible por debajo de los cobros activos.
 
 Para registrar un cobro, envía `requestKey` (UUID único), `paymentDate` (`AAAA-MM-DD`), `amount`, `method` (`CASH`, `QR`, `TRANSFER` u `OTHER`) y `reference` opcional. La fecha no puede ser futura en Bolivia y el importe tiene dos decimales como máximo. Se admiten anticipos hasta el total acordado; en una venta anulada, el límite es el valor entregado. Para corregir el cobro, envía sus datos nuevos más `expectedVersion` y `reason`; para anularlo, solo `expectedVersion` y `reason`. El historial conserva los valores anteriores y nuevos, y un cobro anulado deja de sumarse. La lista y el detalle incluyen `agreedTotal`, `deliveredValue`, `payableTotal`, `paidTotal` y `balance`.
 
 ## Qué sigue
 
-Incorporar corrección y anulación de entregas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

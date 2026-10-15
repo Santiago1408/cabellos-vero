@@ -75,6 +75,11 @@ class SaleRepository {
             SaleRepository::mapDelivery, requestKey).stream().findFirst();
     }
 
+    Optional<Delivery> findDeliveryById(UUID deliveryId) {
+        return jdbc.query("SELECT * FROM sale_delivery WHERE id = ?",
+            SaleRepository::mapDelivery, deliveryId).stream().findFirst();
+    }
+
     List<Delivery> deliveries(UUID saleId) {
         return jdbc.query("""
             SELECT * FROM sale_delivery WHERE sale_id = ?
@@ -188,6 +193,34 @@ class SaleRepository {
             INSERT INTO sale_delivery_line (id, delivery_id, sale_id, sale_line_id, weight)
             VALUES (?, ?, ?, ?, ?)
             """, id, deliveryId, saleId, saleLineId, weight);
+    }
+
+    void updateDeliveryTime(UUID deliveryId, Instant effectiveAt) {
+        jdbc.update("UPDATE sale_delivery SET effective_at = ? WHERE id = ?",
+            effectiveAt, deliveryId);
+    }
+
+    void updateDeliveryItem(UUID deliveryLineId, BigDecimal weight) {
+        jdbc.update("UPDATE sale_delivery_line SET weight = ? WHERE id = ?",
+            weight, deliveryLineId);
+    }
+
+    void voidDelivery(UUID deliveryId) {
+        jdbc.update("UPDATE sale_delivery SET voided_at = now() WHERE id = ? AND voided_at IS NULL",
+            deliveryId);
+    }
+
+    void reconcileStatusAfterDeliveryChange(UUID saleId, boolean completed) {
+        jdbc.update("""
+            UPDATE sale_order SET
+                status = CASE WHEN status = 'CANCELED' THEN 'CANCELED'
+                              WHEN ? THEN 'CONFIRMED' ELSE 'PENDING' END,
+                confirmed_at = CASE WHEN status = 'CANCELED' THEN confirmed_at
+                                    WHEN ? AND status = 'CONFIRMED' THEN confirmed_at
+                                    WHEN ? THEN now() ELSE NULL END,
+                updated_at = now(), version = version + 1
+            WHERE id = ?
+            """, completed, completed, completed, saleId);
     }
 
     void cancel(UUID saleId) {

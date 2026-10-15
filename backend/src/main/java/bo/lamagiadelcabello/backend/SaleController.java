@@ -92,6 +92,22 @@ class SaleController {
             actorId(authentication)));
     }
 
+    @PutMapping("/{id}/deliveries/{deliveryId}")
+    Detail correctDelivery(@PathVariable UUID id, @PathVariable UUID deliveryId,
+                           @RequestBody DeliveryCorrectionRequest input,
+                           Authentication authentication) {
+        return detailOf(sales.correctDelivery(id, deliveryId,
+            input == null ? null : input.toService(), actorId(authentication)));
+    }
+
+    @PostMapping("/{id}/deliveries/{deliveryId}/void")
+    Detail voidDelivery(@PathVariable UUID id, @PathVariable UUID deliveryId,
+                        @RequestBody DeliveryVoidRequest input,
+                        Authentication authentication) {
+        return detailOf(sales.voidDelivery(id, deliveryId,
+            input == null ? null : input.toService(), actorId(authentication)));
+    }
+
     @PutMapping("/{id}")
     Detail edit(@PathVariable UUID id, @RequestBody EditRequest input,
                 Authentication authentication) {
@@ -237,6 +253,21 @@ class SaleController {
         }
     }
 
+    record DeliveryCorrectionRequest(Long expectedVersion, OffsetDateTime effectiveAt,
+                                     List<DeliveryItemRequest> items, String reason) {
+        SaleService.CorrectionInput toService() {
+            return new SaleService.CorrectionInput(expectedVersion, effectiveAt,
+                items == null ? null : items.stream()
+                    .map(item -> item == null ? null : item.toService()).toList(), reason);
+        }
+    }
+
+    record DeliveryVoidRequest(Long expectedVersion, String reason) {
+        SaleService.VoidDeliveryInput toService() {
+            return new SaleService.VoidDeliveryInput(expectedVersion, reason);
+        }
+    }
+
     record PaymentRequest(UUID requestKey, LocalDate paymentDate, BigDecimal amount,
                           String method, String reference) {
         SalePaymentService.CreateInput toService() {
@@ -274,13 +305,14 @@ class SaleController {
     record LineView(UUID id, String categoryCode, String categoryName, int lengthCm,
                     BigDecimal agreedWeight, BigDecimal deliveredWeight,
                     BigDecimal remainingWeight, BigDecimal pricePerGram,
-                    BigDecimal agreedTotal) {
+                    BigDecimal agreedTotal, BigDecimal deliveredValue) {
         static LineView from(SaleLine row) {
             return new LineView(row.id(), row.categoryCode(), row.categoryName(), row.lengthCm(),
                 row.agreedWeight(), row.deliveredWeight(),
                 row.agreedWeight().subtract(row.deliveredWeight()),
                 row.pricePerGram(), PurchaseService.lineTotal(
-                    row.agreedWeight(), row.pricePerGram()));
+                    row.agreedWeight(), row.pricePerGram()),
+                PurchaseService.lineTotal(row.deliveredWeight(), row.pricePerGram()));
         }
     }
 

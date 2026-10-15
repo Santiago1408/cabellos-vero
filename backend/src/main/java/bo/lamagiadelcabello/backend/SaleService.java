@@ -31,6 +31,7 @@ import bo.lamagiadelcabello.backend.SaleInventoryRepository.StockPosition;
 import bo.lamagiadelcabello.backend.SaleRepository.Sale;
 import bo.lamagiadelcabello.backend.SaleRepository.SaleLine;
 import bo.lamagiadelcabello.backend.SaleRepository.Delivery;
+import bo.lamagiadelcabello.backend.SaleRepository.DeliveryItem;
 
 @Service
 class SaleService {
@@ -143,9 +144,14 @@ class SaleService {
                     throw problem(HttpStatus.CONFLICT, "SALE_VERSION_CONFLICT",
                         "La venta cambió desde que la abriste. Recarga el detalle antes de editar.");
                 }
-                if (!before.status().equals("PENDING")) {
-                    throw problem(HttpStatus.CONFLICT, "SALE_NOT_PENDING",
-                        "Solo se puede editar una venta pendiente.");
+                boolean confirmed = before.status().equals("CONFIRMED");
+                if (!before.status().equals("PENDING") && !confirmed) {
+                    throw problem(HttpStatus.CONFLICT, "SALE_CANCELED",
+                        "No se puede editar una venta anulada.");
+                }
+                if (confirmed && before.acceptedPendingStock() != input.acceptPendingStock()) {
+                    throw problem(HttpStatus.CONFLICT, "CONFIRMED_SALE_IMMUTABLE",
+                        "No puedes cambiar la aceptación de stock pendiente de una venta confirmada.");
                 }
                 List<SaleLine> oldLines = sales.lines(saleId);
                 Map<UUID, SaleLine> oldById = new HashMap<>();
@@ -158,12 +164,23 @@ class SaleService {
                 Set<UUID> suppliedIds = new HashSet<>();
                 Map<HairType, BigDecimal> requested = new TreeMap<>();
                 for (EditLineInput line : input.lines()) {
+                    if (confirmed && line.id() == null) {
+                        throw problem(HttpStatus.CONFLICT, "CONFIRMED_SALE_IMMUTABLE",
+                            "No puedes agregar líneas a una venta confirmada.");
+                    }
                     if (line.id() != null && (!suppliedIds.add(line.id())
                         || !oldById.containsKey(line.id()))) {
                         throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                             "Una línea está duplicada o no pertenece a esta venta.");
                     }
                     SaleLine original = line.id() == null ? null : oldById.get(line.id());
+                    if (confirmed && (original == null
+                        || !original.categoryCode().equals(line.categoryCode())
+                        || original.lengthCm() != line.lengthCm()
+                        || original.agreedWeight().compareTo(line.weight()) != 0)) {
+                        throw problem(HttpStatus.CONFLICT, "CONFIRMED_SALE_IMMUTABLE",
+                            "Solo puedes corregir datos generales y precios en una venta confirmada.");
+                    }
                     if (original != null && original.deliveredWeight().signum() > 0) {
                         if (!original.categoryCode().equals(line.categoryCode())
                             || original.lengthCm() != line.lengthCm()
@@ -177,6 +194,10 @@ class SaleService {
                             : original.deliveredWeight()), BigDecimal::add);
                 }
                 for (SaleLine old : oldLines) {
+                    if (confirmed && !suppliedIds.contains(old.id())) {
+                        throw problem(HttpStatus.CONFLICT, "CONFIRMED_SALE_IMMUTABLE",
+                            "No puedes quitar líneas de una venta confirmada.");
+                    }
                     if (!suppliedIds.contains(old.id()) && old.deliveredWeight().signum() > 0) {
                         throw problem(HttpStatus.CONFLICT, "DELIVERED_LINE_IMMUTABLE",
                             "No puedes quitar una línea con cabello ya entregado.");
@@ -186,7 +207,9 @@ class SaleService {
                 affected.addAll(requested.keySet());
                 inventory.lockTypes(affected);
                 validateCatalog(requested.keySet());
-                requireAvailability(requested, ownReserved, input.acceptPendingStock());
+                if (!confirmed) {
+                    requireAvailability(requested, ownReserved, input.acceptPendingStock());
+                }
 
                 boolean changed = !before.customerName().equals(input.customerName())
                     || !before.operationDate().equals(input.operationDate())
@@ -348,6 +371,157 @@ class SaleService {
         }
     }
 
+    Sale correctDelivery(UUID saleId, UUID deliveryId, CorrectionInput raw, UUID actorId) {
+        CorrectionInput input = validateCorrection(raw);
+        return transactions.execute(status -> {
+            Sale before = lockedAtVersion(saleId, input.expectedVersion());
+            Delivery delivery = activeDelivery(saleId, deliveryId);
+            List<SaleLine> oldLines = sales.lines(saleId);
+            Set<HairType> affectedTypes = typesOf(oldLines);
+            inventory.lockTypes(affectedTypes);
+            List<DeliveryItem> oldItems = sales.deliveryItems(deliveryId);
+            Map<UUID, DeliveryItem> itemByLine = oldItems.stream().collect(
+                Collectors.toMap(DeliveryItem::saleLineId, item -> item));
+            Set<UUID> supplied = input.items().stream()
+                .map(DeliveryItemInput::lineId).collect(Collectors.toSet());
+            if (!supplied.equals(itemByLine.keySet())) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_DELIVERY_LINES",
+                    "La corrección debe incluir exactamente las líneas originales de la entrega.");
+            }
+            Map<UUID, SaleLine> saleLineById = oldLines.stream().collect(
+                Collectors.toMap(SaleLine::id, line -> line));
+            boolean changed = !delivery.effectiveAt().equals(input.effectiveAt().toInstant());
+            for (DeliveryItemInput item : input.items()) {
+                DeliveryItem original = itemByLine.get(item.lineId());
+                SaleLine line = saleLineById.get(item.lineId());
+                if (line == null) {
+                    throw problem(HttpStatus.CONFLICT, "INVALID_DELIVERY_LINES",
+                        "Una línea de la entrega ya no pertenece a la venta.");
+                }
+                BigDecimal afterDelivered = line.deliveredWeight()
+                    .subtract(original.weight()).add(item.weight());
+                if (afterDelivered.compareTo(line.agreedWeight()) > 0) {
+                    throw problem(HttpStatus.CONFLICT, "EXCESS_DELIVERY",
+                        "La corrección de " + line.categoryName() + " " + line.lengthCm()
+                            + " cm supera los " + line.agreedWeight() + " g acordados.");
+                }
+                if (item.weight().compareTo(original.weight()) != 0) changed = true;
+            }
+            if (!changed) {
+                throw problem(HttpStatus.BAD_REQUEST, "NO_CHANGES",
+                    "No hay cambios en la entrega.");
+            }
+            String oldValues = snapshotMovementJson(before, oldLines, delivery, oldItems);
+            if (!delivery.effectiveAt().equals(input.effectiveAt().toInstant())) {
+                sales.updateDeliveryTime(deliveryId, input.effectiveAt().toInstant());
+            }
+            for (DeliveryItemInput item : input.items()) {
+                DeliveryItem original = itemByLine.get(item.lineId());
+                if (item.weight().compareTo(original.weight()) != 0) {
+                    sales.updateDeliveryItem(original.id(), item.weight());
+                }
+            }
+            rebuildAllocations(affectedTypes);
+            List<SaleLine> afterLines = sales.lines(saleId);
+            sales.reconcileStatusAfterDeliveryChange(saleId, isCompleted(afterLines));
+            ensureReservationsBacked(affectedTypes);
+            Sale after = get(saleId);
+            SalePaymentService.requireWithinPayable(payments.totalActive(saleId),
+                SalePaymentService.payableTotal(after, afterLines));
+            sales.addHistory(saleId, "DELIVERY_CORRECTED", actorId, input.reason(),
+                oldValues, snapshotMovementJson(after, afterLines,
+                    sales.findDeliveryById(deliveryId).orElseThrow(),
+                    sales.deliveryItems(deliveryId)));
+            return after;
+        });
+    }
+
+    Sale voidDelivery(UUID saleId, UUID deliveryId, VoidDeliveryInput raw, UUID actorId) {
+        if (raw == null || raw.expectedVersion() == null || raw.expectedVersion() < 0) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_VERSION",
+                "Indica la versión actual de la venta.");
+        }
+        String reason = validateReason(raw.reason());
+        return transactions.execute(status -> {
+            Sale before = lockedAtVersion(saleId, raw.expectedVersion());
+            Delivery delivery = activeDelivery(saleId, deliveryId);
+            List<SaleLine> oldLines = sales.lines(saleId);
+            Set<HairType> affectedTypes = typesOf(oldLines);
+            inventory.lockTypes(affectedTypes);
+            List<DeliveryItem> oldItems = sales.deliveryItems(deliveryId);
+            String oldValues = snapshotMovementJson(before, oldLines, delivery, oldItems);
+            sales.voidDelivery(deliveryId);
+            rebuildAllocations(affectedTypes);
+            List<SaleLine> afterLines = sales.lines(saleId);
+            sales.reconcileStatusAfterDeliveryChange(saleId, isCompleted(afterLines));
+            ensureReservationsBacked(affectedTypes);
+            Sale after = get(saleId);
+            SalePaymentService.requireWithinPayable(payments.totalActive(saleId),
+                SalePaymentService.payableTotal(after, afterLines));
+            sales.addHistory(saleId, "DELIVERY_VOIDED", actorId, reason,
+                oldValues, snapshotMovementJson(after, afterLines,
+                    sales.findDeliveryById(deliveryId).orElseThrow(), oldItems));
+            return after;
+        });
+    }
+
+    private Sale lockedAtVersion(UUID saleId, long expectedVersion) {
+        Sale sale = sales.findByIdForUpdate(saleId)
+            .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "SALE_NOT_FOUND",
+                "Venta no encontrada."));
+        if (sale.version() != expectedVersion) {
+            throw problem(HttpStatus.CONFLICT, "SALE_VERSION_CONFLICT",
+                "La venta cambió desde que la abriste. Recarga el detalle antes de continuar.");
+        }
+        return sale;
+    }
+
+    private Delivery activeDelivery(UUID saleId, UUID deliveryId) {
+        Delivery delivery = sales.findDeliveryById(deliveryId)
+            .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "DELIVERY_NOT_FOUND",
+                "Entrega no encontrada."));
+        if (!delivery.saleId().equals(saleId)) {
+            throw problem(HttpStatus.NOT_FOUND, "DELIVERY_NOT_FOUND",
+                "Entrega no encontrada en esta venta.");
+        }
+        if (delivery.voidedAt() != null) {
+            throw problem(HttpStatus.CONFLICT, "DELIVERY_VOIDED",
+                "La entrega ya fue anulada.");
+        }
+        return delivery;
+    }
+
+    private static boolean isCompleted(List<SaleLine> lines) {
+        return lines.stream().allMatch(line ->
+            line.deliveredWeight().compareTo(line.agreedWeight()) == 0);
+    }
+
+    private static Set<HairType> typesOf(List<SaleLine> lines) {
+        return lines.stream().map(line -> new HairType(line.categoryCode(), line.lengthCm()))
+            .collect(Collectors.toSet());
+    }
+
+    private void rebuildAllocations(Set<HairType> types) {
+        try {
+            allocation.rebuild(types);
+        } catch (StockAllocationService.AllocationProblem conflict) {
+            throw problem(HttpStatus.CONFLICT, "HISTORICAL_STOCK_SHORTAGE",
+                "No se puede modificar la entrega porque dejaría un movimiento sin stock en su fecha real: "
+                    + conflict.getMessage());
+        }
+    }
+
+    private void ensureReservationsBacked(Set<HairType> types) {
+        var shortages = inventory.backingShortages(types);
+        if (shortages.isEmpty()) return;
+        String details = shortages.stream().map(shortage ->
+            shortage.type().categoryCode() + " " + shortage.type().lengthCm()
+                + " cm: faltan " + shortage.missing() + " g"
+        ).collect(Collectors.joining("; "));
+        throw problem(HttpStatus.CONFLICT, "UNBACKED_RESERVATIONS",
+            "El cambio dejaría reservas sin respaldo: " + details + ".");
+    }
+
     private Sale sameDelivery(Delivery delivery, UUID saleId, String hash) {
         if (!delivery.saleId().equals(saleId) || !delivery.requestHash().equals(hash)) {
             throw problem(HttpStatus.CONFLICT, "REQUEST_KEY_REUSED",
@@ -366,8 +540,28 @@ class SaleService {
             throw problem(HttpStatus.BAD_REQUEST, "FUTURE_DELIVERY",
                 "La hora real de entrega no puede estar en el futuro.");
         }
+        return new DeliveryInput(raw.requestKey(), raw.effectiveAt(),
+            validateDeliveryItems(raw.items()));
+    }
+
+    private CorrectionInput validateCorrection(CorrectionInput raw) {
+        if (raw == null || raw.expectedVersion() == null || raw.expectedVersion() < 0
+            || raw.effectiveAt() == null || raw.items() == null || raw.items().isEmpty()
+            || raw.items().size() > 100) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_DELIVERY",
+                "Indica versión, fecha y entre 1 y 100 líneas de la entrega.");
+        }
+        if (raw.effectiveAt().toInstant().isAfter(Instant.now().plusSeconds(300))) {
+            throw problem(HttpStatus.BAD_REQUEST, "FUTURE_DELIVERY",
+                "La hora real de entrega no puede estar en el futuro.");
+        }
+        return new CorrectionInput(raw.expectedVersion(), raw.effectiveAt(),
+            validateDeliveryItems(raw.items()), validateReason(raw.reason()));
+    }
+
+    private List<DeliveryItemInput> validateDeliveryItems(List<DeliveryItemInput> rawItems) {
         Set<UUID> seen = new HashSet<>();
-        List<DeliveryItemInput> items = raw.items().stream().map(item -> {
+        return rawItems.stream().map(item -> {
             if (item == null || item.lineId() == null || !seen.add(item.lineId())) {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                     "Cada línea de entrega debe aparecer una sola vez.");
@@ -375,7 +569,6 @@ class SaleService {
             return new DeliveryItemInput(item.lineId(),
                 positiveTwoDecimals(item.weight(), "peso entregado"));
         }).toList();
-        return new DeliveryInput(raw.requestKey(), raw.effectiveAt(), items);
     }
 
     private Sale sameRequest(Sale existing, String hash) {
@@ -528,6 +721,26 @@ class SaleService {
         ));
     }
 
+    private String snapshotMovementJson(Sale sale, List<SaleLine> lines,
+                                        Delivery delivery, List<DeliveryItem> items) {
+        Map<String, Object> movement = new HashMap<>();
+        movement.put("id", delivery.id().toString());
+        movement.put("effectiveAt", delivery.effectiveAt().toString());
+        movement.put("recordedAt", delivery.recordedAt().toString());
+        movement.put("voidedAt", delivery.voidedAt() == null
+            ? null : delivery.voidedAt().toString());
+        movement.put("items", items.stream().map(item -> Map.of(
+            "deliveryItemId", item.id().toString(),
+            "saleLineId", item.saleLineId().toString(),
+            "weight", item.weight(),
+            "consumedLots", sales.consumptions(item.id())
+        )).toList());
+        return json.writeValueAsString(Map.of(
+            "sale", json.readTree(snapshotJson(sale, lines)),
+            "delivery", movement
+        ));
+    }
+
     private String fingerprint(Object value) {
         try {
             byte[] bytes = json.writeValueAsBytes(value);
@@ -553,6 +766,9 @@ class SaleService {
     record DeliveryItemInput(UUID lineId, BigDecimal weight) {}
     record DeliveryInput(UUID requestKey, OffsetDateTime effectiveAt,
                          List<DeliveryItemInput> items) {}
+    record CorrectionInput(Long expectedVersion, OffsetDateTime effectiveAt,
+                           List<DeliveryItemInput> items, String reason) {}
+    record VoidDeliveryInput(Long expectedVersion, String reason) {}
     private record DeliveryFingerprint(UUID saleId, DeliveryInput input) {}
     record AvailabilityIssue(String categoryCode, int lengthCm, BigDecimal requested,
                              BigDecimal physicalAvailable, BigDecimal pendingAvailable,
