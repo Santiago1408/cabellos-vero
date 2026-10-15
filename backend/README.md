@@ -217,6 +217,22 @@ El detalle muestra las recepciones activas como `PURCHASE` y las entregas activa
 
 Los importes de recepciones y entregas parciales se calculan como diferencias entre el valor acumulado anterior y el nuevo de cada línea, redondeado a dos decimales. El costo de cada lote recibido se distribuye entre sus entregas de la misma forma. Así los centavos de las entregas más el valor restante del lote suman su valor de compra, incluso después de corregir fechas, pesos o precios. El margen bruto es ingresos por entregas menos costo del cabello entregado; no incluye otros gastos.
 
+## Deudas independientes
+
+`/api/debts` está disponible solo para el administrador. Las deudas registran movimientos de efectivo ajenos a compras y ventas, y no alteran inventario ni reportes de margen. `kind` es `RECEIVABLE` (por cobrar) o `PAYABLE` (por pagar). El estado se calcula al consultar: `PAID` si el saldo es cero, `OVERDUE` si pasó el vencimiento, `PARTIAL` si tiene abonos vigentes o `PENDING` en los demás casos.
+
+| Ruta | Acción |
+| --- | --- |
+| `GET /api/debts` | Lista con importe, pagado, saldo y estado. |
+| `GET /api/debts/{id}` | Detalle con abonos vigentes y anulados e historial de cambios. |
+| `POST /api/debts` | Crea una deuda con `requestKey`, `party`, `phone`, `kind`, `total`, `openedOn`, `dueOn` y `notes`. |
+| `PUT /api/debts/{id}` | Edita datos con `expectedVersion` y `reason`. |
+| `POST /api/debts/{id}/payments` | Registra un abono con `requestKey`, `paidOn`, `amount` y `note`. |
+| `PUT /api/debts/{id}/payments/{paymentId}` | Corrige un abono con `expectedVersion` y `reason`. |
+| `POST /api/debts/{id}/payments/{paymentId}/void` | Anula un abono con `expectedVersion` y `reason`. |
+
+Los importes admiten hasta dos decimales. La fecha del abono va desde el registro de la deuda hasta hoy. La suma de abonos vigentes nunca puede superar el total; al editar la deuda tampoco se puede reducir el total por debajo de lo ya pagado ni mover la fecha de registro después de cualquier abono histórico. Las claves `requestKey` hacen idempotentes las creaciones. Los cambios, correcciones y anulaciones conservan valor anterior, valor nuevo, usuario y motivo. Un abono anulado deja de contar en el saldo y sigue visible en el detalle.
+
 ## Qué sigue
 
-Incorporar deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). El frontend aún utiliza `DemoStore` y no consume estos endpoints.
