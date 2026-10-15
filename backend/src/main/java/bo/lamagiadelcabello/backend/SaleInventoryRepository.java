@@ -46,9 +46,16 @@ class SaleInventoryRepository {
             WHERE p.status = 'PENDING' AND l.category_code = ? AND l.length_cm = ?
             """, type);
         BigDecimal reserved = amount("""
-            SELECT COALESCE(SUM(l.agreed_weight), 0)
+            SELECT COALESCE(SUM(l.agreed_weight - COALESCE(d.delivered_weight, 0)), 0)
             FROM sale_line l
             JOIN sale_order s ON s.id = l.sale_id
+            LEFT JOIN (
+                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight
+                FROM sale_delivery_line dl
+                JOIN sale_delivery sd ON sd.id = dl.delivery_id
+                WHERE sd.voided_at IS NULL
+                GROUP BY dl.sale_line_id
+            ) d ON d.sale_line_id = l.id
             WHERE s.status = 'PENDING' AND l.category_code = ? AND l.length_cm = ?
             """, type);
         return new StockPosition(physical, pending, reserved);

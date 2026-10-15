@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.HashMap;
@@ -27,6 +29,7 @@ import bo.lamagiadelcabello.backend.SaleInventoryRepository.HairType;
 import bo.lamagiadelcabello.backend.SaleInventoryRepository.StockPosition;
 import bo.lamagiadelcabello.backend.SaleRepository.Sale;
 import bo.lamagiadelcabello.backend.SaleRepository.SaleLine;
+import bo.lamagiadelcabello.backend.SaleRepository.Delivery;
 
 @Service
 class SaleService {
@@ -34,14 +37,17 @@ class SaleService {
     private final SaleRepository sales;
     private final SaleInventoryRepository inventory;
     private final CatalogRepository catalog;
+    private final StockAllocationService allocation;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
 
     SaleService(SaleRepository sales, SaleInventoryRepository inventory,
-                CatalogRepository catalog, TransactionTemplate transactions, ObjectMapper json) {
+                CatalogRepository catalog, StockAllocationService allocation,
+                TransactionTemplate transactions, ObjectMapper json) {
         this.sales = sales;
         this.inventory = inventory;
         this.catalog = catalog;
+        this.allocation = allocation;
         this.transactions = transactions;
         this.json = json;
     }
@@ -118,7 +124,7 @@ class SaleService {
                 for (SaleLine line : oldLines) {
                     oldById.put(line.id(), line);
                     ownReserved.merge(new HairType(line.categoryCode(), line.lengthCm()),
-                        line.agreedWeight(), BigDecimal::add);
+                        line.agreedWeight().subtract(line.deliveredWeight()), BigDecimal::add);
                 }
                 Set<UUID> suppliedIds = new HashSet<>();
                 Map<HairType, BigDecimal> requested = new TreeMap<>();
@@ -128,8 +134,24 @@ class SaleService {
                         throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                             "Una línea está duplicada o no pertenece a esta venta.");
                     }
+                    SaleLine original = line.id() == null ? null : oldById.get(line.id());
+                    if (original != null && original.deliveredWeight().signum() > 0) {
+                        if (!original.categoryCode().equals(line.categoryCode())
+                            || original.lengthCm() != line.lengthCm()
+                            || line.weight().compareTo(original.deliveredWeight()) < 0) {
+                            throw problem(HttpStatus.CONFLICT, "DELIVERED_LINE_IMMUTABLE",
+                                "No puedes cambiar el tipo ni reducir el peso por debajo de lo ya entregado.");
+                        }
+                    }
                     requested.merge(new HairType(line.categoryCode(), line.lengthCm()),
-                        line.weight(), BigDecimal::add);
+                        line.weight().subtract(original == null ? BigDecimal.ZERO
+                            : original.deliveredWeight()), BigDecimal::add);
+                }
+                for (SaleLine old : oldLines) {
+                    if (!suppliedIds.contains(old.id()) && old.deliveredWeight().signum() > 0) {
+                        throw problem(HttpStatus.CONFLICT, "DELIVERED_LINE_IMMUTABLE",
+                            "No puedes quitar una línea con cabello ya entregado.");
+                    }
                 }
                 Set<HairType> affected = new HashSet<>(ownReserved.keySet());
                 affected.addAll(requested.keySet());
@@ -198,6 +220,129 @@ class SaleService {
                 oldValues, snapshotJson(after, lines));
             return after;
         });
+    }
+
+    Sale deliver(UUID saleId, DeliveryInput raw, UUID actorId) {
+        DeliveryInput input = validateDelivery(raw);
+        String hash = fingerprint(new DeliveryFingerprint(saleId, input));
+        Delivery repeated = sales.findDeliveryByRequestKey(input.requestKey()).orElse(null);
+        if (repeated != null) return sameDelivery(repeated, saleId, hash);
+        try {
+            return transactions.execute(status -> {
+                Sale before = sales.findByIdForUpdate(saleId)
+                    .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "SALE_NOT_FOUND",
+                        "Venta no encontrada."));
+                Delivery duplicate = sales.findDeliveryByRequestKey(input.requestKey()).orElse(null);
+                if (duplicate != null) return sameDelivery(duplicate, saleId, hash);
+                if (!before.status().equals("PENDING")) {
+                    throw problem(HttpStatus.CONFLICT, "SALE_NOT_PENDING",
+                        "Esta venta ya no tiene entregas pendientes.");
+                }
+                List<SaleLine> oldLines = sales.lines(saleId);
+                Map<UUID, SaleLine> byId = oldLines.stream().collect(
+                    Collectors.toMap(SaleLine::id, line -> line));
+                Map<HairType, BigDecimal> requested = new TreeMap<>();
+                for (DeliveryItemInput item : input.items()) {
+                    SaleLine line = byId.get(item.lineId());
+                    if (line == null) {
+                        throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
+                            "Una línea no pertenece a esta venta.");
+                    }
+                    BigDecimal remaining = line.agreedWeight().subtract(line.deliveredWeight());
+                    if (item.weight().compareTo(remaining) > 0) {
+                        throw problem(HttpStatus.CONFLICT, "EXCESS_DELIVERY",
+                            "La entrega de " + line.categoryName() + " " + line.lengthCm()
+                                + " cm supera los " + remaining + " g pendientes.");
+                    }
+                    requested.merge(new HairType(line.categoryCode(), line.lengthCm()),
+                        item.weight(), BigDecimal::add);
+                }
+                inventory.lockTypes(requested.keySet());
+                List<AvailabilityIssue> shortages = new ArrayList<>();
+                for (var entry : requested.entrySet()) {
+                    StockPosition position = inventory.position(entry.getKey());
+                    BigDecimal missing = entry.getValue().subtract(position.physical())
+                        .max(BigDecimal.ZERO);
+                    if (missing.signum() > 0) {
+                        HairType type = entry.getKey();
+                        shortages.add(new AvailabilityIssue(type.categoryCode(), type.lengthCm(),
+                            entry.getValue(), position.physical(), position.pending(), missing));
+                    }
+                }
+                if (!shortages.isEmpty()) {
+                    throw new SaleProblem(HttpStatus.CONFLICT, "INSUFFICIENT_PHYSICAL_STOCK",
+                        "No se registró ninguna entrega: falta stock físico en uno o más tipos.",
+                        shortages);
+                }
+
+                String oldValues = snapshotJson(before, oldLines);
+                UUID deliveryId = UUID.randomUUID();
+                sales.addDelivery(deliveryId, saleId, input.requestKey(), hash,
+                    input.effectiveAt().toInstant());
+                for (DeliveryItemInput item : input.items()) {
+                    sales.addDeliveryLine(UUID.randomUUID(), deliveryId, saleId,
+                        item.lineId(), item.weight());
+                }
+                try {
+                    allocation.rebuild(requested.keySet());
+                } catch (StockAllocationService.AllocationProblem conflict) {
+                    throw problem(HttpStatus.CONFLICT, "HISTORICAL_STOCK_SHORTAGE",
+                        conflict.getMessage());
+                }
+                List<SaleLine> afterLines = sales.lines(saleId);
+                boolean completed = afterLines.stream().allMatch(line ->
+                    line.deliveredWeight().compareTo(line.agreedWeight()) == 0);
+                if (completed) sales.confirm(saleId);
+                else sales.touch(saleId);
+                Sale after = get(saleId);
+                Map<String, Object> movement = new HashMap<>();
+                movement.put("sale", json.readTree(snapshotJson(after, afterLines)));
+                movement.put("deliveryId", deliveryId.toString());
+                movement.put("effectiveAt", input.effectiveAt().toInstant().toString());
+                movement.put("recordedAt", sales.deliveries(saleId).stream()
+                    .filter(delivery -> delivery.id().equals(deliveryId)).findFirst()
+                    .orElseThrow().recordedAt().toString());
+                movement.put("items", input.items());
+                sales.addHistory(saleId, "DELIVERY_RECORDED", actorId, null,
+                    oldValues, json.writeValueAsString(movement));
+                return after;
+            });
+        } catch (DataIntegrityViolationException conflict) {
+            Delivery duplicate = sales.findDeliveryByRequestKey(input.requestKey()).orElse(null);
+            if (duplicate != null) return sameDelivery(duplicate, saleId, hash);
+            throw problem(HttpStatus.CONFLICT, "DELIVERY_CONFLICT",
+                "La venta o el inventario cambió durante el registro de la entrega.");
+        }
+    }
+
+    private Sale sameDelivery(Delivery delivery, UUID saleId, String hash) {
+        if (!delivery.saleId().equals(saleId) || !delivery.requestHash().equals(hash)) {
+            throw problem(HttpStatus.CONFLICT, "REQUEST_KEY_REUSED",
+                "La clave de solicitud ya se usó con otros datos.");
+        }
+        return get(saleId);
+    }
+
+    private DeliveryInput validateDelivery(DeliveryInput raw) {
+        if (raw == null || raw.requestKey() == null || raw.effectiveAt() == null
+            || raw.items() == null || raw.items().isEmpty() || raw.items().size() > 100) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_DELIVERY",
+                "Indica clave de solicitud, fecha y entre 1 y 100 líneas de entrega.");
+        }
+        if (raw.effectiveAt().toInstant().isAfter(Instant.now().plusSeconds(300))) {
+            throw problem(HttpStatus.BAD_REQUEST, "FUTURE_DELIVERY",
+                "La hora real de entrega no puede estar en el futuro.");
+        }
+        Set<UUID> seen = new HashSet<>();
+        List<DeliveryItemInput> items = raw.items().stream().map(item -> {
+            if (item == null || item.lineId() == null || !seen.add(item.lineId())) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
+                    "Cada línea de entrega debe aparecer una sola vez.");
+            }
+            return new DeliveryItemInput(item.lineId(),
+                positiveTwoDecimals(item.weight(), "peso entregado"));
+        }).toList();
+        return new DeliveryInput(raw.requestKey(), raw.effectiveAt(), items);
     }
 
     private Sale sameRequest(Sale existing, String hash) {
@@ -344,6 +489,7 @@ class SaleService {
                 "categoryCode", line.categoryCode(),
                 "lengthCm", line.lengthCm(),
                 "agreedWeight", line.agreedWeight(),
+                "deliveredWeight", line.deliveredWeight(),
                 "pricePerGram", line.pricePerGram()
             )).toList()
         ));
@@ -369,6 +515,10 @@ class SaleService {
                          BigDecimal weight, BigDecimal pricePerGram) {}
     record EditInput(Long expectedVersion, String customerName, LocalDate operationDate,
                      List<EditLineInput> lines, boolean acceptPendingStock, String reason) {}
+    record DeliveryItemInput(UUID lineId, BigDecimal weight) {}
+    record DeliveryInput(UUID requestKey, OffsetDateTime effectiveAt,
+                         List<DeliveryItemInput> items) {}
+    private record DeliveryFingerprint(UUID saleId, DeliveryInput input) {}
     record AvailabilityIssue(String categoryCode, int lengthCm, BigDecimal requested,
                              BigDecimal physicalAvailable, BigDecimal pendingAvailable,
                              BigDecimal missing) {}

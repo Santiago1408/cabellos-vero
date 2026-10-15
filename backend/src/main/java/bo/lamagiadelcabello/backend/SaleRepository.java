@@ -51,17 +51,62 @@ class SaleRepository {
     List<SaleLine> lines(UUID saleId) {
         return jdbc.query("""
             SELECT l.id, l.sale_id, l.category_code, c.display_name AS category_name,
-                   l.length_cm, l.agreed_weight, l.price_per_gram
+                   l.length_cm, l.agreed_weight, l.price_per_gram,
+                   COALESCE(d.delivered_weight, 0) AS delivered_weight
             FROM sale_line l
             JOIN hair_category c ON c.code = l.category_code
+            LEFT JOIN (
+                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight
+                FROM sale_delivery_line dl JOIN sale_delivery sd ON sd.id = dl.delivery_id
+                WHERE sd.voided_at IS NULL GROUP BY dl.sale_line_id
+            ) d ON d.sale_line_id = l.id
             WHERE l.sale_id = ?
             ORDER BY l.category_code, l.length_cm, l.id
             """, (row, number) -> new SaleLine(
                 (UUID) row.getObject("id"), (UUID) row.getObject("sale_id"),
                 row.getString("category_code"), row.getString("category_name"),
                 row.getInt("length_cm"), row.getBigDecimal("agreed_weight"),
-                row.getBigDecimal("price_per_gram")
+                row.getBigDecimal("price_per_gram"), row.getBigDecimal("delivered_weight")
             ), saleId);
+    }
+
+    Optional<Delivery> findDeliveryByRequestKey(UUID requestKey) {
+        return jdbc.query("SELECT * FROM sale_delivery WHERE request_key = ?",
+            SaleRepository::mapDelivery, requestKey).stream().findFirst();
+    }
+
+    List<Delivery> deliveries(UUID saleId) {
+        return jdbc.query("""
+            SELECT * FROM sale_delivery WHERE sale_id = ?
+            ORDER BY effective_at, recorded_at, id
+            """, SaleRepository::mapDelivery, saleId);
+    }
+
+    List<DeliveryItem> deliveryItems(UUID deliveryId) {
+        return jdbc.query("""
+            SELECT dl.id, dl.sale_line_id, dl.weight
+            FROM sale_delivery_line dl WHERE dl.delivery_id = ? ORDER BY dl.id
+            """, (row, number) -> new DeliveryItem((UUID) row.getObject("id"),
+                (UUID) row.getObject("sale_line_id"), row.getBigDecimal("weight")), deliveryId);
+    }
+
+    List<Consumption> consumptions(UUID deliveryLineId) {
+        return jdbc.query("""
+            SELECT sc.stock_lot_id, sc.weight, sl.cost_per_gram,
+                   sl.effective_at AS received_at, p.id AS purchase_id,
+                   s.name AS supplier_name
+            FROM stock_consumption sc
+            JOIN stock_lot sl ON sl.id = sc.stock_lot_id
+            JOIN purchase_receipt_line rl ON rl.id = sl.receipt_line_id
+            JOIN purchase_receipt pr ON pr.id = rl.receipt_id
+            JOIN purchase_order p ON p.id = pr.purchase_id
+            JOIN supplier s ON s.id = p.supplier_id
+            WHERE sc.delivery_line_id = ? ORDER BY sl.effective_at, sl.created_at, sl.id
+            """, (row, number) -> new Consumption(
+                (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("weight"),
+                row.getBigDecimal("cost_per_gram"), row.getTimestamp("received_at").toInstant(),
+                (UUID) row.getObject("purchase_id"), row.getString("supplier_name")
+            ), deliveryLineId);
     }
 
     List<History> history(UUID saleId) {
@@ -121,6 +166,30 @@ class SaleRepository {
             """, saleId);
     }
 
+    void confirm(UUID saleId) {
+        jdbc.update("""
+            UPDATE sale_order SET status = 'CONFIRMED', confirmed_at = now(),
+                updated_at = now(), version = version + 1
+            WHERE id = ? AND status = 'PENDING'
+            """, saleId);
+    }
+
+    void addDelivery(UUID id, UUID saleId, UUID requestKey,
+                     String requestHash, Instant effectiveAt) {
+        jdbc.update("""
+            INSERT INTO sale_delivery (id, sale_id, request_key, request_hash, effective_at)
+            VALUES (?, ?, ?, ?, ?)
+            """, id, saleId, requestKey, requestHash, effectiveAt);
+    }
+
+    void addDeliveryLine(UUID id, UUID deliveryId, UUID saleId,
+                         UUID saleLineId, BigDecimal weight) {
+        jdbc.update("""
+            INSERT INTO sale_delivery_line (id, delivery_id, sale_id, sale_line_id, weight)
+            VALUES (?, ?, ?, ?, ?)
+            """, id, deliveryId, saleId, saleLineId, weight);
+    }
+
     void cancel(UUID saleId) {
         jdbc.update("""
             UPDATE sale_order SET status = 'CANCELED', canceled_at = now(),
@@ -153,13 +222,29 @@ class SaleRepository {
         );
     }
 
+    private static Delivery mapDelivery(ResultSet row, int number) throws SQLException {
+        var voided = row.getTimestamp("voided_at");
+        return new Delivery((UUID) row.getObject("id"), (UUID) row.getObject("sale_id"),
+            (UUID) row.getObject("request_key"), row.getString("request_hash"),
+            row.getTimestamp("effective_at").toInstant(),
+            row.getTimestamp("recorded_at").toInstant(),
+            voided == null ? null : voided.toInstant());
+    }
+
     record Sale(UUID id, UUID requestKey, String requestHash, String customerName,
                 LocalDate operationDate, boolean acceptedPendingStock, String status,
                 Instant createdAt, Instant confirmedAt, Instant canceledAt,
                 Instant updatedAt, long version) {}
 
     record SaleLine(UUID id, UUID saleId, String categoryCode, String categoryName,
-                    int lengthCm, BigDecimal agreedWeight, BigDecimal pricePerGram) {}
+                    int lengthCm, BigDecimal agreedWeight, BigDecimal pricePerGram,
+                    BigDecimal deliveredWeight) {}
+
+    record Delivery(UUID id, UUID saleId, UUID requestKey, String requestHash,
+                    Instant effectiveAt, Instant recordedAt, Instant voidedAt) {}
+    record DeliveryItem(UUID id, UUID saleLineId, BigDecimal weight) {}
+    record Consumption(UUID stockLotId, BigDecimal weight, BigDecimal costPerGram,
+                       Instant receivedAt, UUID purchaseId, String supplierName) {}
 
     record History(long id, Instant changedAt, String eventType, UUID actorUserId,
                    String reason, String oldValuesJson, String newValuesJson) {}

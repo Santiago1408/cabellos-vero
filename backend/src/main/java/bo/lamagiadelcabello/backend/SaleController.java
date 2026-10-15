@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +25,9 @@ import tools.jackson.databind.ObjectMapper;
 import bo.lamagiadelcabello.backend.SaleRepository.History;
 import bo.lamagiadelcabello.backend.SaleRepository.Sale;
 import bo.lamagiadelcabello.backend.SaleRepository.SaleLine;
+import bo.lamagiadelcabello.backend.SaleRepository.Delivery;
+import bo.lamagiadelcabello.backend.SaleRepository.DeliveryItem;
+import bo.lamagiadelcabello.backend.SaleRepository.Consumption;
 import bo.lamagiadelcabello.backend.SaleService.SaleProblem;
 
 @RestController
@@ -65,6 +69,13 @@ class SaleController {
             actorId(authentication)));
     }
 
+    @PostMapping("/{id}/deliveries")
+    Detail deliver(@PathVariable UUID id, @RequestBody DeliveryRequest input,
+                   Authentication authentication) {
+        return detailOf(sales.deliver(id, input == null ? null : input.toService(),
+            actorId(authentication)));
+    }
+
     @PutMapping("/{id}")
     Detail edit(@PathVariable UUID id, @RequestBody EditRequest input,
                 Authentication authentication) {
@@ -85,16 +96,29 @@ class SaleController {
         BigDecimal total = lines.stream().map(line -> PurchaseService.lineTotal(
                 line.agreedWeight(), line.pricePerGram()))
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        BigDecimal delivered = lines.stream().map(SaleLine::deliveredWeight)
+            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         return new Summary(sale.id(), sale.customerName(), sale.operationDate(),
             sale.acceptedPendingStock(), sale.status(), sale.createdAt(),
             sale.confirmedAt(), sale.canceledAt(), sale.updatedAt(), sale.version(),
-            weight, BigDecimal.ZERO.setScale(2), total);
+            weight, delivered, total);
     }
 
     private Detail detailOf(Sale sale) {
         return new Detail(summary(sale), repository.lines(sale.id()).stream()
-            .map(LineView::from).toList(), repository.history(sale.id()).stream()
+            .map(LineView::from).toList(), repository.deliveries(sale.id()).stream()
+            .map(this::deliveryView).toList(), repository.history(sale.id()).stream()
             .map(this::historyView).toList());
+    }
+
+    private DeliveryView deliveryView(Delivery row) {
+        return new DeliveryView(row.id(), row.effectiveAt(), row.recordedAt(), row.voidedAt(),
+            repository.deliveryItems(row.id()).stream().map(this::deliveryItemView).toList());
+    }
+
+    private DeliveryItemView deliveryItemView(DeliveryItem row) {
+        return new DeliveryItemView(row.id(), row.saleLineId(), row.weight(),
+            repository.consumptions(row.id()).stream().map(ConsumptionView::from).toList());
     }
 
     private HistoryView historyView(History row) {
@@ -143,13 +167,29 @@ class SaleController {
 
     record ReasonRequest(String reason) {}
 
+    record DeliveryRequest(UUID requestKey, OffsetDateTime effectiveAt,
+                           List<DeliveryItemRequest> items) {
+        SaleService.DeliveryInput toService() {
+            return new SaleService.DeliveryInput(requestKey, effectiveAt,
+                items == null ? null : items.stream()
+                    .map(item -> item == null ? null : item.toService()).toList());
+        }
+    }
+
+    record DeliveryItemRequest(UUID lineId, BigDecimal weight) {
+        SaleService.DeliveryItemInput toService() {
+            return new SaleService.DeliveryItemInput(lineId, weight);
+        }
+    }
+
     record Summary(UUID id, String customerName, LocalDate operationDate,
                    boolean acceptedPendingStock, String status, Instant createdAt,
                    Instant confirmedAt, Instant canceledAt, Instant updatedAt,
                    long version, BigDecimal agreedWeight, BigDecimal deliveredWeight,
                    BigDecimal agreedTotal) {}
 
-    record Detail(Summary summary, List<LineView> lines, List<HistoryView> history) {}
+    record Detail(Summary summary, List<LineView> lines,
+                  List<DeliveryView> deliveries, List<HistoryView> history) {}
 
     record LineView(UUID id, String categoryCode, String categoryName, int lengthCm,
                     BigDecimal agreedWeight, BigDecimal deliveredWeight,
@@ -157,9 +197,22 @@ class SaleController {
                     BigDecimal agreedTotal) {
         static LineView from(SaleLine row) {
             return new LineView(row.id(), row.categoryCode(), row.categoryName(), row.lengthCm(),
-                row.agreedWeight(), BigDecimal.ZERO.setScale(2), row.agreedWeight(),
+                row.agreedWeight(), row.deliveredWeight(),
+                row.agreedWeight().subtract(row.deliveredWeight()),
                 row.pricePerGram(), PurchaseService.lineTotal(
                     row.agreedWeight(), row.pricePerGram()));
+        }
+    }
+
+    record DeliveryView(UUID id, Instant effectiveAt, Instant recordedAt, Instant voidedAt,
+                        List<DeliveryItemView> items) {}
+    record DeliveryItemView(UUID id, UUID lineId, BigDecimal weight,
+                            List<ConsumptionView> consumedLots) {}
+    record ConsumptionView(UUID stockLotId, BigDecimal weight, BigDecimal costPerGram,
+                           Instant receivedAt, UUID purchaseId, String supplierName) {
+        static ConsumptionView from(Consumption row) {
+            return new ConsumptionView(row.stockLotId(), row.weight(), row.costPerGram(),
+                row.receivedAt(), row.purchaseId(), row.supplierName());
         }
     }
 

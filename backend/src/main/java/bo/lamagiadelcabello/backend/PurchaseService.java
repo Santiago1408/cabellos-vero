@@ -39,18 +39,21 @@ class PurchaseService {
     private final CatalogRepository catalog;
     private final PurchasePaymentRepository payments;
     private final SaleInventoryRepository inventory;
+    private final StockAllocationService allocation;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
 
     PurchaseService(PurchaseRepository purchases, SupplierRepository suppliers,
                     CatalogRepository catalog, PurchasePaymentRepository payments,
-                    SaleInventoryRepository inventory, TransactionTemplate transactions,
+                    SaleInventoryRepository inventory, StockAllocationService allocation,
+                    TransactionTemplate transactions,
                     ObjectMapper json) {
         this.purchases = purchases;
         this.suppliers = suppliers;
         this.catalog = catalog;
         this.payments = payments;
         this.inventory = inventory;
+        this.allocation = allocation;
         this.transactions = transactions;
         this.json = json;
     }
@@ -275,19 +278,11 @@ class PurchaseService {
             Map<UUID, PurchaseLine> purchaseLineById = new HashMap<>();
             for (PurchaseLine line : oldLines) purchaseLineById.put(line.id(), line);
             boolean changed = !receipt.effectiveAt().equals(input.effectiveAt().toInstant());
-            boolean hasSoldHair = false;
             for (ReceiptItemInput item : input.items()) {
                 ReceiptItem original = itemByLine.get(item.lineId());
                 StockLot lot = lotByLine.get(item.lineId());
                 if (lot == null || lot.voidedAt() != null) {
                     throw problem(HttpStatus.CONFLICT, "El lote de esta recepción ya no está disponible.");
-                }
-                BigDecimal consumed = lot.originalWeight().subtract(lot.remainingWeight());
-                if (consumed.signum() > 0) hasSoldHair = true;
-                if (item.weight().compareTo(consumed) < 0) {
-                    throw problem(HttpStatus.CONFLICT,
-                        "No puedes reducir esta recepción por debajo de " + consumed
-                            + " g ya vendidos de ese lote.");
                 }
                 PurchaseLine line = purchaseLineById.get(item.lineId());
                 BigDecimal afterReceived = line.receivedWeight()
@@ -300,10 +295,6 @@ class PurchaseService {
                 if (item.weight().compareTo(original.weight()) != 0) changed = true;
             }
             if (!changed) throw problem(HttpStatus.BAD_REQUEST, "No hay cambios en la recepción.");
-            if (hasSoldHair) {
-                throw problem(HttpStatus.CONFLICT,
-                    "Esta recepción ya tiene cabello vendido; la corrección requiere recalcular consumos y márgenes.");
-            }
 
             String oldValues = snapshotMovementJson(before, oldLines, receipt, oldItems);
             if (!receipt.effectiveAt().equals(input.effectiveAt().toInstant())) {
@@ -313,10 +304,10 @@ class PurchaseService {
                 ReceiptItem original = itemByLine.get(item.lineId());
                 if (item.weight().compareTo(original.weight()) == 0) continue;
                 StockLot lot = lotByLine.get(item.lineId());
-                BigDecimal consumed = lot.originalWeight().subtract(lot.remainingWeight());
                 purchases.updateReceiptItem(original.id(), item.weight());
-                purchases.updateStockLotWeight(lot.id(), item.weight(), item.weight().subtract(consumed));
+                purchases.updateStockLotWeight(lot.id(), item.weight(), item.weight());
             }
+            rebuildAllocations(affectedTypes);
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
             ensureReservationsBacked(affectedTypes);
@@ -351,13 +342,10 @@ class PurchaseService {
                 if (lot.voidedAt() != null) {
                     throw problem(HttpStatus.CONFLICT, "Un lote de esta recepción ya fue anulado.");
                 }
-                if (lot.originalWeight().compareTo(lot.remainingWeight()) != 0) {
-                    throw problem(HttpStatus.CONFLICT,
-                        "No puedes anular una recepción cuyo cabello ya se vendió.");
-                }
             }
             String oldValues = snapshotMovementJson(before, oldLines, receipt, oldItems);
             purchases.voidReceipt(receiptId);
+            rebuildAllocations(affectedTypes);
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
             ensureReservationsBacked(affectedTypes);
@@ -432,6 +420,7 @@ class PurchaseService {
             purchases.addStockLot(UUID.randomUUID(), receiptLineId, line.categoryCode(),
                 line.lengthCm(), line.pricePerGram(), item.weight(), effectiveAt);
         }
+        rebuildAllocations(typesOf(lines));
         List<PurchaseLine> afterLines = purchases.lines(purchaseId);
         boolean completed = afterLines.stream()
             .allMatch(line -> line.receivedWeight().compareTo(line.agreedWeight()) == 0);
@@ -488,6 +477,16 @@ class PurchaseService {
         ).collect(java.util.stream.Collectors.joining("; "));
         throw problem(HttpStatus.CONFLICT,
             "El cambio dejaría reservas de ventas sin respaldo: " + details + ".");
+    }
+
+    private void rebuildAllocations(Set<HairType> types) {
+        try {
+            allocation.rebuild(types);
+        } catch (StockAllocationService.AllocationProblem conflict) {
+            throw problem(HttpStatus.CONFLICT,
+                "No se puede modificar la recepción porque dejaría una entrega sin stock en su fecha real: "
+                    + conflict.getMessage());
+        }
     }
 
     private Purchase sameRequest(Purchase existing, String fingerprint) {

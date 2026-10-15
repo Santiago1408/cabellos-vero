@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas está implementada la reserva pendiente; entregas, ventas inmediatas, pagos de ventas y reportes siguen pendientes.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas y entregas parciales que descuentan lotes físicos. Ventas inmediatas en una sola solicitud, corrección o anulación de entregas, pagos de ventas y reportes siguen pendientes.
 
 ## Requisitos locales
 
@@ -138,15 +138,15 @@ Para crearla ya confirmada, usa `receiveNow: true` y añade `effectiveAt` con fe
 
 Para editar, lee primero el detalle y envía en `PUT` la `summary.version` como `expectedVersion`, junto con `supplierId`, `operationDate`, todas las `lines` que permanecerán y un `reason` de 1 a 500 caracteres. Cada línea existente lleva su `id`; una línea nueva no lo lleva. Omitir una línea sin recepciones la elimina. La respuesta incluye la versión nueva y el historial con los valores anteriores y nuevos. Si otra acción cambió la compra entre la lectura y la edición, se responde `409` y hay que recargar el detalle. No se puede reducir un peso por debajo de lo recibido, quitar o cambiar el tipo de una línea ya recibida, ni cambiar los pesos de una compra confirmada. Al cambiar el precio de una línea recibida se actualiza el costo de sus lotes; cuando se incorporen ventas, esa operación deberá recalcular los márgenes históricos afectados.
 
-Para corregir una recepción, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. No se cambian las líneas que componen esa recepción; cada peso debe seguir siendo positivo y el total recibido de cada línea no puede superar lo acordado. El momento de registro (`recordedAt`) permanece intacto. La corrección actualiza el lote físico y puede devolver una compra confirmada a pendiente o completar una pendiente. Para anularla, envía `{"expectedVersion": 2, "reason": "Recepción duplicada"}` al endpoint `/void`; el movimiento y sus lotes quedan marcados como anulados, se excluyen del stock efectivo y permanecen en el historial. Una recepción con cabello ya vendido no puede corregirse ni anularse hasta incorporar el recálculo de consumos y márgenes en la etapa de ventas. Las futuras consultas de inventario y asignación de lotes deben filtrar `stock_lot.voided_at IS NULL`.
+Para corregir una recepción, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. No se cambian las líneas que componen esa recepción; cada peso debe seguir siendo positivo y el total recibido de cada línea no puede superar lo acordado. El momento de registro (`recordedAt`) permanece intacto. La corrección actualiza el lote físico y puede devolver una compra confirmada a pendiente o completar una pendiente. Para anularla, envía `{"expectedVersion": 2, "reason": "Recepción duplicada"}` al endpoint `/void`; el movimiento y sus lotes quedan marcados como anulados, se excluyen del stock efectivo y permanecen en el historial. Si ya hubo entregas de ventas, el sistema recalcula qué lotes las abastecieron según su fecha real. Si la corrección o anulación deja una entrega sin stock físico en ese momento, rechaza el cambio completo con `409`. El costo vigente del lote puede consultarse desde cada entrega para calcular nuevamente los márgenes históricos.
 
 Para registrar un pago, envía `requestKey` (UUID único), `paymentDate` (`AAAA-MM-DD`), `amount`, `method` (`CASH`, `QR`, `TRANSFER` u `OTHER`) y `reference` opcional. La fecha no puede ser futura en Bolivia y el importe debe ser positivo, con dos decimales como máximo. La suma de pagos activos no puede superar el total acordado; en una compra anulada no puede superar el valor recibido. La clave de solicitud evita duplicados por reintentos. El detalle conserva también los pagos anulados con `voidedAt`, pero no los suma. Para corregir, envía todos los datos del pago más `expectedVersion` y `reason`; para anular, solo `expectedVersion` y `reason`. Ambas acciones guardan valores anteriores y nuevos. La edición del importe de la compra, la corrección de recepciones y la anulación del saldo pendiente se rechazan si dejarían el total exigible por debajo de los pagos activos.
 
-El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. Las entregas de ventas y el cálculo de márgenes se incorporarán en las siguientes etapas, con las validaciones de stock y de historial acordadas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
+El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. Los reportes y la integración del frontend se incorporarán en las siguientes etapas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
 
-## Ventas: reservas pendientes
+## Ventas: reservas y entregas parciales
 
-`GET /api/sales` y `GET /api/sales/{id}` permiten consultar ventas con una sesión de administrador o empleado. `POST /api/sales/reservations` registra una venta **Pendiente** con varias líneas; `PUT /api/sales/{id}` edita cliente, fecha y líneas con motivo e historial; `POST /api/sales/{id}/cancel` anula la reserva con motivo. Las escrituras requieren administrador y token CSRF. Todavía no hay entrega ni descuento físico al registrar la reserva; esos movimientos se incorporarán en la siguiente etapa.
+`GET /api/sales` y `GET /api/sales/{id}` permiten consultar ventas con una sesión de administrador o empleado. `POST /api/sales/reservations` registra una venta **Pendiente** con varias líneas; `PUT /api/sales/{id}` edita cliente, fecha y líneas con motivo e historial; `POST /api/sales/{id}/deliveries` registra una entrega real parcial o completa; `POST /api/sales/{id}/cancel` anula el saldo pendiente con motivo. Las escrituras requieren administrador y token CSRF. Una reserva no descuenta stock físico; cada entrega sí lo hace.
 
 Ejemplo de reserva:
 
@@ -164,8 +164,20 @@ Ejemplo de reserva:
 
 La API agrupa las líneas de la misma categoría y longitud antes de evaluar disponibilidad. Primero considera el stock físico libre y después el cabello pendiente de recibir, restando las reservas existentes. Si alguna línea supera ambos, rechaza toda la venta con `INSUFFICIENT_HAIR` y un desglose de pesos. Si el stock físico libre no alcanza pero el pendiente sí, responde `PENDING_STOCK_CONFIRMATION_REQUIRED`; el administrador debe aceptar ese uso y repetir la solicitud con `acceptPendingStock: true`. `requestKey` evita duplicados por reintentos. Las compras no se pueden reducir, corregir o anular si ello dejaría reservas sin respaldo. La reserva no confirma la venta: seguirá pendiente hasta registrar la entrega real.
 
-Para editar una reserva, envía la `summary.version` como `expectedVersion`, los datos completos de la venta, todas las líneas que permanecerán y `reason` de 1 a 500 caracteres. Las líneas existentes llevan su `id`; las nuevas no. Se puede quitar una línea omitiéndola. Se vuelve a comprobar toda la disponibilidad antes de guardar y se responde `409` si otra acción cambió la versión. La anulación libera la reserva sin borrar su historial.
+Para registrar una entrega, envía un UUID único en `requestKey`, la fecha y hora **reales** en `effectiveAt` con zona horaria, y `items` con `lineId` y `weight` por cada línea entregada. Por ejemplo:
+
+```json
+{
+  "requestKey": "9bd81dac-70b5-4568-b06e-dc9cad2f688f",
+  "effectiveAt": "2026-10-14T16:30:00-04:00",
+  "items": [{"lineId": "UUID de la línea", "weight": "100.00"}]
+}
+```
+
+La entrega no puede exceder lo pendiente ni el stock físico. Además, el stock debe haber existido en la fecha real indicada. El detalle muestra cuánto se entregó, cuánto falta, cuándo se entregó y registró cada movimiento, y de cuáles lotes salió el cabello. La venta pasa a `CONFIRMED` solo cuando se entregan todas las líneas. El mismo `requestKey` evita registrar dos veces un reintento.
+
+Para editar una venta pendiente, envía la `summary.version` como `expectedVersion`, los datos completos de la venta, todas las líneas que permanecerán y `reason` de 1 a 500 caracteres. Las líneas existentes llevan su `id`; las nuevas no. Se puede quitar una línea sin entregas omitiéndola. Una línea ya entregada conserva su tipo y un peso acordado al menos igual al entregado. Se vuelve a comprobar la disponibilidad restante antes de guardar y se responde `409` si otra acción cambió la versión. La anulación libera solo el saldo pendiente; el cabello ya entregado y su historial permanecen.
 
 ## Qué sigue
 
-Incorporar entregas de ventas, consumo de lotes, pagos de ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al incorporar entregas se debe extender la corrección de lotes vendidos con recálculo de consumos y márgenes históricos. Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar venta inmediata atómica, corrección y anulación de entregas, pagos de ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
