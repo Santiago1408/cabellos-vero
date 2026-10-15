@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados y catálogos de cabello. Las operaciones del negocio todavía no están implementadas; sus rutas HTTP siguen denegadas.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello y proveedores. Las operaciones del negocio todavía no están implementadas; sus rutas HTTP siguen denegadas.
 
 ## Requisitos locales
 
@@ -91,6 +91,18 @@ Las tres últimas acciones reciben JSON como `{"reason":"Corrección solicitada 
 
 No se admiten nombres de categoría repetidos aunque cambien mayúsculas o espacios exteriores, longitudes repetidas ni valores no positivos. Debe quedar al menos una categoría y una longitud. Las futuras tablas de operaciones referenciarán estos catálogos mediante claves foráneas; esas referencias impedirán eliminar opciones ya usadas. Agregar una opción no crea stock ni combinaciones vacías en Inventario.
 
+## Proveedores
+
+Todas las rutas `/api/suppliers` requieren una sesión de administrador. `GET /api/suppliers` lista los proveedores y `GET /api/suppliers/{id}` muestra uno. `GET /api/suppliers/{id}/history` devuelve el historial de creación, ediciones y eventual eliminación; el historial permanece consultable por ID después de eliminar un proveedor sin referencias.
+
+| Método y ruta | Cuerpo JSON | Resultado |
+| --- | --- | --- |
+| `POST /api/suppliers` | `name`, `phone`, `city`, `address`, `mapsUrl` | `201` y proveedor creado. |
+| `PUT /api/suppliers/{id}` | Los mismos campos y `reason` | Proveedor actualizado. |
+| `DELETE /api/suppliers/{id}` | `{"reason":"Motivo de la eliminación"}` | `204` si no tiene referencias. |
+
+Solo `name` y `phone` son obligatorios. `city`, `address` y `mapsUrl` pueden enviarse vacíos u omitirse. El enlace, cuando se registra, debe ser HTTPS de Google Maps. Los nombres no pueden repetirse ignorando mayúsculas. La edición y la eliminación exigen un motivo de 1 a 500 caracteres; el historial guarda actor, fecha y valores anteriores/nuevos. Las futuras compras referenciarán al proveedor por UUID para mostrar siempre su nombre vigente y para impedir su eliminación si ya aparece en una compra.
+
 ## Qué sigue
 
-Incorporar proveedores, compras, ventas, movimientos, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar compras, ventas, movimientos, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

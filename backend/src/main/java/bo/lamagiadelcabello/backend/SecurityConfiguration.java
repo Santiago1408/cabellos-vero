@@ -39,6 +39,7 @@ class SecurityConfiguration {
                 .requestMatchers("/api/employees", "/api/employees/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/catalog/**").authenticated()
                 .requestMatchers("/api/catalog/**").hasRole("ADMIN")
+                .requestMatchers("/api/suppliers", "/api/suppliers/**").hasRole("ADMIN")
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, error) -> {
