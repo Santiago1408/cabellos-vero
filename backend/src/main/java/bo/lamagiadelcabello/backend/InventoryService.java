@@ -52,8 +52,7 @@ class InventoryService {
             movements.add(new MovementView(movement.movementId(), movement.kind(),
                 movement.effectiveAt(), movement.recordedAt(), movement.operationId(),
                 movement.partyName(), movement.weight(), signed,
-                movement.pricePerGram(),
-                PurchaseService.lineTotal(movement.weight(), movement.pricePerGram()),
+                movement.pricePerGram(), movement.movementValue(),
                 movement.stockLotId(), movement.lotRemaining(), running));
         }
         if (running.compareTo(stock.physicalStock()) != 0) {
@@ -69,7 +68,9 @@ class InventoryService {
                 row.supplierId(), row.supplierName(), row.lineId(), row.categoryCode(),
                 row.categoryName(), row.lengthCm(), row.agreedWeight(), row.receivedWeight(),
                 row.remainingWeight(), row.pricePerGram(),
-                PurchaseService.lineTotal(row.remainingWeight(), row.pricePerGram()))
+                PurchaseService.lineTotal(row.agreedWeight(), row.pricePerGram())
+                    .subtract(PurchaseService.lineTotal(
+                        row.receivedWeight(), row.pricePerGram())))
         ).toList();
     }
 
@@ -80,7 +81,9 @@ class InventoryService {
                 row.customerName(), row.lineId(), row.categoryCode(), row.categoryName(),
                 row.lengthCm(), row.agreedWeight(), row.deliveredWeight(),
                 row.remainingWeight(), row.pricePerGram(),
-                PurchaseService.lineTotal(row.remainingWeight(), row.pricePerGram()))
+                PurchaseService.lineTotal(row.agreedWeight(), row.pricePerGram())
+                    .subtract(PurchaseService.lineTotal(
+                        row.deliveredWeight(), row.pricePerGram())))
         ).toList();
     }
 

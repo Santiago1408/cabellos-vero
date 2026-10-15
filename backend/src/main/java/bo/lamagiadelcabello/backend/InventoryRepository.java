@@ -36,13 +36,15 @@ class InventoryRepository {
         List<Movement> incoming = jdbc.query("""
             SELECT rl.id AS movement_id, pr.effective_at, pr.recorded_at,
                    p.id AS operation_id, s.name AS party_name, rl.weight,
-                   sl.cost_per_gram AS price_per_gram, sl.id AS stock_lot_id,
+                   sl.cost_per_gram AS price_per_gram, lv.purchase_value AS movement_value,
+                   sl.id AS stock_lot_id,
                    sl.remaining_weight AS lot_remaining
             FROM stock_lot sl
             JOIN purchase_receipt_line rl ON rl.id = sl.receipt_line_id
             JOIN purchase_receipt pr ON pr.id = rl.receipt_id
             JOIN purchase_order p ON p.id = pr.purchase_id
             JOIN supplier s ON s.id = p.supplier_id
+            JOIN active_stock_lot_value lv ON lv.stock_lot_id = sl.id
             WHERE sl.category_code = ? AND sl.length_cm = ?
               AND sl.voided_at IS NULL AND pr.voided_at IS NULL
             """, (row, number) -> new Movement(
@@ -51,16 +53,18 @@ class InventoryRepository {
                 row.getTimestamp("recorded_at").toInstant(),
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
                 row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("movement_value"),
                 (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("lot_remaining")
             ), type.categoryCode(), type.lengthCm());
         List<Movement> outgoing = jdbc.query("""
             SELECT dl.id AS movement_id, sd.effective_at, sd.recorded_at,
                    s.id AS operation_id, s.customer_name AS party_name, dl.weight,
-                   l.price_per_gram, l.category_code, l.length_cm
+                   l.price_per_gram, dv.revenue_value AS movement_value
             FROM sale_delivery_line dl
             JOIN sale_delivery sd ON sd.id = dl.delivery_id
             JOIN sale_line l ON l.id = dl.sale_line_id
             JOIN sale_order s ON s.id = sd.sale_id
+            JOIN active_sale_delivery_line_value dv ON dv.delivery_line_id = dl.id
             WHERE l.category_code = ? AND l.length_cm = ? AND sd.voided_at IS NULL
             """, (row, number) -> new Movement(
                 (UUID) row.getObject("movement_id"), "SALE",
@@ -68,6 +72,7 @@ class InventoryRepository {
                 row.getTimestamp("recorded_at").toInstant(),
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
                 row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("movement_value"),
                 null, null
             ), type.categoryCode(), type.lengthCm());
         return Stream.concat(incoming.stream(), outgoing.stream())
@@ -149,7 +154,8 @@ class InventoryRepository {
 
     record Movement(UUID movementId, String kind, Instant effectiveAt, Instant recordedAt,
                     UUID operationId, String partyName, BigDecimal weight,
-                    BigDecimal pricePerGram, UUID stockLotId, BigDecimal lotRemaining) {}
+                    BigDecimal pricePerGram, BigDecimal movementValue,
+                    UUID stockLotId, BigDecimal lotRemaining) {}
 
     record PendingPurchase(UUID operationId, LocalDate operationDate, Instant createdAt,
                            UUID supplierId, String supplierName, UUID lineId,

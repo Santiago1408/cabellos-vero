@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores, compras, ventas e inventario calculado. Los reportes siguen pendientes.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores, compras, ventas, inventario y reportes calculados. El frontend aún utiliza datos de demostración.
 
 ## Requisitos locales
 
@@ -205,8 +205,18 @@ Estas rutas son de solo lectura y están disponibles para administrador y emplea
 
 Cada fila indica `physicalStock`, `pendingPurchase` y `reservedSale` en gramos. También desglosa cuánto de la reserva se cubre con cabello físico (`reservedFromPhysical`) y cuánto con compras pendientes (`reservedFromPending`), además de `freePhysical` y `freePending`. Una combinación nueva aparece cuando se registra una compra de ese tipo; agregarla solo al catálogo no crea una fila de stock vacío.
 
-El detalle muestra las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, proveedor o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+El detalle muestra las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, proveedor o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los importes de movimientos parciales reparten los centavos del total de su línea sin duplicarlos. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+
+## Reportes
+
+`GET /api/reports/overview`, `GET /api/reports/results`, `GET /api/reports/top-products` y `GET /api/reports/top-categories` son consultas disponibles para administrador y empleados. No incluyen deudas independientes ni usan fechas o importes de pagos para reconocer resultados.
+
+`/overview` devuelve el valor acumulado de cabello recibido, ingresos de entregas, costo del cabello vendido, margen bruto, valor del stock al costo y número de ventas con al menos una entrega. `/top-products` devuelve los tipos más vendidos con peso, ingresos, costo, margen y stock físico; `/top-categories` agrupa las ventas por calidad. Ambas listas admiten `limit` entre 1 y 20; el valor predeterminado es 5.
+
+`/results` admite `period=days|weeks|months`, `asOf=AAAA-MM-DD` y `count`. Sin parámetros muestra los seis meses hasta el actual; `days` muestra 30 días y `weeks` 12 semanas. Las semanas empiezan el lunes. Cada fila devuelve inicio y fin exclusivo del periodo, compras recibidas, ingresos por entregas, costo y margen bruto. Los periodos sin movimientos figuran con cero. `asOf` no puede ser futuro y `count` tiene límites para evitar respuestas excesivas.
+
+Los importes de recepciones y entregas parciales se calculan como diferencias entre el valor acumulado anterior y el nuevo de cada línea, redondeado a dos decimales. El costo de cada lote recibido se distribuye entre sus entregas de la misma forma. Así los centavos de las entregas más el valor restante del lote suman su valor de compra, incluso después de corregir fechas, pesos o precios. El margen bruto es ingresos por entregas menos costo del cabello entregado; no incluye otros gastos.
 
 ## Qué sigue
 
-Incorporar reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
