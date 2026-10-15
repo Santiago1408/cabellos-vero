@@ -7,6 +7,7 @@ import { ApiClient } from '../../data/api-client';
 import { AuthSession } from '../../data/auth-session';
 import { ConnectedSuppliers } from './connected-suppliers';
 import { ConnectedPurchases } from './connected-purchases';
+import { ConnectedSales } from './connected-sales';
 import { Icon } from '../../shared/icon/icon';
 
 type Category = { code: string; displayName: string };
@@ -33,7 +34,7 @@ registerLocaleData(localeEsBo);
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, Icon],
   providers: [{ provide: LOCALE_ID, useValue: 'es-BO' }],
   templateUrl: './connected-workspace.html',
   styleUrls: ['./connected-workspace.css', '../../shared/shell/shell.css', '../../shared/operation.css'],
@@ -59,7 +60,7 @@ export class ConnectedWorkspace implements OnInit {
   readonly typesOpen = signal(false);
   readonly stockDetail = signal<StockDetail | null>(null);
   readonly stockDetailError = signal('');
-  readonly section = signal<'inventory' | 'suppliers' | 'purchases'>('inventory');
+  readonly section = signal<'inventory' | 'suppliers' | 'purchases' | 'sales'>('inventory');
   readonly mobileOpen = signal(false);
   readonly profileOpen = signal(false);
   readonly message = signal('');
@@ -76,7 +77,7 @@ export class ConnectedWorkspace implements OnInit {
       .map(part => part[0] ?? '').join('').toUpperCase();
   }
 
-  selectSection(value: 'inventory' | 'suppliers' | 'purchases'): void {
+  selectSection(value: 'inventory' | 'suppliers' | 'purchases' | 'sales'): void {
     this.section.set(value);
     this.mobileOpen.set(false);
     this.profileOpen.set(false);

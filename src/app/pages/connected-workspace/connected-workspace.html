@@ -23,6 +23,7 @@
         <button type="button" [class.active]="section() === 'inventory'" (click)="selectSection('inventory')"><app-icon name="box" /><span>Inventario</span></button>
         @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'suppliers'" (click)="selectSection('suppliers')"><app-icon name="users" /><span>Proveedores</span></button> }
         <button type="button" [class.active]="section() === 'purchases'" (click)="selectSection('purchases')"><app-icon name="truck" /><span>Compras</span></button>
+        <button type="button" [class.active]="section() === 'sales'" (click)="selectSection('sales')"><app-icon name="store" /><span>Ventas</span></button>
       </nav>
       <div class="sidebar-bottom"><button type="button" class="sidebar-logout" [disabled]="busy()" (click)="logout()"><app-icon name="logout" /><span>Cerrar sesión</span></button></div>
     </aside>
@@ -32,6 +33,7 @@
       </header>
       <main class="page-content">
         @if (section() === 'purchases') { <app-connected-purchases /> }
+        @else if (section() === 'sales') { <app-connected-sales /> }
         @else if (section() === 'suppliers' && session.account()?.role === 'ADMIN') { <app-connected-suppliers /> }
         @else {
           <div class="page-header"><div><h1>Inventario</h1><p>Controla el cabello disponible por categoría, longitud y peso.</p></div></div>
