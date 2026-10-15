@@ -8,6 +8,12 @@ import { AuthSession } from '../../data/auth-session';
 import { ConnectedSuppliers } from './connected-suppliers';
 import { ConnectedPurchases } from './connected-purchases';
 import { ConnectedSales } from './connected-sales';
+import { ConnectedReports } from './connected-reports';
+import { ConnectedDashboard } from './connected-dashboard';
+import { ConnectedDebts } from './connected-debts';
+import { ConnectedEmployees } from './connected-employees';
+import { ConnectedSettings } from './connected-settings';
+import { BackupSettings } from '../../data/backup-api';
 import { Icon } from '../../shared/icon/icon';
 
 type Category = { code: string; displayName: string };
@@ -34,7 +40,7 @@ registerLocaleData(localeEsBo);
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, ConnectedReports, ConnectedDashboard, ConnectedDebts, ConnectedEmployees, ConnectedSettings, Icon],
   providers: [{ provide: LOCALE_ID, useValue: 'es-BO' }],
   templateUrl: './connected-workspace.html',
   styleUrls: ['./connected-workspace.css', '../../shared/shell/shell.css', '../../shared/operation.css'],
@@ -60,9 +66,11 @@ export class ConnectedWorkspace implements OnInit {
   readonly typesOpen = signal(false);
   readonly stockDetail = signal<StockDetail | null>(null);
   readonly stockDetailError = signal('');
-  readonly section = signal<'inventory' | 'suppliers' | 'purchases' | 'sales'>('inventory');
+  readonly section = signal<'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'>('inventory');
   readonly mobileOpen = signal(false);
   readonly profileOpen = signal(false);
+  readonly backupDue = signal(false);
+  readonly backupDismissed = signal(false);
   readonly message = signal('');
   categoryDraft = '';
   lengthDraft: number | null = null;
@@ -77,7 +85,8 @@ export class ConnectedWorkspace implements OnInit {
       .map(part => part[0] ?? '').join('').toUpperCase();
   }
 
-  selectSection(value: 'inventory' | 'suppliers' | 'purchases' | 'sales'): void {
+  selectSection(value: 'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'): void {
+    if (this.session.account()?.role !== 'ADMIN' && ['dashboard', 'suppliers', 'debts', 'employees'].includes(value)) return;
     this.section.set(value);
     this.mobileOpen.set(false);
     this.profileOpen.set(false);
@@ -116,7 +125,7 @@ export class ConnectedWorkspace implements OnInit {
   private async restore(): Promise<void> {
     try {
       const account = await this.session.restore();
-      if (account && !account.mustChangePassword) await this.loadData();
+      if (account && !account.mustChangePassword) { this.section.set(account.role === 'ADMIN' ? 'dashboard' : 'inventory'); await this.loadData(); }
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -134,7 +143,7 @@ export class ConnectedWorkspace implements OnInit {
     this.error.set('');
     try {
       const account = await this.session.login(this.username.trim(), this.password);
-      if (!account.mustChangePassword) await this.loadData();
+      if (!account.mustChangePassword) { this.section.set(account.role === 'ADMIN' ? 'dashboard' : 'inventory'); await this.loadData(); }
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -158,6 +167,7 @@ export class ConnectedWorkspace implements OnInit {
     try {
       await this.session.changePassword(this.currentPassword, this.newPassword);
       await this.loadData();
+      this.section.set(this.session.account()?.role === 'ADMIN' ? 'dashboard' : 'inventory');
       this.currentPassword = '';
       this.newPassword = '';
       this.confirmPassword = '';
@@ -183,6 +193,8 @@ export class ConnectedWorkspace implements OnInit {
       this.username = '';
       this.mobileOpen.set(false);
       this.profileOpen.set(false);
+      this.backupDue.set(false);
+      this.backupDismissed.set(false);
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -252,14 +264,16 @@ export class ConnectedWorkspace implements OnInit {
 
   private async loadData(): Promise<void> {
     try {
-      const [categories, lengths, stock] = await Promise.all([
+      const [categories, lengths, stock, backup] = await Promise.all([
         this.api.get<Category[]>('/api/catalog/categories'),
         this.api.get<Length[]>('/api/catalog/lengths'),
         this.api.get<StockRow[]>('/api/inventory'),
+        this.session.account()?.role === 'ADMIN' ? this.api.get<BackupSettings>('/api/backups/settings') : Promise.resolve(null),
       ]);
       this.categories.set(categories);
       this.lengths.set(lengths);
       this.stock.set(stock);
+      this.backupDue.set(backup?.due ?? false);
       this.dataLoaded.set(true);
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 401) {

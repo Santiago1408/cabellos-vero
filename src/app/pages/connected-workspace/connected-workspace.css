@@ -50,6 +50,8 @@
 .stock-income > span { color: #208149; font-weight: 800; }
 .stock-outcome { border-left: 3px solid var(--color-delete); background: #fff7f7; }
 .stock-outcome > span { color: var(--color-delete); font-weight: 800; }
+.connected-backup-reminder { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding: 9px 12px 9px 16px; border: 1px solid #e6d58f; border-radius: 8px; background: #fff9df; color: #634f00; font-size: 13px; }
+.connected-backup-reminder .icon-button { flex: none; color: inherit; }
 @media (max-width: 650px) {
   .connected-page { padding: 18px; }
   .connected-header, .connected-title { align-items: flex-start; flex-direction: column; }

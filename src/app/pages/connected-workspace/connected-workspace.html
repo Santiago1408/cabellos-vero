@@ -17,13 +17,17 @@
   <div class="app-frame">
     @if (mobileOpen()) { <button type="button" class="mobile-scrim" aria-label="Cerrar menú" (click)="mobileOpen.set(false)"></button> }
     <aside class="sidebar" [class.sidebar-open]="mobileOpen()">
-      <button type="button" class="brand connected-brand" (click)="selectSection('inventory')"><span class="brand-mark">MC<span class="brand-mark-dot"></span></span><span>La Magia del <strong>Cabello</strong></span></button>
+      <button type="button" class="brand connected-brand" (click)="selectSection(session.account()?.role === 'ADMIN' ? 'dashboard' : 'inventory')"><span class="brand-mark">MC<span class="brand-mark-dot"></span></span><span>La Magia del <strong>Cabello</strong></span></button>
       <div class="sidebar-caption">MENÚ PRINCIPAL</div>
       <nav class="nav-list" aria-label="Navegación principal">
+        @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'dashboard'" (click)="selectSection('dashboard')"><app-icon name="home" /><span>Inicio</span></button> }
         <button type="button" [class.active]="section() === 'inventory'" (click)="selectSection('inventory')"><app-icon name="box" /><span>Inventario</span></button>
         @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'suppliers'" (click)="selectSection('suppliers')"><app-icon name="users" /><span>Proveedores</span></button> }
         <button type="button" [class.active]="section() === 'purchases'" (click)="selectSection('purchases')"><app-icon name="truck" /><span>Compras</span></button>
         <button type="button" [class.active]="section() === 'sales'" (click)="selectSection('sales')"><app-icon name="store" /><span>Ventas</span></button>
+        <button type="button" [class.active]="section() === 'reports'" (click)="selectSection('reports')"><app-icon name="chart" /><span>Reportes</span></button>
+        @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'debts'" (click)="selectSection('debts')"><app-icon name="wallet" /><span>Deudas</span></button><button type="button" [class.active]="section() === 'employees'" (click)="selectSection('employees')"><app-icon name="users" /><span>Empleados</span></button> }
+        <button type="button" [class.active]="section() === 'settings'" (click)="selectSection('settings')"><app-icon name="settings" /><span>Configuración</span></button>
       </nav>
       <div class="sidebar-bottom"><button type="button" class="sidebar-logout" [disabled]="busy()" (click)="logout()"><app-icon name="logout" /><span>Cerrar sesión</span></button></div>
     </aside>
@@ -32,7 +36,13 @@
         @if (profileOpen()) { <div class="top-popover profile-popover"><strong>{{ session.account()?.displayName }}</strong><p>{{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }} · {{ session.account()?.username }}</p><button type="button" [disabled]="busy()" (click)="logout()">Cerrar sesión</button></div> }
       </header>
       <main class="page-content">
-        @if (section() === 'purchases') { <app-connected-purchases /> }
+        @if (session.account()?.role === 'ADMIN' && backupDue() && !backupDismissed()) { <div class="connected-backup-reminder" role="status"><span>Hay un respaldo pendiente. Descárgalo desde Configuración cuando estés en una computadora.</span><button type="button" class="icon-button" aria-label="Cerrar aviso de respaldo" title="Cerrar aviso" (click)="backupDismissed.set(true)"><app-icon name="close" /></button></div> }
+        @if (section() === 'dashboard' && session.account()?.role === 'ADMIN') { <app-connected-dashboard (navigate)="selectSection($event)" /> }
+        @else if (section() === 'reports') { <app-connected-reports /> }
+        @else if (section() === 'debts' && session.account()?.role === 'ADMIN') { <app-connected-debts /> }
+        @else if (section() === 'employees' && session.account()?.role === 'ADMIN') { <app-connected-employees /> }
+        @else if (section() === 'settings') { <app-connected-settings (backupState)="backupDue.set($event)" /> }
+        @else if (section() === 'purchases') { <app-connected-purchases /> }
         @else if (section() === 'sales') { <app-connected-sales /> }
         @else if (section() === 'suppliers' && session.account()?.role === 'ADMIN') { <app-connected-suppliers /> }
         @else {

@@ -1,0 +1,6 @@
+.connected-restore-card { grid-column: 1 / -1; }
+.connected-restore-summary, .connected-restore-confirm { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-subtle); }
+.connected-restore-summary p, .connected-restore-confirm p { margin: 0; line-height: 1.5; }
+.connected-restore-summary ul { margin: 12px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px 12px; }
+.connected-restore-confirm { border-color: var(--color-delete); background: #fff7f7; }
+@media (max-width: 720px) { .connected-restore-card { display: none; } }

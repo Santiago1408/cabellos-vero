@@ -250,8 +250,8 @@ El administrador prepara una restauración en cuatro pasos. Los archivos se env�
 
 La restauración conserva las credenciales, la obligación vigente de cambiar contraseña y la versión de sesión de las cuentas con el mismo identificador. Una cuenta previamente desactivada continúa desactivada. Una cuenta nueva del archivo recibe una contraseña aleatoria desconocida: el administrador puede restablecer la de un empleado; si el administrador es nuevo, se recupera mediante el comando privado `recover`. No se cierran sesiones por la restauración; cada solicitud vuelve a comprobar la cuenta. Las restauraciones completadas quedan en `restore_event`, fuera de los datos de negocio exportados.
 
-La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). La Configuración del prototipo aún utiliza `DemoStore` y no consume estos endpoints.
+La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). La Configuración de `/sistema` ya consume estos endpoints; las rutas de demostración siguen usando `DemoStore`.
 
 ## Qué sigue
 
-Continuar la integración de `/sistema` con Reportes, Deudas, Empleados y Configuración; trasladar los flujos de respaldo y restauración al panel del administrador.
+La interfaz `/sistema` ya incluye Inicio, Inventario, Proveedores, Compras, Ventas, Reportes, Deudas, Empleados y Configuración conectados a PostgreSQL. Antes de sustituir las rutas de demostración, revisar los flujos completos con datos locales y ajustar los detalles de presentación que surjan.
