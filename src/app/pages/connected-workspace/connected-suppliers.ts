@@ -41,7 +41,7 @@ const fieldLabels: { key: keyof SupplierForm; label: string }[] = [
   standalone: true,
   imports: [FormsModule, DatePipe, Icon],
   templateUrl: './connected-suppliers.html',
-  styleUrl: './connected-suppliers.css',
+  styleUrls: ['./connected-suppliers.css', '../../shared/operation.css'],
 })
 export class ConnectedSuppliers implements OnInit {
   private readonly api = inject(ApiClient);
@@ -88,6 +88,11 @@ export class ConnectedSuppliers implements OnInit {
   sortBy(key: SortKey): void {
     if (this.sortKey() === key) this.sortDirection.update(value => value === 1 ? -1 : 1);
     else { this.sortKey.set(key); this.sortDirection.set(1); }
+  }
+  setMobileSort(value: string): void {
+    const [key, direction] = value.split(':');
+    this.sortKey.set(key as SortKey);
+    this.sortDirection.set(direction === 'desc' ? -1 : 1);
   }
 
   async select(supplier: Supplier): Promise<void> {

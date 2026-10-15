@@ -52,7 +52,7 @@ Si se pierde el acceso, el operador con acceso privado al servidor podrá ejecut
 
 ## Autenticación de la API
 
-La ruta Angular `/sistema` usa `ApiClient` y `AuthSession` para ingresar con una cuenta real, cambiar una contraseña temporal, consultar inventario y gestionar catálogos y proveedores. El resto del frontend sigue en memoria. En desarrollo, `npm start` escucha en `127.0.0.1:4200` y dirige `/api/**` al backend local en `127.0.0.1:8080`, de modo que el navegador mantiene la cookie de sesión en el mismo origen:
+La ruta Angular `/sistema` usa `ApiClient` y `AuthSession` para ingresar con una cuenta real, cambiar una contraseña temporal y consultar Inventario, Proveedores y Compras. El administrador puede gestionar los catálogos, proveedores y compras; los empleados tienen acceso de consulta. El resto del frontend sigue en memoria. En desarrollo, `npm start` escucha en `127.0.0.1:4200` y dirige `/api/**` al backend local en `127.0.0.1:8080`, de modo que el navegador mantiene la cookie de sesión en el mismo origen:
 
 1. `GET /api/auth/csrf` abre una sesión y devuelve `headerName` y `token`. El cliente conserva la cookie `SESSION` y envía el token en ese encabezado para cada solicitud que modifica datos.
 2. `POST /api/auth/login` recibe JSON con `username` y `password`, más la cookie y el encabezado CSRF. Devuelve el identificador, nombre visible, rol y estado de cambio obligatorio. Al ingresar, cambia el identificador de sesión y descarta el token CSRF anterior; el cliente debe solicitar uno nuevo.
@@ -250,8 +250,8 @@ El administrador prepara una restauración en cuatro pasos. Los archivos se env�
 
 La restauración conserva las credenciales, la obligación vigente de cambiar contraseña y la versión de sesión de las cuentas con el mismo identificador. Una cuenta previamente desactivada continúa desactivada. Una cuenta nueva del archivo recibe una contraseña aleatoria desconocida: el administrador puede restablecer la de un empleado; si el administrador es nuevo, se recupera mediante el comando privado `recover`. No se cierran sesiones por la restauración; cada solicitud vuelve a comprobar la cuenta. Las restauraciones completadas quedan en `restore_event`, fuera de los datos de negocio exportados.
 
-La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). La Configuración del prototipo aún utiliza `DemoStore` y no consume estos endpoints.
 
 ## Qué sigue
 
-Conectar el frontend con la API y trasladar los flujos de Configuración y restauración al panel del administrador.
+Continuar la integración de `/sistema` con Ventas, Reportes, Deudas, Empleados y Configuración; trasladar los flujos de respaldo y restauración al panel del administrador.

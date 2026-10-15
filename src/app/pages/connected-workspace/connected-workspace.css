@@ -34,6 +34,22 @@
 .connected-delete app-icon { width: 17px; height: 17px; }
 .connected-delete:hover { color: var(--color-delete); opacity: .75; }
 .connected-success { padding: 11px 14px; border-radius: 7px; color: #17652b; background: #eaf8ee; }
+.connected-brand { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.nav-list button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 46px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent; color: #737373; font-size: 13px; font-weight: 580; text-align: left; cursor: pointer; }
+.nav-list button:hover { background: var(--color-subtle); color: var(--color-primary); }
+.nav-list button.active { background: var(--color-primary-soft); color: var(--color-primary); font-weight: 750; }
+.nav-list button app-icon { width: 18px; height: 18px; }
+.connected-grid .connected-panel { min-height: 0; }
+.connected-types-content { padding: 10px 28px 26px; }
+.connected-types-content .connected-grid { margin: 0; }
+.connected-types-content .connected-panel { padding: 0; }
+.connected-types-content .connected-panel li { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+.inventory-list .operation-actions-heading, .inventory-list .operation-actions-cell { width: 82px; min-width: 82px; text-align: right; }
+.inventory-list .operation-actions { display: flex; justify-content: flex-end; }
+.stock-income { border-left: 3px solid #2c9856; background: #f3fbf5; }
+.stock-income > span { color: #208149; font-weight: 800; }
+.stock-outcome { border-left: 3px solid var(--color-delete); background: #fff7f7; }
+.stock-outcome > span { color: var(--color-delete); font-weight: 800; }
 @media (max-width: 650px) {
   .connected-page { padding: 18px; }
   .connected-header, .connected-title { align-items: flex-start; flex-direction: column; }
@@ -44,4 +60,9 @@
   .connected-stock-row span { white-space: normal; }
   .connected-inline-form { align-items: stretch; flex-direction: column; }
   .connected-inline-form .btn { width: 100%; }
+  .connected-types-content { padding: 10px 18px 22px; }
+}
+@media (max-width: 720px) {
+  .nav-list button { min-height: 52px; font-size: 15px; }
+  .nav-list button app-icon { width: 22px; height: 22px; }
 }

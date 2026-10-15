@@ -1,106 +1,41 @@
-<section class="card supplier-panel">
-  <div class="supplier-heading">
-    <div><h2>Proveedores</h2><p>Los cambios de esta sección se guardan en PostgreSQL.</p></div>
-    <div class="supplier-heading-actions">
-      <button type="button" class="btn btn-outline" (click)="load()">Actualizar</button>
-      <button type="button" class="btn btn-primary" (click)="create()">Agregar proveedor</button>
-    </div>
-  </div>
-  @if (message()) { <p class="supplier-success" role="status">{{ message() }}</p> }
-  @if (error() && !formOpen()) { <p class="form-error" role="alert">{{ error() }}</p> }
-  @if (loading()) { <p>Cargando proveedores…</p> }
-  @else if (!suppliers().length) { <p class="supplier-empty">Todavía no hay proveedores registrados.</p> }
-  @else {
-    <div class="supplier-table-wrap">
-      <table class="supplier-table">
-        <thead><tr>
-          <th><button type="button" (click)="sortBy('name')">Nombre {{ sortKey() === 'name' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</button></th>
-          <th><button type="button" (click)="sortBy('phone')">Teléfono {{ sortKey() === 'phone' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</button></th>
-          <th><button type="button" (click)="sortBy('city')">Ciudad {{ sortKey() === 'city' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</button></th>
-          <th><button type="button" (click)="sortBy('createdAt')">Registro {{ sortKey() === 'createdAt' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</button></th>
-          <th>Acciones</th>
-        </tr></thead>
-        <tbody>
-          @for (supplier of sortedSuppliers(); track supplier.id) {
-            <tr>
-              <td><strong>{{ supplier.name }}</strong></td>
-              <td>{{ supplier.phone }}</td>
-              <td>{{ supplier.city || '—' }}</td>
-              <td class="supplier-date">{{ supplier.createdAt | date:'dd/MM/yyyy' }}</td>
-              <td class="supplier-actions">
-                <button type="button" class="supplier-icon" [attr.aria-label]="'Ver detalle de ' + supplier.name" (click)="select(supplier)"><app-icon name="eye" /></button>
-                <button type="button" class="supplier-icon" [attr.aria-label]="'Editar ' + supplier.name" (click)="edit(supplier)"><app-icon name="edit" /></button>
-                <button type="button" class="supplier-icon supplier-delete-icon" [attr.aria-label]="'Eliminar ' + supplier.name" (click)="beginDelete(supplier)"><app-icon name="trash" /></button>
-              </td>
-              <td class="supplier-card-open-cell"><button type="button" class="supplier-card-open" [attr.aria-label]="'Ver detalle de ' + supplier.name" (click)="select(supplier)"></button></td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
+<div class="page-header"><div><h1>Proveedores</h1><p>Organiza los contactos de compra y acopio de cabello.</p></div></div>
+@if (message()) { <p class="supplier-success" role="status">{{ message() }}</p> }
+@if (error() && !formOpen()) { <p class="form-error" role="alert">{{ error() }}</p> }
+<section class="card table-card">
+  <div class="card-heading table-heading"><div><h2>Todos los proveedores</h2><p>{{ suppliers().length }} contactos registrados</p></div><div class="card-actions"><button type="button" class="btn btn-primary" (click)="create()"><app-icon name="plus" /> Agregar proveedor</button><button type="button" class="btn btn-outline" (click)="load()">Actualizar</button></div></div>
+  <label class="mobile-sort">Ordenar por<select class="field-input" [ngModel]="sortKey() + ':' + (sortDirection() === 1 ? 'asc' : 'desc')" (ngModelChange)="setMobileSort($event)"><option value="name:asc">Nombre A–Z</option><option value="name:desc">Nombre Z–A</option><option value="city:asc">Ciudad A–Z</option><option value="phone:asc">Teléfono</option></select></label>
+  <div class="table-scroll"><table class="operation-list mobile-list-table mobile-card-list"><thead><tr>
+    <th><button type="button" class="sort-heading" (click)="sortBy('name')">Proveedor <span aria-hidden="true">{{ sortKey() === 'name' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</span></button></th>
+    <th><button type="button" class="sort-heading" (click)="sortBy('phone')">Teléfono <span aria-hidden="true">{{ sortKey() === 'phone' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</span></button></th>
+    <th><button type="button" class="sort-heading" (click)="sortBy('city')">Ciudad <span aria-hidden="true">{{ sortKey() === 'city' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</span></button></th>
+    <th><button type="button" class="sort-heading" (click)="sortBy('createdAt')">Registro <span aria-hidden="true">{{ sortKey() === 'createdAt' ? (sortDirection() === 1 ? '↑' : '↓') : '' }}</span></button></th>
+    <th class="operation-actions-heading">Acciones</th>
+  </tr></thead><tbody>
+    @for (supplier of sortedSuppliers(); track supplier.id) {
+      <tr><td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de ' + supplier.name" (click)="select(supplier)"></button><span class="table-primary">{{ supplier.name }}</span></td>
+        <td class="mobile-meta" data-label="Teléfono">{{ supplier.phone }}</td><td class="mobile-hide">{{ supplier.city || '—' }}</td><td class="mobile-hide">{{ supplier.createdAt | date:'dd/MM/yyyy':'-0400':'es-BO' }}</td>
+        <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de ' + supplier.name" title="Ver detalle" (click)="select(supplier)"><app-icon name="eye" /></button><button type="button" class="row-edit-button" [attr.aria-label]="'Editar ' + supplier.name" title="Editar proveedor" (click)="edit(supplier)"><app-icon name="edit" /></button><button type="button" class="row-delete-button" [attr.aria-label]="'Eliminar ' + supplier.name" title="Eliminar proveedor" (click)="beginDelete(supplier)"><app-icon name="trash" /></button></div></td>
+      </tr>
+    } @empty { <tr><td colspan="5" class="empty-table">{{ loading() ? 'Cargando proveedores…' : 'No hay proveedores registrados.' }}</td></tr> }
+  </tbody></table></div>
 </section>
-
 @if (selected(); as supplier) {
-  <section class="card supplier-panel supplier-detail">
-    <div class="supplier-heading">
-      <div><h2>{{ supplier.name }}</h2><p>Detalle del proveedor</p></div>
-      <div class="supplier-heading-actions">
-        <button type="button" class="supplier-icon" [attr.aria-label]="'Editar ' + supplier.name" (click)="edit(supplier)"><app-icon name="edit" /></button>
-        <button type="button" class="supplier-icon supplier-delete-icon" [attr.aria-label]="'Eliminar ' + supplier.name" (click)="deleteOpen.set(!deleteOpen())"><app-icon name="trash" /></button>
-      </div>
+  <div class="modal-backdrop" (click)="selected.set(null)"><section class="modal-card small-modal" role="dialog" aria-modal="true" aria-label="Detalle del proveedor" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h2>{{ supplier.name }}</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="selected.set(null)"><app-icon name="close" /></button></div>
+    <div class="supplier-detail-content"><dl class="supplier-data"><div><dt>Teléfono</dt><dd>{{ supplier.phone }}</dd></div><div><dt>Ciudad</dt><dd>{{ supplier.city || '—' }}</dd></div><div><dt>Dirección</dt><dd>{{ supplier.address || '—' }}</dd></div><div><dt>Google Maps</dt><dd>@if (supplier.mapsUrl) { <a [href]="supplier.mapsUrl" target="_blank" rel="noopener noreferrer">Abrir dirección ↗</a> } @else { — }</dd></div></dl>
+      <div class="supplier-detail-actions"><button type="button" class="btn btn-outline" (click)="edit(supplier)"><app-icon name="edit" /> Editar proveedor</button><button type="button" class="row-delete-button" [attr.aria-label]="'Eliminar ' + supplier.name" (click)="deleteOpen.set(!deleteOpen())"><app-icon name="trash" /></button></div>
+      @if (deleteOpen()) { <div class="supplier-delete-panel"><strong>Eliminar proveedor</strong><p>Solo se permite si no aparece en compras u otros registros. Su historial de eliminación permanecerá.</p><label class="field-label">Motivo obligatorio<textarea class="field-input" [(ngModel)]="deleteReason" maxlength="500" rows="2"></textarea></label><button type="button" class="btn btn-delete" [disabled]="busy()" (click)="remove()">Eliminar proveedor</button></div> }
+      <details class="supplier-history"><summary>Historial de cambios ({{ history().length }})</summary>@for (entry of history(); track entry.id) { <div class="supplier-history-entry"><strong>{{ entry.eventType === 'SUPPLIER_CREATED' ? 'Creación' : entry.eventType === 'SUPPLIER_UPDATED' ? 'Edición' : 'Eliminación' }}</strong><span>{{ entry.changedAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }}</span>@if (entry.reason) { <p>Motivo: {{ entry.reason }}</p> }@for (change of historyChanges(entry); track change.label) { <p>{{ change.label }}: {{ change.before }} → {{ change.after }}</p> }</div> }</details>
     </div>
-    <dl class="supplier-data">
-      <div><dt>Teléfono</dt><dd>{{ supplier.phone }}</dd></div>
-      <div><dt>Ciudad</dt><dd>{{ supplier.city || '—' }}</dd></div>
-      <div><dt>Dirección</dt><dd>{{ supplier.address || '—' }}</dd></div>
-      <div><dt>Google Maps</dt><dd>@if (supplier.mapsUrl) { <a [href]="supplier.mapsUrl" target="_blank" rel="noopener noreferrer">Abrir dirección</a> } @else { — }</dd></div>
-    </dl>
-    @if (deleteOpen()) {
-      <div class="supplier-delete-panel">
-        <strong>Eliminar proveedor</strong>
-        <p>Solo se permite si no aparece en compras u otros registros. El historial de su eliminación permanecerá.</p>
-        <label class="field-label">Motivo obligatorio
-          <textarea class="field-input" [(ngModel)]="deleteReason" maxlength="500" rows="2"></textarea>
-        </label>
-        <button type="button" class="btn supplier-danger-button" [disabled]="busy()" (click)="remove()">Eliminar proveedor</button>
-      </div>
-    }
-    <details class="supplier-history">
-      <summary>Historial de cambios</summary>
-      @for (entry of history(); track entry.id) {
-        <div class="supplier-history-entry">
-          <strong>{{ entry.eventType === 'SUPPLIER_CREATED' ? 'Creación' : entry.eventType === 'SUPPLIER_UPDATED' ? 'Edición' : 'Eliminación' }}</strong>
-          <span>{{ entry.changedAt | date:'dd/MM/yyyy HH:mm' }}</span>
-          @if (entry.reason) { <p>Motivo: {{ entry.reason }}</p> }
-          @for (change of historyChanges(entry); track change.label) {
-            <p>{{ change.label }}: {{ change.before }} → {{ change.after }}</p>
-          }
-        </div>
-      }
-    </details>
-  </section>
+  </section></div>
 }
-
 @if (formOpen()) {
-  <div class="supplier-modal-backdrop" (click)="closeForm()">
-    <section class="card supplier-modal" role="dialog" aria-modal="true" [attr.aria-label]="editing() ? 'Editar proveedor' : 'Nuevo proveedor'" (click)="$event.stopPropagation()">
-      <div class="supplier-heading"><h2>{{ editing() ? 'Editar proveedor' : 'Nuevo proveedor' }}</h2><button type="button" class="supplier-close" aria-label="Cerrar" (click)="closeForm()">×</button></div>
-      <form (ngSubmit)="save()">
-        <label class="field-label">Nombre <input class="field-input" name="name" [(ngModel)]="form.name" maxlength="160" required /></label>
-        <label class="field-label">Teléfono <input class="field-input" name="phone" [(ngModel)]="form.phone" maxlength="40" required /></label>
-        <label class="field-label">Ciudad <input class="field-input" name="city" [(ngModel)]="form.city" maxlength="100" /></label>
-        <label class="field-label">Dirección <input class="field-input" name="address" [(ngModel)]="form.address" maxlength="250" /></label>
-        <label class="field-label">Enlace de Google Maps <input class="field-input" type="url" name="mapsUrl" [(ngModel)]="form.mapsUrl" maxlength="1000" placeholder="https://maps.google.com/..." /></label>
-        @if (editing()) {
-          <label class="field-label">Motivo de la edición <textarea class="field-input" name="reason" [(ngModel)]="reason" maxlength="500" rows="2" required></textarea></label>
-        }
-        @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
-        <div class="supplier-modal-actions">
-          <button type="button" class="btn btn-outline" [disabled]="busy()" (click)="closeForm()">Cancelar</button>
-          <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Guardando…' : 'Guardar' }}</button>
-        </div>
-      </form>
-    </section>
-  </div>
+  <div class="modal-backdrop" (click)="closeForm()"><section class="modal-card" role="dialog" aria-modal="true" [attr.aria-label]="editing() ? 'Editar proveedor' : 'Nuevo proveedor'" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h2>{{ editing() ? 'Editar proveedor' : 'Nuevo proveedor' }}</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="closeForm()"><app-icon name="close" /></button></div>
+    <form class="modal-form" (ngSubmit)="save()" novalidate><div class="form-grid"><label class="field-label">Nombre del proveedor<input class="field-input" name="name" [(ngModel)]="form.name" maxlength="160" required /></label><label class="field-label">Teléfono<input class="field-input" type="tel" name="phone" [(ngModel)]="form.phone" maxlength="40" required /></label><label class="field-label">Ciudad<input class="field-input" name="city" [(ngModel)]="form.city" maxlength="100" /></label><label class="field-label">Dirección<input class="field-input" name="address" [(ngModel)]="form.address" maxlength="250" /></label><label class="field-label form-wide">Enlace de Google Maps<input class="field-input" type="url" name="mapsUrl" [(ngModel)]="form.mapsUrl" maxlength="1000" /></label></div>
+      @if (editing()) { <label class="field-label">Motivo de la edición<input class="field-input" name="reason" [(ngModel)]="reason" maxlength="500" required /></label> }
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      <div class="modal-actions"><button type="button" class="btn btn-outline" [disabled]="busy()" (click)="closeForm()">Cancelar</button><button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Guardando…' : 'Guardar' }}</button></div>
+    </form>
+  </section></div>
 }

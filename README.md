@@ -11,7 +11,9 @@ npm start
 
 Abrir `http://localhost:4200/ingresar`. La cuenta fija de demostración del administrador usa `admin` / `CabelloDemo2026!`. Desde Empleados, el administrador puede crear cuentas de prueba para ingresar con usuario y contraseña.
 
-`npm start` escucha en `127.0.0.1:4200`. Para la integración gradual con la base real, abrir `http://127.0.0.1:4200/sistema` con la API local en marcha. Esa ruta permite entrar con una cuenta de PostgreSQL, consultar inventario y gestionar categorías, longitudes y proveedores con los permisos del administrador. El resto de las pantallas sigue siendo el prototipo en memoria. La clave del administrador real se introduce únicamente en ese formulario y nunca en el prototipo.
+`npm start` escucha en `127.0.0.1:4200`. Para trabajar con PostgreSQL, iniciar la API local y abrir `http://127.0.0.1:4200/sistema`. Esa ruta usa cuentas y datos reales para Inventario, Proveedores y Compras. El administrador puede gestionar tipos y proveedores, registrar y editar compras, recibir cabello parcial o totalmente, registrar y corregir pagos y consultar el historial. Un empleado solo puede consultar. Las demás secciones permanecen en el prototipo en memoria. La contraseña real se introduce únicamente en `/sistema`.
+
+La ruta conectada conserva por ahora una entrada separada para evitar mezclar las operaciones reales con las de demostración. Su marco, tablas, tarjetas móviles y modales ya siguen el diseño del prototipo. Cuando se conecten las demás secciones, la ruta conectada podrá sustituir la entrada de demostración.
 
 ## Pantallas
 
@@ -35,7 +37,7 @@ Los cambios de datos y las cuentas de empleados viven solo en memoria y se reini
 El administrador puede descargar desde Configuración un CSV integral sin cifrar con el estado actual del prototipo. Los CSV por sección incluyen identificadores, fechas y detalles adicionales. El formato y sus límites de restauración están documentados en [docs/respaldos-csv.md](docs/respaldos-csv.md).
 El plan de implementación del backend está en [docs/guia-backend.md](docs/guia-backend.md), con las [decisiones acordadas](docs/decisiones-backend.md) y un [prompt completo para implementarlo](docs/prompt-backend.md).
 La primera etapa del backend está en [backend/README.md](backend/README.md). El flujo recomendado para trabajar sin publicar cambios incompletos está en [docs/ramas.md](docs/ramas.md).
-La aplicación Angular ya dispone de un cliente HTTP para la API y un proxy local de `/api/**` hacia `127.0.0.1:8080`. El inicio de sesión y los datos visibles siguen siendo de demostración hasta que las vistas se conecten de forma coherente; crear el administrador en PostgreSQL no cambia todavía las credenciales del prototipo.
+La aplicación Angular dispone de un cliente HTTP y un proxy local de `/api/**` hacia `127.0.0.1:8080`. La ruta `/sistema` usa la sesión real del backend; las rutas de demostración continúan usando `DemoStore`. Crear el administrador en PostgreSQL no cambia las credenciales del prototipo.
 La frecuencia del recordatorio de respaldo se configura en días desde el panel del administrador; comienza en 7 días y se reinicia cuando confirma que guardó el archivo descargado. Solo el intervalo y la fecha confirmada persisten en este navegador; los datos del negocio siguen en memoria.
 El aviso superior puede cerrarse durante la sesión del navegador. Cerrarlo no confirma ni crea un respaldo; volverá a aparecer al abrir una nueva sesión si la copia sigue pendiente.
 

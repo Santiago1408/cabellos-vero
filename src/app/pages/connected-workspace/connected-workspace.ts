@@ -1,10 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { DecimalPipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { DatePipe, DecimalPipe, registerLocaleData } from '@angular/common';
+import localeEsBo from '@angular/common/locales/es-BO';
+import { Component, computed, inject, LOCALE_ID, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiClient } from '../../data/api-client';
 import { AuthSession } from '../../data/auth-session';
 import { ConnectedSuppliers } from './connected-suppliers';
+import { ConnectedPurchases } from './connected-purchases';
 import { Icon } from '../../shared/icon/icon';
 
 type Category = { code: string; displayName: string };
@@ -18,13 +20,23 @@ type StockRow = {
   reservedSale: number;
   freePhysical: number;
 };
+type StockMovement = {
+  id: string; kind: string; effectiveAt: string; recordedAt: string; operationId: string;
+  partyName: string; weight: number; signedWeight: number; pricePerGram: number;
+  total: number; runningPhysicalStock: number;
+};
+type StockDetail = { stock: StockRow; movements: StockMovement[] };
+type InventorySort = 'category' | 'length' | 'quantity';
+
+registerLocaleData(localeEsBo);
 
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, ConnectedSuppliers, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, Icon],
+  providers: [{ provide: LOCALE_ID, useValue: 'es-BO' }],
   templateUrl: './connected-workspace.html',
-  styleUrl: './connected-workspace.css',
+  styleUrls: ['./connected-workspace.css', '../../shared/shell/shell.css', '../../shared/operation.css'],
 })
 export class ConnectedWorkspace implements OnInit {
   readonly session = inject(AuthSession);
@@ -36,7 +48,20 @@ export class ConnectedWorkspace implements OnInit {
   readonly categories = signal<Category[]>([]);
   readonly lengths = signal<Length[]>([]);
   readonly stock = signal<StockRow[]>([]);
-  readonly section = signal<'inventory' | 'suppliers'>('inventory');
+  readonly inventorySort = signal<InventorySort>('category');
+  readonly inventoryDirection = signal<1 | -1>(1);
+  readonly sortedStock = computed(() => [...this.stock()].sort((left, right) => {
+    const key = this.inventorySort();
+    const comparison = key === 'category' ? left.categoryName.localeCompare(right.categoryName, 'es-BO')
+      : key === 'length' ? left.lengthCm - right.lengthCm : left.physicalStock - right.physicalStock;
+    return this.inventoryDirection() * (comparison || left.lengthCm - right.lengthCm);
+  }));
+  readonly typesOpen = signal(false);
+  readonly stockDetail = signal<StockDetail | null>(null);
+  readonly stockDetailError = signal('');
+  readonly section = signal<'inventory' | 'suppliers' | 'purchases'>('inventory');
+  readonly mobileOpen = signal(false);
+  readonly profileOpen = signal(false);
   readonly message = signal('');
   categoryDraft = '';
   lengthDraft: number | null = null;
@@ -45,6 +70,43 @@ export class ConnectedWorkspace implements OnInit {
   currentPassword = '';
   newPassword = '';
   confirmPassword = '';
+
+  get initials(): string {
+    return (this.session.account()?.displayName ?? 'MC').split(/\s+/).slice(0, 2)
+      .map(part => part[0] ?? '').join('').toUpperCase();
+  }
+
+  selectSection(value: 'inventory' | 'suppliers' | 'purchases'): void {
+    this.section.set(value);
+    this.mobileOpen.set(false);
+    this.profileOpen.set(false);
+    if (value === 'inventory') void this.refresh();
+  }
+
+  sortInventory(key: InventorySort): void {
+    if (this.inventorySort() === key) this.inventoryDirection.update(value => value === 1 ? -1 : 1);
+    else { this.inventorySort.set(key); this.inventoryDirection.set(1); }
+  }
+
+  inventorySortIndicator(key: InventorySort): string {
+    return this.inventorySort() === key ? this.inventoryDirection() === 1 ? '↑' : '↓' : '';
+  }
+
+  setMobileInventorySort(value: string): void {
+    const [key, direction] = value.split(':');
+    this.inventorySort.set(key as InventorySort);
+    this.inventoryDirection.set(direction === 'desc' ? -1 : 1);
+  }
+
+  async openStockDetail(item: StockRow): Promise<void> {
+    this.stockDetailError.set('');
+    try {
+      this.stockDetail.set(await this.api.get<StockDetail>(
+        `/api/inventory/${encodeURIComponent(item.categoryCode)}/${item.lengthCm}`));
+    } catch (error) { this.stockDetailError.set(this.errorMessage(error)); }
+  }
+
+  movementLabel(kind: string): string { return kind === 'PURCHASE' ? 'Compra' : 'Venta'; }
 
   ngOnInit(): void {
     void this.restore();
@@ -118,6 +180,8 @@ export class ConnectedWorkspace implements OnInit {
       this.section.set('inventory');
       this.message.set('');
       this.username = '';
+      this.mobileOpen.set(false);
+      this.profileOpen.set(false);
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
