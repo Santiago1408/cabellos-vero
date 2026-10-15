@@ -29,6 +29,7 @@ import bo.lamagiadelcabello.backend.PurchaseRepository.PurchaseLine;
 import bo.lamagiadelcabello.backend.PurchaseRepository.Receipt;
 import bo.lamagiadelcabello.backend.PurchaseRepository.ReceiptItem;
 import bo.lamagiadelcabello.backend.PurchaseRepository.StockLot;
+import bo.lamagiadelcabello.backend.SaleInventoryRepository.HairType;
 
 @Service
 class PurchaseService {
@@ -37,16 +38,19 @@ class PurchaseService {
     private final SupplierRepository suppliers;
     private final CatalogRepository catalog;
     private final PurchasePaymentRepository payments;
+    private final SaleInventoryRepository inventory;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
 
     PurchaseService(PurchaseRepository purchases, SupplierRepository suppliers,
                     CatalogRepository catalog, PurchasePaymentRepository payments,
-                    TransactionTemplate transactions, ObjectMapper json) {
+                    SaleInventoryRepository inventory, TransactionTemplate transactions,
+                    ObjectMapper json) {
         this.purchases = purchases;
         this.suppliers = suppliers;
         this.catalog = catalog;
         this.payments = payments;
+        this.inventory = inventory;
         this.transactions = transactions;
         this.json = json;
     }
@@ -81,6 +85,11 @@ class PurchaseService {
                             "Alguna categoría o longitud seleccionada ya no existe.");
                     }
                 }
+                Set<HairType> types = new HashSet<>();
+                for (LineInput line : input.lines()) {
+                    types.add(new HairType(line.categoryCode(), line.lengthCm()));
+                }
+                inventory.lockTypes(types);
 
                 UUID purchaseId = UUID.randomUUID();
                 purchases.create(purchaseId, input.requestKey(), fingerprint,
@@ -152,6 +161,11 @@ class PurchaseService {
                 }
 
                 List<PurchaseLine> oldLines = purchases.lines(purchaseId);
+                Set<HairType> affectedTypes = typesOf(oldLines);
+                for (EditLineInput line : input.lines()) {
+                    affectedTypes.add(new HairType(line.categoryCode(), line.lengthCm()));
+                }
+                inventory.lockTypes(affectedTypes);
                 Map<UUID, PurchaseLine> oldById = new HashMap<>();
                 for (PurchaseLine line : oldLines) oldById.put(line.id(), line);
                 Set<UUID> suppliedIds = new HashSet<>();
@@ -219,6 +233,7 @@ class PurchaseService {
                 }
                 purchases.updateHeader(purchaseId, input.supplierId(), input.operationDate());
                 List<PurchaseLine> afterLines = purchases.lines(purchaseId);
+                ensureReservationsBacked(affectedTypes);
                 PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
                     PurchasePaymentService.payableTotal(before, afterLines));
                 boolean completed = afterLines.stream()
@@ -242,6 +257,8 @@ class PurchaseService {
             Purchase before = lockedPurchaseAtVersion(purchaseId, input.expectedVersion());
             Receipt receipt = activeReceipt(purchaseId, receiptId);
             List<PurchaseLine> oldLines = purchases.lines(purchaseId);
+            Set<HairType> affectedTypes = typesOf(oldLines);
+            inventory.lockTypes(affectedTypes);
             List<ReceiptItem> oldItems = purchases.receiptItems(receiptId);
             List<StockLot> lots = purchases.stockLotsForReceiptForUpdate(receiptId);
             Map<UUID, ReceiptItem> itemByLine = new HashMap<>();
@@ -302,6 +319,7 @@ class PurchaseService {
             }
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
+            ensureReservationsBacked(affectedTypes);
             Purchase after = get(purchaseId);
             PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
                 PurchasePaymentService.payableTotal(after, afterLines));
@@ -321,6 +339,8 @@ class PurchaseService {
             Purchase before = lockedPurchaseAtVersion(purchaseId, raw.expectedVersion());
             Receipt receipt = activeReceipt(purchaseId, receiptId);
             List<PurchaseLine> oldLines = purchases.lines(purchaseId);
+            Set<HairType> affectedTypes = typesOf(oldLines);
+            inventory.lockTypes(affectedTypes);
             List<ReceiptItem> oldItems = purchases.receiptItems(receiptId);
             List<StockLot> lots = purchases.stockLotsForReceiptForUpdate(receiptId);
             if (lots.size() != oldItems.size()) {
@@ -340,6 +360,7 @@ class PurchaseService {
             purchases.voidReceipt(receiptId);
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
+            ensureReservationsBacked(affectedTypes);
             Purchase after = get(purchaseId);
             PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
                 PurchasePaymentService.payableTotal(after, afterLines));
@@ -359,8 +380,11 @@ class PurchaseService {
                 throw problem(HttpStatus.CONFLICT, "Solo se puede anular el saldo de una compra pendiente.");
             }
             List<PurchaseLine> lines = purchases.lines(purchaseId);
+            Set<HairType> affectedTypes = typesOf(lines);
+            inventory.lockTypes(affectedTypes);
             String oldValues = snapshotJson(before, lines);
             purchases.cancel(purchaseId);
+            ensureReservationsBacked(affectedTypes);
             Purchase after = get(purchaseId);
             PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
                 PurchasePaymentService.payableTotal(after, lines));
@@ -381,6 +405,7 @@ class PurchaseService {
         }
 
         List<PurchaseLine> lines = purchases.lines(purchaseId);
+        inventory.lockTypes(typesOf(lines));
         Map<UUID, PurchaseLine> byId = lines.stream().collect(
             java.util.stream.Collectors.toMap(PurchaseLine::id, line -> line));
         for (ReceiptItemInput item : input.items()) {
@@ -444,6 +469,25 @@ class PurchaseService {
     private static boolean isCompleted(List<PurchaseLine> lines) {
         return lines.stream().allMatch(line ->
             line.receivedWeight().compareTo(line.agreedWeight()) == 0);
+    }
+
+    private static Set<HairType> typesOf(List<PurchaseLine> lines) {
+        Set<HairType> types = new HashSet<>();
+        for (PurchaseLine line : lines) {
+            types.add(new HairType(line.categoryCode(), line.lengthCm()));
+        }
+        return types;
+    }
+
+    private void ensureReservationsBacked(Set<HairType> types) {
+        var shortages = inventory.backingShortages(types);
+        if (shortages.isEmpty()) return;
+        String details = shortages.stream().map(shortage ->
+            shortage.type().categoryCode() + " " + shortage.type().lengthCm()
+                + " cm: faltan " + shortage.missing() + " g"
+        ).collect(java.util.stream.Collectors.joining("; "));
+        throw problem(HttpStatus.CONFLICT,
+            "El cambio dejaría reservas de ventas sin respaldo: " + details + ".");
     }
 
     private Purchase sameRequest(Purchase existing, String fingerprint) {
