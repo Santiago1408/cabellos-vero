@@ -11,6 +11,10 @@ npm start
 
 Abrir `http://localhost:4200/ingresar`. La cuenta fija de demostración del administrador usa `admin` / `CabelloDemo2026!`. Desde Empleados, el administrador puede crear cuentas de prueba para ingresar con usuario y contraseña.
 
+`npm start` escucha en `127.0.0.1:4200`. Para trabajar con PostgreSQL, iniciar la API local y abrir `http://127.0.0.1:4200/sistema`. Esa ruta usa cuentas y datos reales para Inicio, Inventario, Proveedores, Compras, Ventas, Reportes, Deudas, Empleados y Configuración. El administrador puede gestionar tipos y proveedores, registrar y editar operaciones, confirmar movimientos parciales, registrar y corregir pagos o cobros y consultar el historial. En Ventas, la API verifica el stock: si solo alcanza incluyendo cabello por recibir, la pantalla solicita una aceptación explícita y crea una reserva pendiente; si falta cabello incluso así, rechaza la venta completa con un desglose. Inicio y Reportes calculan sus cifras con movimientos confirmados en PostgreSQL. Deudas conserva movimientos de efectivo independientes. Empleados permite crear, editar, desactivar, reactivar y restablecer cuentas. Configuración permite cambiar la contraseña y, al administrador, gestionar respaldos y restauraciones. Un empleado solo puede consultar Inventario, Compras, Ventas, Reportes y su perfil. La contraseña real se introduce únicamente en `/sistema`.
+
+La ruta conectada conserva por ahora una entrada separada para evitar mezclar las operaciones reales con las de demostración. Su marco, tablas, tarjetas móviles y modales siguen el diseño del prototipo. Las rutas antiguas continúan usando datos en memoria; antes de sustituirlas conviene recorrer los flujos conectados con datos locales.
+
 ## Pantallas
 
 - Inicio, inventario, detalle de cabello, proveedores, compras, ventas, deudas, empleados, reportes y configuración.
@@ -32,7 +36,11 @@ Los cambios de datos y las cuentas de empleados viven solo en memoria y se reini
 
 El administrador puede descargar desde Configuración un CSV integral sin cifrar con el estado actual del prototipo. Los CSV por sección incluyen identificadores, fechas y detalles adicionales. El formato y sus límites de restauración están documentados en [docs/respaldos-csv.md](docs/respaldos-csv.md).
 El plan de implementación del backend está en [docs/guia-backend.md](docs/guia-backend.md), con las [decisiones acordadas](docs/decisiones-backend.md) y un [prompt completo para implementarlo](docs/prompt-backend.md).
+La primera etapa del backend está en [backend/README.md](backend/README.md). El flujo recomendado para trabajar sin publicar cambios incompletos está en [docs/ramas.md](docs/ramas.md).
+Para practicar con una base PostgreSQL separada, sigue la sección «Base local de pruebas aislada» del [README del backend](backend/README.md) y ejecuta `npm run start:test` desde la raíz; abre `http://127.0.0.1:4201/sistema`. La preparación del stock físico anterior al sistema se explica en [Apertura de inventario](docs/stock-inicial.md).
+La aplicación Angular dispone de un cliente HTTP y un proxy local de `/api/**` hacia `127.0.0.1:8080`. La ruta `/sistema` usa la sesión real del backend; las rutas de demostración continúan usando `DemoStore`. Crear el administrador en PostgreSQL no cambia las credenciales del prototipo.
 La frecuencia del recordatorio de respaldo se configura en días desde el panel del administrador; comienza en 7 días y se reinicia cuando confirma que guardó el archivo descargado. Solo el intervalo y la fecha confirmada persisten en este navegador; los datos del negocio siguen en memoria.
+El aviso superior puede cerrarse durante la sesión del navegador. Cerrarlo no confirma ni crea un respaldo; volverá a aparecer al abrir una nueva sesión si la copia sigue pendiente.
 
 Cada recepción suma stock físico y cada entrega lo descuenta. Una operación permanece pendiente mientras falten cantidades; sus movimientos ya realizados conservan fecha, hora, peso e historial. Las compras pendientes muestran el saldo por recibir y las ventas pendientes reservan capacidad. Cuando una venta requiere cabello por recibir, el sistema pide confirmación y la registra como pendiente hasta que ese cabello esté disponible.
 

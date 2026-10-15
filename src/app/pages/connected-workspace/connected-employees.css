@@ -1,0 +1,4 @@
+.connected-employee-action { display: grid; gap: 12px; width: 100%; padding: 14px; border: 1px solid var(--color-border); border-radius: 8px; }
+.connected-employee-action p { margin: 0; }
+.connected-employee-action .field-label { width: 100%; }
+.connected-temporary-password { display: block; padding: 16px; margin-block: 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-subtle); font-size: 22px; font-weight: 750; letter-spacing: .1em; overflow-wrap: anywhere; }

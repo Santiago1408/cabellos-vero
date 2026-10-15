@@ -1,0 +1,4 @@
+.connected-debt-payment { display: grid; width: 100%; gap: 12px; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; }
+.connected-debt-payment h3 { margin: 0; }
+.connected-debt-payment .field-label { width: 100%; }
+.connected-debt-payment .modal-actions { justify-content: flex-end; }

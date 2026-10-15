@@ -6,9 +6,10 @@ Este documento registra las decisiones de producto tomadas durante la planificac
 
 - Una sola sucursal al inicio, con empleados y un administrador. Varias sucursales y superadministrador, incluida su estructura de datos específica, quedan para una etapa posterior.
 - Aplicación siempre conectada a internet. Angular, API Java con Spring Boot y PostgreSQL se desplegarán con Docker en el mismo OVHcloud VPS-1. El desarrollo y las pruebas serán locales; en el VPS habrá solo producción.
+- La primera etapa local del backend usa Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6; las versiones se revisarán antes del despliegue de producción.
 - El backend se incorporará al repositorio privado actual de GitHub. Cada cambio aprobado en la rama principal se publicará automáticamente después de pasar las comprobaciones acordadas.
 - En GitHub Free, un repositorio privado no dispone de protecciones de rama ni aprobaciones de despliegue exigibles. El flujo gratuito será revisar el cambio y sus comprobaciones antes de incorporarlo manualmente a `main`; el despliegue automático se activará al llegar a esa rama. Si se necesita imponer esas reglas técnicamente dentro de GitHub, habrá que revisar un plan de pago.
-- La base de datos real empezará sin los registros de demostración del prototipo, pero con las categorías y longitudes actuales y stock cero.
+- La base de datos real empezará sin los registros de demostración del prototipo y con las categorías y longitudes actuales. Antes de registrar operaciones reales se cargará el stock físico existente mediante una apertura de inventario, separada de las compras.
 - Se prevén como máximo unos cinco empleados durante el primer año y unas 800 transacciones **por año**.
 - Para comenzar se usará un subdominio gratuito con HTTPS. El nombre concreto se elegirá al configurar el VPS.
 
@@ -35,11 +36,18 @@ Este documento registra las decisiones de producto tomadas durante la planificac
 - No se diseñará por ahora un flujo de excedentes o devoluciones al anular el saldo pendiente de una operación parcialmente completada: el cliente indicó que esa combinación no ocurre en su negocio.
 - Las ediciones, confirmaciones, anulaciones y pagos conservan historial. El motivo será obligatorio en toda edición.
 
+## Apertura de inventario
+
+- Se acordará con el cliente una única fecha y hora de corte antes de registrar nuevas compras o ventas. Se contará el cabello físico por categoría y longitud, con dos decimales en gramos.
+- Cada partida de apertura tendrá peso y costo por gramo, aunque ese costo sea estimado. Si se conocen partidas de un mismo tipo con distinta antigüedad o costo, se cargarán como lotes separados. Se conservará la indicación de que el costo es estimado cuando corresponda.
+- La apertura creará lotes disponibles para ventas y sus cálculos de costo, sin inventar proveedores, compras, pagos ni deudas. Su detalle de inventario identificará claramente la entrada como «Apertura de inventario»; sus importes no se presentarán como compras del periodo.
+- La carga será exclusiva del administrador, revisable antes de confirmarse y quedará auditada. Sus correcciones posteriores requerirán motivo y validaciones que impidan dejar ventas históricas sin respaldo. Se incluirá en el respaldo y la restauración integrales.
+
 ## Cálculos
 
 - El peso del cabello se registra en gramos con dos decimales, igual que las balanzas del negocio. Los precios por gramo y los importes en bolivianos también se manejan con dos decimales. Se validará esta precisión antes de guardar; los datos ingresados no se redondearán silenciosamente.
 - El importe de cada línea se calcula como peso por precio por gramo y se redondea a dos decimales, elevando el centavo en los empates (por ejemplo, Bs. 0,125 pasa a Bs. 0,13). El total de una compra o venta es la suma de los importes redondeados de sus líneas.
-- Cada cantidad entregada descuenta lotes de compra por antigüedad. Los reportes reconocen compras, ingresos, costos y margen bruto por las cantidades efectivamente recibidas o entregadas, incluso si la operación todavía está Pendiente; los periodos sin movimientos muestran cero. Los pagos y anticipos no determinan el momento de reconocimiento de esos resultados.
+- Cada cantidad entregada descuenta los lotes disponibles por antigüedad, incluidos los de apertura. Los reportes reconocen compras, ingresos, costos y margen bruto por las cantidades efectivamente recibidas o entregadas, incluso si la operación todavía está Pendiente; los periodos sin movimientos muestran cero. El stock de apertura no es una compra del periodo, pero su costo sí entra en el margen de una venta que lo consuma. Los pagos y anticipos no determinan el momento de reconocimiento de esos resultados.
 - Los resultados muestran margen bruto; no se registrarán otros gastos para calcular un resultado neto en esta etapa.
 
 ## Respaldo y restauración

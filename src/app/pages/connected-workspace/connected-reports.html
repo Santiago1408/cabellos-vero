@@ -1,0 +1,28 @@
+<div class="page-header"><div><h1>Reportes</h1><p>Resultados según el cabello recibido y entregado.</p></div><button type="button" class="btn btn-outline" [disabled]="loading()" (click)="load()">Actualizar</button></div>
+@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+@if (loading()) { <section class="card connected-panel"><p>Cargando reportes…</p></section> }
+@else if (overview(); as totals) {
+<div class="reports-grid">
+  <section class="card report-overview"><div class="card-heading"><h2>Acumulado de entregas</h2></div>
+    <div class="report-primary-metrics"><div><strong>{{ money(totals.salesRevenue) }}</strong><span>Ingresos</span></div><div><strong>{{ money(totals.hairCost) }}</strong><span>Costo del cabello vendido</span></div><div><strong>{{ money(totals.grossMargin) }}</strong><span>Margen bruto</span></div></div>
+    <div class="report-secondary-metrics"><div><strong>{{ money(totals.stockCostValue) }}</strong><span>Valor del stock al costo</span></div><div><strong>{{ totals.salesWithDeliveries }}</strong><span>Ventas con entregas</span></div></div>
+    <p class="report-note">El margen bruto resta el costo del cabello. No incluye otros gastos ni deudas independientes.</p>
+  </section>
+  <section class="card category-card"><div class="card-heading"><h2>Calidades más vendidas</h2></div><div class="table-scroll"><table class="mobile-list-table category-list"><thead><tr><th>Calidad</th><th>Peso vendido</th><th>Participación</th></tr></thead><tbody>
+    @for (category of categories(); track category.categoryCode) { <tr><td class="mobile-title">{{ category.categoryName }}</td><td class="mobile-value" data-label="Vendido">{{ weight(category.soldWeight) }}</td><td class="mobile-hide">{{ category.sharePercent }} %</td></tr> }
+    @empty { <tr><td colspan="3" class="empty-table">Todavía no hay entregas registradas.</td></tr> }
+  </tbody></table></div></section>
+  <section class="card table-card monthly-card"><div class="card-heading"><h2>{{ periodHeading() }}</h2><label class="report-period-select">Periodo <select class="btn btn-outline filter-select" aria-label="Periodo del reporte" [ngModel]="period()" (ngModelChange)="setPeriod($event)"><option value="days">Días · últimos 30</option><option value="weeks">Semanas · últimas 12</option><option value="months">Meses · últimos 6</option></select></label></div>
+    <div class="table-scroll"><table class="mobile-list-table period-list"><thead><tr><th>Periodo</th><th>Compras recibidas</th><th>Ingresos por entregas</th><th>Costo del cabello vendido</th><th>Margen bruto</th></tr></thead><tbody>
+      @for (row of results()?.rows ?? []; track row.start) { <tr><td class="mobile-title">{{ label(row.start) }}</td><td class="mobile-meta" data-label="Compras">{{ money(row.purchases) }}</td><td class="mobile-value" data-label="Ventas">{{ money(row.sales) }}</td><td class="mobile-hide period-cost" data-label="Costo del cabello">{{ money(row.costs) }}</td><td class="mobile-meta period-margin" data-label="Margen bruto" [class.negative]="row.grossMargin < 0">{{ money(row.grossMargin) }}</td></tr> }
+    </tbody></table></div>
+  </section>
+  <section class="card revenue-chart-card"><div class="card-heading"><h2>Compras recibidas y ventas entregadas</h2><span class="period-pill">Últimos seis periodos</span></div><div class="connected-report-bars">
+    @for (row of chartRows(); track row.start) { <div class="connected-report-bar"><div class="connected-report-pair"><span class="connected-report-purchase" [style.height.%]="chartHeight(row.purchases)" [attr.title]="'Compras: ' + money(row.purchases)"></span><span class="connected-report-sale" [style.height.%]="chartHeight(row.sales)" [attr.title]="'Ventas: ' + money(row.sales)"></span></div><small>{{ label(row.start) }}</small></div> }
+  </div><div class="chart-legend"><span><i class="legend-swatch black"></i> Compras</span><span><i class="legend-swatch gray"></i> Ventas</span></div></section>
+  <section class="card table-card best-products"><div class="card-heading"><h2>Cabellos más vendidos</h2></div><div class="table-scroll"><table class="mobile-list-table"><thead><tr><th>Cabello</th><th>En stock</th><th>Peso vendido</th><th>Ingresos reales</th></tr></thead><tbody>
+    @for (product of products(); track product.categoryCode + ':' + product.lengthCm) { <tr><td class="mobile-title">{{ product.categoryName }} {{ product.lengthCm }} cm</td><td class="mobile-meta" data-label="En stock">{{ weight(product.physicalStock) }}</td><td class="mobile-value" data-label="Vendido">{{ weight(product.soldWeight) }}</td><td class="mobile-hide">{{ money(product.salesRevenue) }}</td></tr> }
+    @empty { <tr><td colspan="4" class="empty-table">Todavía no hay entregas registradas.</td></tr> }
+  </tbody></table></div></section>
+</div>
+}

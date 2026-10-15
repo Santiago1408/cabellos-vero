@@ -1,0 +1,5 @@
+@import './connected-reports.css';
+.connected-link { border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
+.quick-counts button { border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 10px; color: #555; background: white; font: inherit; font-size: 11px; cursor: pointer; }
+.pending-link.connected-link { display: flex; width: 100%; }
+@media (max-width: 720px) { .quick-counts button { min-height: 48px; font-size: 14px; } .quick-counts button strong { font-size: 22px; } }

@@ -3,6 +3,7 @@ import { Shell } from './shared/shell/shell';
 import { guestOnly, requireAdmin, requireSession } from './data/access-guards';
 
 export const routes: Routes = [
+  { path: 'sistema', loadComponent: () => import('./pages/connected-workspace/connected-workspace').then(m => m.ConnectedWorkspace) },
   { path: 'ingresar', canActivate: [guestOnly], loadComponent: () => import('./pages/auth/auth').then(m => m.Auth) },
   { path: 'registro', redirectTo: 'ingresar' },
   { path: '', component: Shell, canActivate: [requireSession], canActivateChild: [requireSession], children: [

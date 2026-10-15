@@ -99,7 +99,7 @@
         </div>
       }
     </header>
-    @if (store.backupDue(now())) {
+    @if (showBackupReminder()) {
       <div class="backup-reminder" role="status">
         <div>
           <strong>Respaldo de datos pendiente</strong>
@@ -107,6 +107,7 @@
         </div>
         <a routerLink="/configuracion" class="backup-reminder-link">Ir a Configuración</a>
         <span class="backup-reminder-mobile">Realízalo desde una computadora.</span>
+        <button type="button" class="backup-reminder-dismiss" aria-label="Cerrar aviso de respaldo" title="Cerrar aviso" (click)="dismissBackupReminder()"><app-icon name="close" /></button>
       </div>
     }
     <main class="page-content"><router-outlet /></main>

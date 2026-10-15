@@ -1,0 +1,122 @@
+<div class="page-header"><div><h1>Compras</h1><p>Registra cada compra y consulta los tipos de cabello incluidos.</p></div></div>
+@if (message()) { <p class="purchase-notice" role="status">{{ message() }}</p> }
+@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+<section class="card table-card">
+  <div class="card-heading table-heading">
+    <div><h2>Compras recientes</h2><p>{{ filtered().length }} resultados</p></div>
+    <div class="card-actions">
+      @if (session.account()?.role === 'ADMIN') { <button type="button" class="btn btn-primary" (click)="openCreate()"><app-icon name="plus" /> Nueva compra</button> }
+      <select class="btn btn-outline filter-select" aria-label="Filtrar por estado" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event); page.set(1)">
+        <option value="">Todos los estados</option><option value="PENDING">Pendiente</option><option value="CONFIRMED">Confirmado</option><option value="CANCELED">Anulada</option>
+      </select>
+      <button type="button" class="btn btn-outline" [disabled]="loading()" (click)="load()">Actualizar</button>
+    </div>
+  </div>
+  <label class="mobile-sort">Ordenar por
+    <select class="field-input" [ngModel]="sortKey() + ':' + (sortDirection() === 1 ? 'asc' : 'desc')" (ngModelChange)="setMobileSort($event)">
+      <option value="date:desc">Más recientes</option><option value="date:asc">Más antiguas</option>
+      <option value="supplier:asc">Proveedor A–Z</option><option value="value:desc">Mayor importe</option><option value="status:asc">Estado</option>
+    </select>
+  </label>
+  <div class="table-scroll"><table class="operation-list mobile-list-table mobile-card-list">
+    <thead><tr>
+      <th [attr.aria-sort]="sortAria('supplier')"><button type="button" class="sort-heading" (click)="sortBy('supplier')">Proveedor <span aria-hidden="true">{{ sortIndicator('supplier') }}</span></button></th>
+      <th [attr.aria-sort]="sortAria('value')"><button type="button" class="sort-heading" (click)="sortBy('value')">Valor de compra <span aria-hidden="true">{{ sortIndicator('value') }}</span></button></th>
+      <th [attr.aria-sort]="sortAria('weight')"><button type="button" class="sort-heading" (click)="sortBy('weight')">Peso <span aria-hidden="true">{{ sortIndicator('weight') }}</span></button></th>
+      <th [attr.aria-sort]="sortAria('date')"><button type="button" class="sort-heading" (click)="sortBy('date')">Fecha de compra <span aria-hidden="true">{{ sortIndicator('date') }}</span></button></th>
+      <th [attr.aria-sort]="sortAria('status')"><button type="button" class="sort-heading" (click)="sortBy('status')">Estado <span aria-hidden="true">{{ sortIndicator('status') }}</span></button></th>
+      <th class="operation-actions-heading">Acciones</th>
+    </tr></thead>
+    <tbody>
+      @for (purchase of pageItems(); track purchase.id) {
+        <tr [class.operation-pending]="purchase.status === 'PENDING'" [class.operation-confirmed]="purchase.status === 'CONFIRMED'" [class.operation-cancelled]="purchase.status === 'CANCELED'">
+          <td class="mobile-title"><button type="button" class="mobile-card-open" [attr.aria-label]="'Ver detalle de la compra a ' + purchase.supplierName" (click)="openDetail(purchase.id)"></button><span class="table-primary">{{ purchase.supplierName }}</span>@if (purchase.status === 'PENDING' && purchase.receivedWeight > 0) { <small class="table-sub">Recibido {{ purchase.receivedWeight | number:'1.2-2' }} de {{ purchase.agreedWeight | number:'1.2-2' }} g</small> }</td>
+          <td class="mobile-value" data-label="Total">{{ purchase.agreedTotal | number:'1.2-2' }} Bs.</td>
+          <td class="mobile-hide">{{ purchase.agreedWeight | number:'1.2-2' }} g</td>
+          <td class="mobile-meta" data-label="Fecha">{{ dateLabel(purchase.operationDate) }}</td>
+          <td class="mobile-status"><span class="status" [class.status-good]="purchase.status === 'CONFIRMED'" [class.status-cancelled]="purchase.status === 'CANCELED'">{{ statusLabel(purchase.status) }}</span></td>
+          <td class="operation-actions-cell mobile-actions"><div class="operation-actions"><button type="button" class="row-detail-button" [attr.aria-label]="'Ver detalle de la compra a ' + purchase.supplierName" title="Ver detalle" (click)="openDetail(purchase.id)"><app-icon name="eye" /></button>@if (session.account()?.role === 'ADMIN' && purchase.status !== 'CANCELED') { <button type="button" class="row-edit-button" [attr.aria-label]="'Editar compra a ' + purchase.supplierName" title="Editar compra" (click)="openEdit(purchase.id)"><app-icon name="edit" /></button> }</div></td>
+        </tr>
+      } @empty { <tr><td colspan="6" class="empty-table">{{ loading() ? 'Cargando compras…' : 'No hay compras con ese criterio.' }}</td></tr> }
+    </tbody>
+  </table></div>
+  <div class="table-footer"><button type="button" class="btn btn-outline" [disabled]="page() === 1" (click)="page.update(n => n - 1)">Anterior</button><span>Página {{ page() }} de {{ pageCount() }}</span><button type="button" class="btn btn-outline" [disabled]="page() >= pageCount()" (click)="page.update(n => n + 1)">Siguiente</button></div>
+</section>
+
+@if (formOpen()) {
+  <div class="modal-backdrop" (click)="formOpen.set(false)"><section class="modal-card operation-modal" role="dialog" aria-modal="true" [attr.aria-label]="editing() ? 'Editar compra' : 'Nueva compra'" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h2>{{ editing() ? 'Editar compra' : 'Nueva compra' }}</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="formOpen.set(false)"><app-icon name="close" /></button></div>
+    <form class="modal-form" (ngSubmit)="save()" novalidate>
+      <div class="form-grid">
+        <label class="field-label">Proveedor<select class="field-input" name="supplierId" [(ngModel)]="supplierId"><option value="">Seleccionar proveedor</option>@for (supplier of suppliers(); track supplier.id) { <option [value]="supplier.id">{{ supplier.name }}</option> }</select></label>
+        <label class="field-label">Fecha de compra<input class="field-input" type="date" name="operationDate" [(ngModel)]="operationDate" /></label>
+        @if (!editing()) {
+          <label class="field-label">Estado<select class="field-input" name="receiveNow" [(ngModel)]="receiveNow"><option [ngValue]="true">Confirmado · cabello recibido</option><option [ngValue]="false">Pendiente · por recibir</option></select></label>
+          @if (receiveNow) {
+            <label class="field-label">Fecha real de recepción<input class="field-input" type="date" name="effectiveDate" [(ngModel)]="effectiveDate" /></label>
+            <label class="field-label">Hora real de recepción<input class="field-input" type="time" name="effectiveTime" [(ngModel)]="effectiveTime" /></label>
+          }
+        }
+      </div>
+      <div class="line-heading"><h3>Cabellos de la compra</h3><button type="button" class="btn btn-outline" [disabled]="editingConfirmed" (click)="addLine()"><app-icon name="plus" /> Agregar cabello</button></div>
+      @if (editing()) { <p class="movement-edit-note">Los pesos ya recibidos se corrigen desde el historial de recepciones en el detalle.</p> }
+      @for (line of lines; track line; let i = $index) {
+        <div class="operation-line"><div class="line-title"><strong>Cabello {{ i + 1 }}</strong>@if (lines.length > 1 && !line.receivedWeight && !editingConfirmed) { <button type="button" class="line-remove" [attr.aria-label]="'Quitar cabello ' + (i + 1)" title="Quitar cabello" (click)="removeLine(i)"><app-icon name="trash" /></button> }</div>
+          <div class="form-grid">
+            <label class="field-label">Calidad<select class="field-input" [name]="'category-' + i" [(ngModel)]="line.categoryCode" [disabled]="!!line.receivedWeight"><option value="">Seleccionar calidad</option>@for (category of categories(); track category.code) { <option [value]="category.code">{{ category.displayName }}</option> }</select></label>
+            <label class="field-label">Longitud<select class="field-input" [name]="'length-' + i" [(ngModel)]="line.lengthCm" [disabled]="!!line.receivedWeight"><option [ngValue]="null">Seleccionar longitud</option>@for (length of lengths(); track length.centimeters) { <option [ngValue]="length.centimeters">{{ length.centimeters }} cm</option> }</select></label>
+            <label class="field-label">Peso (g)<input class="field-input" type="number" min="0.01" step="0.01" [name]="'weight-' + i" [(ngModel)]="line.weight" [disabled]="editingConfirmed" /></label>
+            <label class="field-label">Precio de compra (Bs./g)<input class="field-input" type="number" min="0.01" step="0.01" [name]="'price-' + i" [(ngModel)]="line.pricePerGram" /></label>
+          </div><span class="line-subtotal">Importe: {{ lineValue(line.weight ?? 0, line.pricePerGram ?? 0) | number:'1.2-2' }} Bs.</span>
+        </div>
+      }
+      <div class="operation-total"><span>Total de la compra</span><strong>{{ draftTotal | number:'1.2-2' }} Bs.</strong></div>
+      @if (editing()) { <label class="field-label">Motivo de la edición (obligatorio)<input class="field-input" name="editReason" [(ngModel)]="editReason" maxlength="300" /></label> }
+      @if (formError()) { <p class="form-error" role="alert">{{ formError() }}</p> }
+      <div class="modal-actions"><button type="button" class="btn btn-outline" (click)="formOpen.set(false)">Cancelar</button><button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Guardando…' : editing() ? 'Guardar cambios' : 'Crear compra' }}</button></div>
+    </form>
+  </section></div>
+}
+
+@if (detail(); as purchase) {
+  <div class="modal-backdrop" (click)="closeDetail()"><section class="modal-card operation-modal" role="dialog" aria-modal="true" aria-label="Detalle de compra" (click)="$event.stopPropagation()">
+    <div class="modal-header"><h2>Compra del {{ dateLabel(purchase.summary.operationDate) }} · {{ purchase.summary.supplierName }}</h2><button type="button" class="icon-button" aria-label="Cerrar" (click)="closeDetail()"><app-icon name="close" /></button></div>
+    <div class="detail-content">
+      <div class="detail-meta"><span>Proveedor: <strong>{{ purchase.summary.supplierName }}</strong></span><span>Compra: <strong>{{ dateLabel(purchase.summary.operationDate) }}</strong></span><span class="status" [class.status-good]="purchase.summary.status === 'CONFIRMED'" [class.status-cancelled]="purchase.summary.status === 'CANCELED'">{{ statusLabel(purchase.summary.status) }}</span></div>
+      @if (lastEdit(purchase); as editAt) { <p class="modified-note">Última modificación de los datos de la compra: {{ editAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }}</p> }
+      <div class="table-scroll"><table class="mobile-detail-table"><thead><tr><th>Calidad</th><th>Longitud</th><th>Peso</th><th>Recibido</th><th>{{ purchase.summary.status === 'CANCELED' ? 'Anulado' : 'Pendiente' }}</th><th>Precio Bs./g</th><th>Importe</th></tr></thead><tbody>
+        @for (line of purchase.lines; track line.id) { <tr><td>{{ line.categoryName }}</td><td data-label="Longitud">{{ line.lengthCm }} cm</td><td data-label="Peso">{{ line.agreedWeight | number:'1.2-2' }} g</td><td data-label="Recibido">{{ line.receivedWeight | number:'1.2-2' }} g</td><td [attr.data-label]="purchase.summary.status === 'CANCELED' ? 'Anulado' : 'Pendiente'">{{ line.remainingWeight | number:'1.2-2' }} g</td><td data-label="Precio Bs./g">{{ line.pricePerGram | number:'1.2-2' }}</td><td data-label="Importe">{{ line.agreedTotal | number:'1.2-2' }} Bs.</td></tr> }
+      </tbody></table></div>
+      <div class="operation-total"><span>Total · {{ purchase.summary.agreedWeight | number:'1.2-2' }} g</span><strong>{{ purchase.summary.agreedTotal | number:'1.2-2' }} Bs.</strong></div>
+      <p class="fulfillment-progress">Recibido {{ purchase.summary.receivedWeight | number:'1.2-2' }} de {{ purchase.summary.agreedWeight | number:'1.2-2' }} g</p>
+      @if (purchase.receipts.length) { <div class="movement-history"><h3>Recepciones registradas</h3>@for (receipt of purchase.receipts; track receipt.id) {
+        <div class="movement-entry" [class.movement-voided]="receipt.voidedAt"><div class="movement-date"><strong>Fecha real: {{ receipt.effectiveAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }}</strong><small>Registrada: {{ receipt.recordedAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }}</small>@if (receipt.voidedAt) { <small>Anulada: {{ receipt.voidedAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }}</small> }</div><span>{{ receipt.voidedAt ? 'Movimiento anulado' : (receiptTotal(receipt) | number:'1.2-2') + ' g · ' + (receiptValue(receipt, purchase.lines) | number:'1.2-2') + ' Bs.' }}</span>
+          @if (session.account()?.role === 'ADMIN' && !receipt.voidedAt) { <button type="button" class="row-edit-button" aria-label="Corregir recepción" (click)="editReceipt(receipt, purchase)"><app-icon name="edit" /></button> }
+        </div>
+        <details class="payment-history"><summary>Tipos de cabello de esta recepción ({{ receipt.items.length }})</summary>@for (item of receipt.items; track item.id) { <p>{{ receiptItemLabel(purchase, item.lineId) }} · {{ item.weight | number:'1.2-2' }} g</p> }</details>
+      }</div> }
+      @if (session.account()?.role === 'ADMIN' && (purchase.summary.status === 'PENDING' || correctionReceiptId)) {
+        <div class="fulfillment-form"><strong>{{ correctionReceiptId ? 'Corregir recepción' : 'Registrar recepción parcial' }}</strong>
+          <div class="form-grid"><label class="field-label">Fecha real<input class="field-input" type="date" [(ngModel)]="receiptDate" /></label><label class="field-label">Hora real<input class="field-input" type="time" [(ngModel)]="receiptTime" /></label></div>
+          @for (line of receiptLines(purchase); track line.id) { <label class="field-label">{{ line.categoryName }} · {{ line.lengthCm }} cm · {{ correctionReceiptId ? 'Recibido' : 'Falta ' + line.remainingWeight + ' g' }}<input class="field-input" type="number" min="0" step="0.01" [(ngModel)]="receiptWeights[line.id]" /></label> }
+          @if (correctionReceiptId) { <label class="field-label">Motivo de la corrección o anulación<input class="field-input" [(ngModel)]="correctionReason" maxlength="300" /></label> }
+          <div class="modal-actions">@if (correctionReceiptId) { <button type="button" class="btn btn-outline" (click)="resetReceipt()">Cancelar</button><button type="button" class="btn btn-delete" [disabled]="busy()" (click)="voidReceipt()">Anular recepción</button> } @else { <button type="button" class="btn btn-outline" (click)="fillRemaining(purchase)">Completar pesos</button> }<button type="button" class="btn btn-primary" [disabled]="busy()" (click)="saveReceipt()">{{ correctionReceiptId ? 'Guardar corrección' : 'Registrar recepción' }}</button></div>
+        </div>
+      }
+      <section class="operation-payments"><h3>Pagos de esta compra</h3><div class="payment-balance"><span>Total exigible {{ purchase.summary.payableTotal | number:'1.2-2' }} Bs.</span><span>Pagado {{ purchase.summary.paidTotal | number:'1.2-2' }} Bs.</span><strong>Saldo {{ purchase.summary.balance | number:'1.2-2' }} Bs.</strong></div>
+        @for (payment of purchase.payments; track payment.id) { <div class="payment-entry" [class.payment-voided]="payment.voidedAt"><div><strong>{{ payment.amount | number:'1.2-2' }} Bs.@if (payment.voidedAt) { · Anulado }</strong><span>{{ dateLabel(payment.paymentDate) }} · {{ paymentLabel(payment.method) }}@if (payment.reference) { · {{ payment.reference }} }</span></div>@if (session.account()?.role === 'ADMIN' && !payment.voidedAt) { <button type="button" class="row-edit-button" aria-label="Corregir pago" (click)="editPayment(payment)"><app-icon name="edit" /></button> }</div> }
+        @if (session.account()?.role === 'ADMIN' && (purchase.summary.balance > 0 || paymentEditingId)) {
+          <div class="payment-form"><strong>{{ paymentEditingId ? 'Corregir pago' : 'Registrar pago' }}</strong><div class="form-grid"><label class="field-label">Fecha<input class="field-input" type="date" [(ngModel)]="paymentDate" /></label><label class="field-label">Importe (Bs.)<input class="field-input" type="number" min="0.01" step="0.01" [(ngModel)]="paymentAmount" /></label><label class="field-label">Método<select class="field-input" [(ngModel)]="paymentMethod"><option value="CASH">Efectivo</option><option value="QR">QR</option><option value="TRANSFER">Transferencia</option><option value="OTHER">Otro</option></select></label><label class="field-label">Referencia opcional<input class="field-input" [(ngModel)]="paymentReference" /></label></div>
+            @if (paymentEditingId) { <label class="field-label">Motivo de la corrección o anulación<input class="field-input" [(ngModel)]="paymentReason" maxlength="300" /></label> }
+            <div class="modal-actions">@if (paymentEditingId) { <button type="button" class="btn btn-outline" (click)="resetPayment()">Cancelar</button><button type="button" class="btn btn-delete" [disabled]="busy()" (click)="voidPayment()">Anular pago</button> }<button type="button" class="btn btn-primary" [disabled]="busy()" (click)="savePayment()">{{ paymentEditingId ? 'Guardar corrección' : 'Registrar pago' }}</button></div>
+          </div>
+        }
+      </section>
+      <details class="payment-history"><summary>Historial de cambios ({{ purchase.history.length }})</summary>@for (change of purchase.history; track change.id) { <p><strong>{{ change.changedAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }} · {{ change.eventType }}</strong>@if (change.reason) { · {{ change.reason }} }<br /><small>Antes: {{ change.oldValues ? (change.oldValues | json) : '—' }}<br />Después: {{ change.newValues ? (change.newValues | json) : '—' }}</small></p> }</details>
+      @if (detailError()) { <p class="form-error" role="alert">{{ detailError() }}</p> }
+      @if (session.account()?.role === 'ADMIN' && purchase.summary.status !== 'CANCELED') { <div class="detail-actions"><button type="button" class="btn btn-outline" (click)="openEdit(purchase.summary.id)"><app-icon name="edit" /> Editar compra</button></div>
+        @if (purchase.summary.status === 'PENDING') { <button type="button" class="btn btn-delete purchase-cancel-toggle" (click)="showCancel = !showCancel">Anular saldo pendiente</button>@if (showCancel) { <div class="fulfillment-form"><p class="cancel-warning">El saldo no recibido dejará de estar pendiente. Las recepciones y pagos anteriores seguirán en el historial.</p><label class="field-label">Motivo de anulación<input class="field-input" [(ngModel)]="cancelReason" maxlength="300" /></label><button type="button" class="btn btn-delete" [disabled]="busy()" (click)="cancelPurchase()">Confirmar anulación</button></div> } }
+      }
+    </div>
+  </section></div>
+}

@@ -241,6 +241,10 @@
 .backup-reminder strong { font-size: 13px; }
 .backup-reminder-link { margin-left: auto; font-weight: 700; white-space: nowrap; }
 .backup-reminder-mobile { display: none; }
+.backup-reminder-dismiss { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--color-delete); cursor: pointer; }
+.backup-reminder-dismiss:hover { background: color-mix(in srgb, var(--color-delete) 12%, transparent); }
+.backup-reminder-dismiss:focus-visible { outline: 2px solid var(--color-delete); outline-offset: 2px; }
+.backup-reminder-dismiss app-icon { width: 18px; height: 18px; }
 @media (max-width: 1200px) {
   .sidebar {
     padding-inline: 11px;
@@ -288,10 +292,11 @@
   .page-content {
     padding: 20px 14px 32px;
   }
-  .backup-reminder { margin: 14px 14px 0; padding: 12px; font-size: 13px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .backup-reminder { position: relative; margin: 14px 14px 0; padding: 12px 48px 12px 12px; font-size: 13px; flex-direction: column; align-items: flex-start; gap: 6px; }
   .backup-reminder strong { font-size: 15px; }
   .backup-reminder-link { display: none; }
   .backup-reminder-mobile { display: block; }
+  .backup-reminder-dismiss { position: absolute; top: 8px; right: 8px; }
   .topbar-right {
     gap: 4px;
   }

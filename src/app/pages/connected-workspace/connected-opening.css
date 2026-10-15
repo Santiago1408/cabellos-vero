@@ -1,0 +1,24 @@
+.opening-modal { width: min(900px, calc(100vw - 32px)); max-height: min(90vh, 950px); overflow-y: auto; }
+.opening-content { display: grid; gap: 18px; padding: 20px 24px 28px; }
+.opening-loading { padding: 24px; }
+.opening-totals { display: flex; flex-wrap: wrap; gap: 12px; }
+.opening-totals span { display: grid; gap: 4px; min-width: 150px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 12px; }
+.opening-totals small, .opening-summary-row small { color: var(--color-muted); }
+.opening-totals strong { font-size: 1.2rem; }
+.opening-list, .opening-lots { display: grid; gap: 10px; }
+.opening-summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; }
+.opening-summary-row > div, .opening-amount { display: grid; gap: 4px; }
+.opening-amount { text-align: right; }
+.opening-history { font-size: .9rem; }
+.opening-history > div { padding: 12px 0; border-top: 1px solid var(--color-border); }
+.opening-history pre { white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow: auto; }
+.opening-lot { padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
+.opening-lot-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.opening-lot-head > div { display: flex; align-items: center; gap: 6px; }
+.opening-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.opening-check { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.connected-delete { color: var(--color-delete); border: 0; background: transparent; cursor: pointer; }
+.opening-preview { padding: 16px; border: 1px solid var(--color-primary); border-radius: 12px; }
+.opening-preview h3 { margin: 0 0 8px; }
+.opening-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 640px) { .opening-content { padding: 16px; } .opening-grid { grid-template-columns: 1fr; } .opening-summary-row { flex-direction: column; } .opening-amount { text-align: left; } }

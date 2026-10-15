@@ -1,0 +1,53 @@
+<div class="modal-backdrop" (click)="close.emit()">
+  <section class="modal-card operation-modal opening-modal" role="dialog" aria-modal="true" aria-label="Apertura de inventario" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Apertura de inventario</h2>
+      <button type="button" class="icon-button" aria-label="Cerrar" (click)="close.emit()"><app-icon name="close" /></button>
+    </div>
+    @if (loading()) { <p class="opening-loading">Cargando apertura…</p> }
+    @else {
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      @if (!editing() && opening(); as current) {
+        <div class="opening-content">
+          <p>Fecha de corte: <strong>{{ current.header.cutoffAt | date:'dd/MM/yyyy HH:mm':'-0400' }}</strong></p>
+          <div class="opening-totals"><span><small>Peso inicial</small><strong>{{ current.totals.weight | number:'1.2-2' }} g</strong></span><span><small>Valor de costo</small><strong>{{ current.totals.value | number:'1.2-2' }} Bs.</strong></span></div>
+          <div class="opening-list">
+            @for (lot of current.lots; track lot.id) {
+              <div class="opening-summary-row"><div><strong>{{ categoryName(lot.categoryCode) }} · {{ lot.lengthCm }} cm</strong><small>Lote {{ lot.order }} · costo {{ lot.costPerGram | number:'1.2-2' }} Bs./g @if (lot.costEstimated) { · estimado } @if (lot.originDate) { · origen {{ lot.originDate | date:'dd/MM/yyyy' }} }</small>@if (lot.note) { <small>{{ lot.note }}</small> }</div><div class="opening-amount"><strong>{{ lot.remainingWeight | number:'1.2-2' }} g</strong><small>de {{ lot.originalWeight | number:'1.2-2' }} g iniciales</small></div></div>
+            }
+          </div>
+          <details class="opening-history"><summary>Historial de cambios</summary>@for (entry of current.history; track entry.id) { <div><strong>{{ entry.changedAt | date:'dd/MM/yyyy HH:mm':'-0400' }}</strong> · {{ entry.reason || 'Apertura registrada' }}<details><summary>Valores guardados</summary><pre>Anterior: {{ entry.oldValues || 'Sin apertura' }}
+Nuevo: {{ entry.newValues }}</pre></details></div> }</details>
+          <div class="opening-actions"><button type="button" class="btn btn-outline" (click)="startCorrection()"><app-icon name="edit" /> Corregir apertura</button></div>
+        </div>
+      } @else if (editing()) {
+        <form class="opening-content" (ngSubmit)="preview()">
+          <p>Registra el cabello contado en la fecha de corte. Coloca primero el lote más antiguo de cada tipo. Cada peso y costo admite dos decimales.</p>
+          <label class="field-label">Fecha y hora de corte (Bolivia)<input class="field-input" type="datetime-local" name="cutoff" [(ngModel)]="cutoffLocal" (ngModelChange)="changed()" [disabled]="!!opening()" required /></label>
+          @if (opening()) { <label class="field-label">Motivo de la corrección<textarea class="field-input" name="reason" [(ngModel)]="reason" minlength="3" maxlength="500" required></textarea></label> }
+          <div class="opening-lots">
+            @for (lot of lots; track $index; let index = $index) {
+              <section class="opening-lot">
+                <div class="opening-lot-head"><strong>Lote {{ index + 1 }}</strong><div><button type="button" class="icon-button" [disabled]="index === 0" aria-label="Mover lote arriba" (click)="move(index, -1)">↑</button><button type="button" class="icon-button" [disabled]="index === lots.length - 1" aria-label="Mover lote abajo" (click)="move(index, 1)">↓</button><button type="button" class="connected-delete" [disabled]="lots.length === 1" aria-label="Quitar lote" (click)="removeLot(index)"><app-icon name="trash" /></button></div></div>
+                <div class="opening-grid">
+                  <label class="field-label">Categoría<select class="field-input" [name]="'category' + index" [(ngModel)]="lot.categoryCode" (ngModelChange)="changed()" required><option value="">Selecciona</option>@for (category of categories(); track category.code) { <option [value]="category.code">{{ category.displayName }}</option> }</select></label>
+                  <label class="field-label">Longitud<select class="field-input" [name]="'length' + index" [(ngModel)]="lot.lengthCm" (ngModelChange)="changed()" required><option [ngValue]="null">Selecciona</option>@for (length of lengths(); track length.centimeters) { <option [ngValue]="length.centimeters">{{ length.centimeters }} cm</option> }</select></label>
+                  <label class="field-label">Peso inicial (g)<input class="field-input" type="text" inputmode="decimal" [name]="'weight' + index" [(ngModel)]="lot.weight" (ngModelChange)="changed()" required /></label>
+                  <label class="field-label">Costo por gramo (Bs.)<input class="field-input" type="text" inputmode="decimal" [name]="'cost' + index" [(ngModel)]="lot.costPerGram" (ngModelChange)="changed()" required /></label>
+                  <label class="field-label">Fecha de origen, si se conoce<input class="field-input" type="date" [name]="'origin' + index" [(ngModel)]="lot.originDate" (ngModelChange)="changed()" /></label>
+                  <label class="field-label">Observación<input class="field-input" type="text" [name]="'note' + index" [(ngModel)]="lot.note" (ngModelChange)="changed()" maxlength="300" /></label>
+                </div>
+                <label class="opening-check"><input type="checkbox" [name]="'estimated' + index" [(ngModel)]="lot.costEstimated" (ngModelChange)="changed()" /> El costo es estimado</label>
+              </section>
+            }
+          </div>
+          <button type="button" class="btn btn-outline" (click)="addLot()"><app-icon name="plus" /> Agregar lote</button>
+          @if (previewData(); as preview) {
+            <div class="opening-preview" role="status"><h3>Revisa antes de guardar</h3><p>{{ preview.lotCount }} lotes · {{ preview.totalWeight | number:'1.2-2' }} g · valor de costo {{ preview.totalValue | number:'1.2-2' }} Bs.</p><p>{{ preview.estimatedCostLots }} lotes con costo estimado. La corrección recalculará las ventas afectadas y será rechazada si falta stock.</p><button type="button" class="btn btn-primary" [disabled]="busy()" (click)="save()">{{ opening() ? 'Confirmar corrección' : 'Confirmar apertura' }}</button></div>
+          }
+          <div class="opening-actions"><button type="submit" class="btn btn-outline" [disabled]="busy()">{{ busy() ? 'Procesando…' : 'Revisar totales' }}</button>@if (opening()) { <button type="button" class="btn btn-outline" (click)="cancelCorrection()">Cancelar</button> }</div>
+        </form>
+      }
+    }
+  </section>
+</div>

@@ -1,0 +1,8 @@
+.connected-report-bars { display: flex; align-items: flex-end; justify-content: space-around; gap: 16px; min-height: 215px; margin: 12px 24px 24px; border-bottom: 1px solid var(--color-border); background: repeating-linear-gradient(to top, #ededed 0 1px, transparent 1px 25%); }
+.connected-report-bar { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; justify-content: end; height: 205px; }
+.connected-report-pair { display: flex; align-items: flex-end; justify-content: center; gap: 5px; width: 100%; height: 175px; }
+.connected-report-pair span { display: block; width: min(32%, 24px); min-height: 1px; border-radius: 4px 4px 0 0; }
+.connected-report-purchase { background: var(--color-primary); }
+.connected-report-sale { background: var(--color-chart-secondary); }
+.connected-report-bar small { min-height: 25px; margin-top: 6px; color: var(--color-muted); text-align: center; white-space: nowrap; overflow: hidden; font-size: 11px; }
+@media (max-width: 720px) { .connected-report-bars { gap: 5px; margin-inline: 12px; } .connected-report-bar small { font-size: 10px; } }

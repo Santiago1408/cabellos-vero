@@ -104,7 +104,7 @@
           </div>
         }
         <div class="operation-total"><span>Total de la venta</span><strong>{{ money(draftValue) }}</strong></div>
-        @if (editingId()) { <label class="field-label">Motivo de la edición<input class="field-input" name="editReason" [(ngModel)]="editReason" maxlength="300" required /></label> }
+        @if (editingId()) { <label class="field-label">Motivo de la edición (obligatorio)<input class="field-input" name="editReason" [(ngModel)]="editReason" maxlength="300" required /></label> }
         @if (pendingPrompt()) {
           <div class="pending-question">
             <strong>¿Usar cabello de compras pendientes?</strong>
