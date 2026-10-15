@@ -32,6 +32,7 @@ class RestoreService {
         "last_login_at", "password_changed_at");
     private static final List<String> HISTORY_TABLES = List.of(
         "app_user_history", "supplier_history", "purchase_history", "sale_history",
+        "inventory_opening_history",
         "cash_debt_history");
 
     private final JdbcTemplate jdbc;
@@ -145,7 +146,7 @@ class RestoreService {
         Map<UUID, Credential> credentials = currentCredentials();
         jdbc.execute("TRUNCATE TABLE " + String.join(", ", BackupService.sourceTables()));
         for (String table : BackupService.sourceTables()) {
-            for (Row row : file.rows().get(table)) {
+            for (Row row : file.rows().getOrDefault(table, List.of())) {
                 String data = table.equals("app_user")
                     ? accountJson(row, credentials) : row.data();
                 jdbc.update("INSERT INTO " + table + " OVERRIDING SYSTEM VALUE "
@@ -174,8 +175,14 @@ class RestoreService {
             if (columns.isEmpty()) {
                 throw problem(HttpStatus.BAD_REQUEST, "La estructura de " + table + " no está disponible.");
             }
-            for (Row row : file.rows().get(table)) {
-                if (!columns.equals(row.values().keySet())) {
+            for (Row row : file.rows().getOrDefault(table, List.of())) {
+                Set<String> expected = new HashSet<>(columns);
+                if (table.equals("stock_lot") &&
+                    Integer.valueOf(3).equals(file.manifest().get("version"))) {
+                    expected.removeAll(Set.of("opening_id", "opening_order", "origin_date",
+                        "cost_estimated", "opening_note"));
+                }
+                if (!expected.equals(row.values().keySet())) {
                     throw problem(HttpStatus.BAD_REQUEST,
                         "Las columnas de " + table + " no coinciden con esta versión del backend.");
                 }
@@ -240,6 +247,38 @@ class RestoreService {
     }
 
     private void validateRestoredBalances() {
+        Long invalidOpeningLots = jdbc.queryForObject("""
+            SELECT count(*) FROM stock_lot lot
+            JOIN inventory_opening opening ON opening.id = lot.opening_id
+            WHERE lot.effective_at <> opening.cutoff_at
+                OR lot.origin_date > (opening.cutoff_at AT TIME ZONE 'America/La_Paz')::date
+            """, Long.class);
+        if (invalidOpeningLots != null && invalidOpeningLots > 0) {
+            throw problem(HttpStatus.BAD_REQUEST,
+                "Hay lotes de apertura que no corresponden a su fecha de corte.");
+        }
+        Long movementsBeforeOpening = jdbc.queryForObject("""
+            SELECT count(*) FROM inventory_opening opening
+            WHERE EXISTS (SELECT 1 FROM purchase_receipt receipt
+                    WHERE receipt.effective_at <= opening.cutoff_at)
+               OR EXISTS (SELECT 1 FROM sale_delivery delivery
+                    WHERE delivery.effective_at <= opening.cutoff_at)
+            """, Long.class);
+        if (movementsBeforeOpening != null && movementsBeforeOpening > 0) {
+            throw problem(HttpStatus.BAD_REQUEST,
+                "Hay recepciones o entregas anteriores a la apertura de inventario.");
+        }
+        Long futureLots = jdbc.queryForObject("""
+            SELECT count(*) FROM stock_consumption consumption
+            JOIN stock_lot lot ON lot.id = consumption.stock_lot_id
+            JOIN sale_delivery_line item ON item.id = consumption.delivery_line_id
+            JOIN sale_delivery delivery ON delivery.id = item.delivery_id
+            WHERE lot.effective_at > delivery.effective_at
+            """, Long.class);
+        if (futureLots != null && futureLots > 0) {
+            throw problem(HttpStatus.BAD_REQUEST,
+                "El respaldo asigna a una venta cabello que aún no existía en esa fecha.");
+        }
         Long excessDebts = jdbc.queryForObject("""
             SELECT count(*) FROM cash_debt d
             LEFT JOIN (SELECT debt_id, SUM(amount) AS paid FROM cash_debt_payment

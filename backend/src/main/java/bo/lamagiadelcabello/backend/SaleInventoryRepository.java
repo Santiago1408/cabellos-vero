@@ -1,6 +1,7 @@
 package bo.lamagiadelcabello.backend;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -25,6 +26,12 @@ class SaleInventoryRepository {
         categories.stream().sorted().forEach(category ->
             jdbc.query("SELECT code FROM hair_category WHERE code = ? FOR NO KEY UPDATE",
                 row -> {}, category));
+    }
+
+    Instant openingCutoff() {
+        return jdbc.query("SELECT cutoff_at FROM inventory_opening",
+            (row, number) -> row.getTimestamp("cutoff_at").toInstant())
+            .stream().findFirst().orElse(null);
     }
 
     StockPosition position(HairType type) {

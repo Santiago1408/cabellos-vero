@@ -13,6 +13,7 @@ import { ConnectedDashboard } from './connected-dashboard';
 import { ConnectedDebts } from './connected-debts';
 import { ConnectedEmployees } from './connected-employees';
 import { ConnectedSettings } from './connected-settings';
+import { ConnectedOpening } from './connected-opening';
 import { BackupSettings } from '../../data/backup-api';
 import { Icon } from '../../shared/icon/icon';
 
@@ -40,7 +41,7 @@ registerLocaleData(localeEsBo);
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, ConnectedReports, ConnectedDashboard, ConnectedDebts, ConnectedEmployees, ConnectedSettings, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, ConnectedReports, ConnectedDashboard, ConnectedDebts, ConnectedEmployees, ConnectedSettings, ConnectedOpening, Icon],
   providers: [{ provide: LOCALE_ID, useValue: 'es-BO' }],
   templateUrl: './connected-workspace.html',
   styleUrls: ['./connected-workspace.css', '../../shared/shell/shell.css', '../../shared/operation.css'],
@@ -64,6 +65,7 @@ export class ConnectedWorkspace implements OnInit {
     return this.inventoryDirection() * (comparison || left.lengthCm - right.lengthCm);
   }));
   readonly typesOpen = signal(false);
+  readonly openingOpen = signal(false);
   readonly stockDetail = signal<StockDetail | null>(null);
   readonly stockDetailError = signal('');
   readonly section = signal<'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'>('inventory');
@@ -88,6 +90,7 @@ export class ConnectedWorkspace implements OnInit {
   selectSection(value: 'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'): void {
     if (this.session.account()?.role !== 'ADMIN' && ['dashboard', 'suppliers', 'debts', 'employees'].includes(value)) return;
     this.section.set(value);
+    if (value !== 'inventory') this.openingOpen.set(false);
     this.mobileOpen.set(false);
     this.profileOpen.set(false);
     if (value === 'inventory') void this.refresh();
@@ -116,7 +119,9 @@ export class ConnectedWorkspace implements OnInit {
     } catch (error) { this.stockDetailError.set(this.errorMessage(error)); }
   }
 
-  movementLabel(kind: string): string { return kind === 'PURCHASE' ? 'Compra' : 'Venta'; }
+  movementLabel(kind: string): string {
+    return kind === 'PURCHASE' ? 'Compra' : kind === 'OPENING' ? 'Apertura de inventario' : 'Venta';
+  }
 
   ngOnInit(): void {
     void this.restore();
@@ -195,6 +200,7 @@ export class ConnectedWorkspace implements OnInit {
       this.profileOpen.set(false);
       this.backupDue.set(false);
       this.backupDismissed.set(false);
+      this.openingOpen.set(false);
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {

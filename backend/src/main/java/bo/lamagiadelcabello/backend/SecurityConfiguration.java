@@ -46,6 +46,7 @@ class SecurityConfiguration {
                 .requestMatchers("/api/purchases", "/api/purchases/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/sales", "/api/sales/**").authenticated()
                 .requestMatchers("/api/sales", "/api/sales/**").hasRole("ADMIN")
+                .requestMatchers("/api/inventory/opening", "/api/inventory/opening/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/inventory", "/api/inventory/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/reports", "/api/reports/**").authenticated()
                 .anyRequest().denyAll())

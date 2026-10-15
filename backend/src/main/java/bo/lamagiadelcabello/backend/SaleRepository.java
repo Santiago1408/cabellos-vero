@@ -102,15 +102,18 @@ class SaleRepository {
                    s.name AS supplier_name
             FROM stock_consumption sc
             JOIN stock_lot sl ON sl.id = sc.stock_lot_id
-            JOIN purchase_receipt_line rl ON rl.id = sl.receipt_line_id
-            JOIN purchase_receipt pr ON pr.id = rl.receipt_id
-            JOIN purchase_order p ON p.id = pr.purchase_id
-            JOIN supplier s ON s.id = p.supplier_id
-            WHERE sc.delivery_line_id = ? ORDER BY sl.effective_at, sl.created_at, sl.id
+            LEFT JOIN purchase_receipt_line rl ON rl.id = sl.receipt_line_id
+            LEFT JOIN purchase_receipt pr ON pr.id = rl.receipt_id
+            LEFT JOIN purchase_order p ON p.id = pr.purchase_id
+            LEFT JOIN supplier s ON s.id = p.supplier_id
+            WHERE sc.delivery_line_id = ?
+            ORDER BY sl.effective_at, sl.opening_order NULLS LAST, sl.created_at, sl.id
             """, (row, number) -> new Consumption(
                 (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("weight"),
                 row.getBigDecimal("cost_per_gram"), row.getTimestamp("received_at").toInstant(),
-                (UUID) row.getObject("purchase_id"), row.getString("supplier_name")
+                (UUID) row.getObject("purchase_id"),
+                row.getString("supplier_name") == null ? "Inventario inicial"
+                    : row.getString("supplier_name")
             ), deliveryLineId);
     }
 

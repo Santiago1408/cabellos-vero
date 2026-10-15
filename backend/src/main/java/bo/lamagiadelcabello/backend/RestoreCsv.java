@@ -52,25 +52,28 @@ final class RestoreCsv {
             throw invalid("Falta el manifiesto al comienzo del respaldo.");
         }
         Map<String, Object> manifest = object(csvRows.getFirst().get(2), json);
+        Object version = manifest.get("version");
         if (!"la-magia-del-cabello-csv".equals(manifest.get("format"))
-            || !Integer.valueOf(3).equals(manifest.get("version"))
+            || (!Integer.valueOf(3).equals(version) && !Integer.valueOf(4).equals(version))
             || !"backend-relational".equals(manifest.get("schema"))
             || !"BOB".equals(manifest.get("currency"))
             || !"g".equals(manifest.get("weightUnit"))
             || !"America/La_Paz".equals(manifest.get("businessTimeZone"))
             || !(manifest.get("counts") instanceof Map<?, ?> counts)) {
-            throw invalid("El respaldo no es una exportación compatible de la versión 3.");
+            throw invalid("El respaldo no es una exportación compatible de las versiones 3 o 4.");
         }
         try { Instant.parse(String.valueOf(manifest.get("exportedAt"))); }
         catch (RuntimeException badDate) {
             throw invalid("La fecha de exportación del manifiesto es inválida.");
         }
-        Set<String> allowed = new HashSet<>(BackupService.sourceTables());
+        List<String> tables = Integer.valueOf(3).equals(version)
+            ? BackupService.sourceTablesV3() : BackupService.sourceTables();
+        Set<String> allowed = new HashSet<>(tables);
         if (!counts.keySet().equals(allowed)) {
             throw invalid("El manifiesto no enumera todas las tablas del respaldo.");
         }
         Map<String, List<Row>> rows = new LinkedHashMap<>();
-        for (String table : BackupService.sourceTables()) rows.put(table, new ArrayList<>());
+        for (String table : tables) rows.put(table, new ArrayList<>());
         Set<String> seen = new HashSet<>();
         for (int i = 1; i < csvRows.size(); i++) {
             List<String> row = csvRows.get(i);
@@ -101,7 +104,7 @@ final class RestoreCsv {
             .filter(row -> "ADMIN".equals(row.values().get("role"))).count();
         if (admins != 1) throw invalid("El respaldo debe contener exactamente un administrador.");
         MessageDigest state = sha256();
-        for (String table : BackupService.sourceTables()) {
+        for (String table : tables) {
             if (table.equals("backup_settings")) continue;
             for (Row row : rows.get(table)) {
                 state.update(table.getBytes(StandardCharsets.UTF_8));
@@ -199,7 +202,8 @@ final class RestoreCsv {
     record Parsed(String sha256, Map<String, List<Row>> rows, Map<String, Object> manifest) {
         Map<String, Integer> counts() {
             Map<String, Integer> counts = new LinkedHashMap<>();
-            for (String table : BackupService.sourceTables()) counts.put(table, rows.get(table).size());
+            for (String table : BackupService.sourceTables())
+                counts.put(table, rows.getOrDefault(table, List.of()).size());
             return counts;
         }
     }

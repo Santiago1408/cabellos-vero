@@ -33,20 +33,20 @@ class InventoryService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<StockRow> list() {
-        return repository.typesWithPurchases().stream().map(this::stockRow).toList();
+        return repository.typesWithEntries().stream().map(this::stockRow).toList();
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public StockDetail detail(String categoryCode, int lengthCm) {
-        InventoryType type = repository.typesWithPurchases().stream()
+        InventoryType type = repository.typesWithEntries().stream()
             .filter(row -> row.categoryCode().equals(categoryCode) && row.lengthCm() == lengthCm)
             .findFirst().orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                "No hay compras registradas de esta categoría y longitud."));
+                "No hay entradas registradas de esta categoría y longitud."));
         StockRow stock = stockRow(type);
         BigDecimal running = ZERO;
         List<MovementView> movements = new ArrayList<>();
         for (Movement movement : repository.movements(type.hairType())) {
-            BigDecimal signed = movement.kind().equals("PURCHASE")
+            BigDecimal signed = !movement.kind().equals("SALE")
                 ? movement.weight() : movement.weight().negate();
             running = running.add(signed);
             movements.add(new MovementView(movement.movementId(), movement.kind(),

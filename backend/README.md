@@ -68,7 +68,7 @@ Abre `http://127.0.0.1:4201/sistema`. Ese puerto usa el proxy `src/proxy.test.co
 sudo docker compose --env-file .env.test -f compose.test.yaml down
 ```
 
-Esta base permite practicar los flujos sin afectar la base de desarrollo. Por ahora empieza vacía: todavía falta implementar una apertura de inventario para cargar el stock físico anterior al sistema. Su procedimiento previsto está en [stock-inicial.md](../docs/stock-inicial.md).
+Esta base permite practicar los flujos sin afectar la base de desarrollo. Empieza vacía; el administrador puede cargar el stock físico anterior al sistema desde **Inventario → Apertura de inventario**. El procedimiento está en [stock-inicial.md](../docs/stock-inicial.md).
 
 ## Crear el primer administrador
 
@@ -236,20 +236,28 @@ Estas rutas son de solo lectura y están disponibles para administrador y emplea
 
 | Método y ruta | Uso |
 | --- | --- |
-| `GET /api/inventory` | Una fila por categoría y longitud con compras registradas. |
+| `GET /api/inventory` | Una fila por categoría y longitud con compras o lotes de apertura registrados. |
 | `GET /api/inventory/{categoryCode}/{lengthCm}` | Stock y movimientos físicos del tipo seleccionado. |
 | `GET /api/inventory/pending-purchases` | Líneas de compras todavía por recibir. |
 | `GET /api/inventory/reserved-sales` | Líneas de ventas todavía reservadas. |
 
-Cada fila indica `physicalStock`, `pendingPurchase` y `reservedSale` en gramos. También desglosa cuánto de la reserva se cubre con cabello físico (`reservedFromPhysical`) y cuánto con compras pendientes (`reservedFromPending`), además de `freePhysical` y `freePending`. Una combinación nueva aparece cuando se registra una compra de ese tipo; agregarla solo al catálogo no crea una fila de stock vacío.
+Cada fila indica `physicalStock`, `pendingPurchase` y `reservedSale` en gramos. También desglosa cuánto de la reserva se cubre con cabello físico (`reservedFromPhysical`) y cuánto con compras pendientes (`reservedFromPending`), además de `freePhysical` y `freePending`. Una combinación nueva aparece cuando se registra una compra o un lote de apertura de ese tipo; agregarla solo al catálogo no crea una fila de stock vacío.
 
-El detalle muestra las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, proveedor o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los importes de movimientos parciales reparten los centavos del total de su línea sin duplicarlos. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+El detalle muestra la apertura como `OPENING`, las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, origen o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los importes de movimientos parciales reparten los centavos del total de su línea sin duplicarlos. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+
+### Apertura de inventario
+
+Solo el administrador puede usar `GET /api/inventory/opening`, `POST /api/inventory/opening/preview`, `POST /api/inventory/opening` y `PUT /api/inventory/opening`. La apertura se crea **una vez y antes de la primera compra o venta**. La fecha y hora de corte se indican con zona horaria; cada lote lleva categoría, longitud, `weight`, `costPerGram`, `costEstimated`, `order` (orden de antigüedad), `originDate` opcional y `note` opcional. Los pesos y costos admiten dos decimales. La vista previa devuelve lotes, peso y valor total; luego el administrador confirma la carga en Inventario. Las ventas consumen estos lotes según el orden registrado, y su costo contribuye al margen bruto. Su valor inicial no figura como compra del periodo.
+
+El detalle de apertura devuelve `header.version`, lotes con peso inicial y restante e historial. `PUT` acepta los lotes completos (con `id` para los existentes), `expectedVersion` y un motivo de 3 a 500 caracteres. Puede agregar, reordenar, corregir o quitar lotes. Recalcula consumos y márgenes; rechaza la corrección completa con `409` si deja entregas o reservas sin respaldo. La fecha de corte no se modifica después de crearla. La interfaz muestra el historial como información secundaria.
 
 ## Reportes
 
 `GET /api/reports/overview`, `GET /api/reports/results`, `GET /api/reports/top-products` y `GET /api/reports/top-categories` son consultas disponibles para administrador y empleados. No incluyen deudas independientes ni usan fechas o importes de pagos para reconocer resultados.
 
 `/overview` devuelve el valor acumulado de cabello recibido, ingresos de entregas, costo del cabello vendido, margen bruto, valor del stock al costo y número de ventas con al menos una entrega. `/top-products` devuelve los tipos más vendidos con peso, ingresos, costo, margen y stock físico; `/top-categories` agrupa las ventas por calidad. Ambas listas admiten `limit` entre 1 y 20; el valor predeterminado es 5.
+
+La apertura cuenta en el valor del stock y en el costo de las ventas que la consumen. No cuenta como compra recibida en `overview` ni en los resultados periódicos.
 
 `/results` admite `period=days|weeks|months`, `asOf=AAAA-MM-DD` y `count`. Sin parámetros muestra los seis meses hasta el actual; `days` muestra 30 días y `weeks` 12 semanas. Las semanas empiezan el lunes. Cada fila devuelve inicio y fin exclusivo del periodo, compras recibidas, ingresos por entregas, costo y margen bruto. Los periodos sin movimientos figuran con cero. `asOf` no puede ser futuro y `count` tiene límites para evitar respuestas excesivas.
 
@@ -275,7 +283,7 @@ Los importes admiten hasta dos decimales. La fecha del abono va desde el registr
 
 Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/settings` devuelve `intervalDays`, `lastConfirmedAt`, `pendingExportAt`, `nextReminderAt` y `due`. `PUT /api/backups/settings` acepta `{ "intervalDays": 7 }`, entre 1 y 365. `POST /api/backups/export` descarga el CSV integral y deja pendiente la confirmación; `POST /api/backups/confirm` registra que el administrador comprobó que el archivo quedó guardado. El sistema no puede comprobar por sí mismo si el archivo sigue en la computadora.
 
-La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 3, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La versión 2 del archivo generado por el prototipo usa otra estructura; el backend comienza con datos nuevos y no la importa automáticamente.
+La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 4, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite la versión 3 anterior a la apertura. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
 
 ### Restauración
 

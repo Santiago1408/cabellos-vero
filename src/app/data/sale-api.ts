@@ -38,7 +38,7 @@ export type SaleConsumption = {
   weight: number;
   costPerGram: number;
   receivedAt: string;
-  purchaseId: string;
+  purchaseId: string | null;
   supplierName: string;
 };
 

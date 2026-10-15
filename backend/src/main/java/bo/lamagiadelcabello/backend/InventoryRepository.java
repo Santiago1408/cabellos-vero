@@ -22,10 +22,14 @@ class InventoryRepository {
         this.jdbc = jdbc;
     }
 
-    List<InventoryType> typesWithPurchases() {
+    List<InventoryType> typesWithEntries() {
         return jdbc.query("""
             SELECT DISTINCT l.category_code, c.display_name AS category_name, l.length_cm
-            FROM purchase_line l
+            FROM (
+                SELECT category_code, length_cm FROM purchase_line
+                UNION
+                SELECT category_code, length_cm FROM stock_lot WHERE opening_id IS NOT NULL
+            ) l
             JOIN hair_category c ON c.code = l.category_code
             ORDER BY c.display_name, l.length_cm, l.category_code
             """, (row, number) -> new InventoryType(row.getString("category_code"),
@@ -54,7 +58,29 @@ class InventoryRepository {
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
                 row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
                 row.getBigDecimal("movement_value"),
-                (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("lot_remaining")
+                (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("lot_remaining"), null
+            ), type.categoryCode(), type.lengthCm());
+        List<Movement> opening = jdbc.query("""
+            SELECT sl.id AS movement_id, o.cutoff_at AS effective_at,
+                   o.created_at AS recorded_at, o.id AS operation_id,
+                   sl.original_weight AS weight, sl.cost_per_gram AS price_per_gram,
+                   lv.purchase_value AS movement_value, sl.remaining_weight AS lot_remaining,
+                   sl.opening_order
+            FROM stock_lot sl
+            JOIN inventory_opening o ON o.id = sl.opening_id
+            JOIN active_stock_lot_value lv ON lv.stock_lot_id = sl.id
+            WHERE sl.category_code = ? AND sl.length_cm = ?
+              AND sl.voided_at IS NULL
+            ORDER BY sl.opening_order, sl.id
+            """, (row, number) -> new Movement(
+                (UUID) row.getObject("movement_id"), "OPENING",
+                row.getTimestamp("effective_at").toInstant(),
+                row.getTimestamp("recorded_at").toInstant(),
+                (UUID) row.getObject("operation_id"), "Inventario inicial",
+                row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("movement_value"),
+                (UUID) row.getObject("movement_id"), row.getBigDecimal("lot_remaining"),
+                row.getInt("opening_order")
             ), type.categoryCode(), type.lengthCm());
         List<Movement> outgoing = jdbc.query("""
             SELECT dl.id AS movement_id, sd.effective_at, sd.recorded_at,
@@ -73,11 +99,15 @@ class InventoryRepository {
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
                 row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
                 row.getBigDecimal("movement_value"),
-                null, null
+                null, null, null
             ), type.categoryCode(), type.lengthCm());
-        return Stream.concat(incoming.stream(), outgoing.stream())
+        return Stream.of(opening.stream(), incoming.stream(), outgoing.stream())
+            .flatMap(stream -> stream)
             .sorted(Comparator.comparing(Movement::effectiveAt)
-                .thenComparing(movement -> movement.kind().equals("PURCHASE") ? 0 : 1)
+                .thenComparing(movement -> movement.kind().equals("OPENING") ? 0
+                    : movement.kind().equals("PURCHASE") ? 1 : 2)
+                .thenComparing(movement -> movement.openingOrder() == null
+                    ? Integer.MAX_VALUE : movement.openingOrder())
                 .thenComparing(Movement::recordedAt)
                 .thenComparing(Movement::movementId))
             .toList();
@@ -155,7 +185,7 @@ class InventoryRepository {
     record Movement(UUID movementId, String kind, Instant effectiveAt, Instant recordedAt,
                     UUID operationId, String partyName, BigDecimal weight,
                     BigDecimal pricePerGram, BigDecimal movementValue,
-                    UUID stockLotId, BigDecimal lotRemaining) {}
+                    UUID stockLotId, BigDecimal lotRemaining, Integer openingOrder) {}
 
     record PendingPurchase(UUID operationId, LocalDate operationDate, Instant createdAt,
                            UUID supplierId, String supplierName, UUID lineId,

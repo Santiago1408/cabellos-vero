@@ -280,6 +280,7 @@ class SaleService {
 
     Sale deliver(UUID saleId, DeliveryInput raw, UUID actorId) {
         DeliveryInput input = validateDelivery(raw);
+        requireAfterOpening(input.effectiveAt().toInstant());
         String hash = fingerprint(new DeliveryFingerprint(saleId, input));
         Delivery repeated = sales.findDeliveryByRequestKey(input.requestKey()).orElse(null);
         if (repeated != null) return sameDelivery(repeated, saleId, hash);
@@ -373,6 +374,7 @@ class SaleService {
 
     Sale correctDelivery(UUID saleId, UUID deliveryId, CorrectionInput raw, UUID actorId) {
         CorrectionInput input = validateCorrection(raw);
+        requireAfterOpening(input.effectiveAt().toInstant());
         return transactions.execute(status -> {
             Sale before = lockedAtVersion(saleId, input.expectedVersion());
             Delivery delivery = activeDelivery(saleId, deliveryId);
@@ -557,6 +559,14 @@ class SaleService {
         }
         return new CorrectionInput(raw.expectedVersion(), raw.effectiveAt(),
             validateDeliveryItems(raw.items()), validateReason(raw.reason()));
+    }
+
+    private void requireAfterOpening(Instant effectiveAt) {
+        Instant cutoff = inventory.openingCutoff();
+        if (cutoff != null && !effectiveAt.isAfter(cutoff)) {
+            throw problem(HttpStatus.CONFLICT, "BEFORE_INVENTORY_OPENING",
+                "La entrega debe ocurrir después de la fecha y hora de apertura del inventario.");
+        }
     }
 
     private List<DeliveryItemInput> validateDeliveryItems(List<DeliveryItemInput> rawItems) {

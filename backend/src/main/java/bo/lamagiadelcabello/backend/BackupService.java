@@ -26,7 +26,7 @@ class BackupService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/La_Paz");
     private static final String FORMAT = "la-magia-del-cabello-csv";
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
 
     // Lista cerrada: ninguna tabla de sesiones, migraciones ni hashes de contraseña se exporta.
     private static final List<Source> SOURCES = List.of(
@@ -41,6 +41,8 @@ class BackupService {
         new Source("purchase_line", "id::text", "to_jsonb(t)"),
         new Source("purchase_receipt", "id::text", "to_jsonb(t)"),
         new Source("purchase_receipt_line", "id::text", "to_jsonb(t)"),
+        new Source("inventory_opening", "id::text", "to_jsonb(t)"),
+        new Source("inventory_opening_history", "id::text", "to_jsonb(t)"),
         new Source("stock_lot", "id::text", "to_jsonb(t)"),
         new Source("purchase_history", "id::text", "to_jsonb(t)"),
         new Source("purchase_payment", "id::text", "to_jsonb(t)"),
@@ -125,6 +127,13 @@ class BackupService {
     }
 
     static List<String> sourceTables() { return SOURCES.stream().map(Source::table).toList(); }
+
+    static List<String> sourceTablesV3() {
+        return SOURCES.stream().map(Source::table)
+            .filter(table -> !table.equals("inventory_opening")
+                && !table.equals("inventory_opening_history"))
+            .toList();
+    }
 
     private Download buildCsv() {
         List<Entry> entries = new ArrayList<>();

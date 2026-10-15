@@ -256,6 +256,7 @@ class PurchaseService {
 
     Purchase correctReceipt(UUID purchaseId, UUID receiptId, CorrectionInput raw, UUID actorId) {
         CorrectionInput input = validateCorrection(raw);
+        requireAfterOpening(input.effectiveAt().toInstant());
         return transactions.execute(status -> {
             Purchase before = lockedPurchaseAtVersion(purchaseId, input.expectedVersion());
             Receipt receipt = activeReceipt(purchaseId, receiptId);
@@ -383,6 +384,7 @@ class PurchaseService {
     }
 
     private Purchase recordReceipt(UUID purchaseId, ReceiptInput input, UUID actorId) {
+        requireAfterOpening(input.effectiveAt().toInstant());
         String fingerprint = fingerprint(new ReceiptFingerprint(purchaseId, input));
         Purchase before = purchases.findByIdForUpdate(purchaseId)
             .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "Compra no encontrada."));
@@ -587,6 +589,14 @@ class PurchaseService {
     private static void validateEffectiveAt(OffsetDateTime effectiveAt) {
         if (effectiveAt.toInstant().isAfter(Instant.now().plusSeconds(300))) {
             throw problem(HttpStatus.BAD_REQUEST, "La recepción no puede tener fecha y hora futuras.");
+        }
+    }
+
+    private void requireAfterOpening(Instant effectiveAt) {
+        Instant cutoff = inventory.openingCutoff();
+        if (cutoff != null && !effectiveAt.isAfter(cutoff)) {
+            throw problem(HttpStatus.CONFLICT,
+                "La recepción debe ocurrir después de la fecha y hora de apertura del inventario.");
         }
     }
 

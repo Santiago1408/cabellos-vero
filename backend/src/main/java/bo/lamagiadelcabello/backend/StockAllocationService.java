@@ -34,7 +34,7 @@ class StockAllocationService {
             SELECT id, effective_at, original_weight
             FROM stock_lot
             WHERE category_code = ? AND length_cm = ? AND voided_at IS NULL
-            ORDER BY effective_at, created_at, id
+            ORDER BY effective_at, opening_order NULLS LAST, created_at, id
             FOR UPDATE
             """, (row, number) -> new MutableLot(
                 (UUID) row.getObject("id"), row.getTimestamp("effective_at").toInstant(),
