@@ -17,7 +17,8 @@ class PurchaseRepository {
 
     private static final String PURCHASE_COLUMNS = """
         p.id, p.request_key, p.request_hash, p.supplier_id, s.name AS supplier_name,
-        p.operation_date, p.status, p.created_at, p.confirmed_at, p.canceled_at, p.updated_at
+        p.operation_date, p.status, p.created_at, p.confirmed_at, p.canceled_at,
+        p.updated_at, p.version
         """;
 
     private final JdbcTemplate jdbc;
@@ -126,6 +127,33 @@ class PurchaseRepository {
             """, id, purchaseId, categoryCode, lengthCm, agreedWeight, pricePerGram);
     }
 
+    void updateHeader(UUID purchaseId, UUID supplierId, LocalDate operationDate) {
+        jdbc.update("""
+            UPDATE purchase_order SET supplier_id = ?, operation_date = ? WHERE id = ?
+            """, supplierId, operationDate, purchaseId);
+    }
+
+    void updateLine(UUID id, String categoryCode, int lengthCm,
+                    BigDecimal agreedWeight, BigDecimal pricePerGram) {
+        jdbc.update("""
+            UPDATE purchase_line SET category_code = ?, length_cm = ?,
+                agreed_weight = ?, price_per_gram = ? WHERE id = ?
+            """, categoryCode, lengthCm, agreedWeight, pricePerGram, id);
+    }
+
+    void deleteLine(UUID id) {
+        jdbc.update("DELETE FROM purchase_line WHERE id = ?", id);
+    }
+
+    void updateLotCost(UUID purchaseLineId, BigDecimal pricePerGram) {
+        jdbc.update("""
+            UPDATE stock_lot SET cost_per_gram = ?
+            WHERE receipt_line_id IN (
+                SELECT id FROM purchase_receipt_line WHERE purchase_line_id = ?
+            )
+            """, pricePerGram, purchaseLineId);
+    }
+
     void addReceipt(UUID id, UUID purchaseId, UUID requestKey, String requestHash, Instant effectiveAt) {
         jdbc.update("""
             INSERT INTO purchase_receipt (id, purchase_id, request_key, request_hash, effective_at)
@@ -155,20 +183,24 @@ class PurchaseRepository {
 
     void confirm(UUID purchaseId) {
         jdbc.update("""
-            UPDATE purchase_order SET status = 'CONFIRMED', confirmed_at = now(), updated_at = now()
+            UPDATE purchase_order SET status = 'CONFIRMED', confirmed_at = now(),
+                updated_at = now(), version = version + 1
             WHERE id = ? AND status = 'PENDING'
             """, purchaseId);
     }
 
     void cancel(UUID purchaseId) {
         jdbc.update("""
-            UPDATE purchase_order SET status = 'CANCELED', canceled_at = now(), updated_at = now()
+            UPDATE purchase_order SET status = 'CANCELED', canceled_at = now(),
+                updated_at = now(), version = version + 1
             WHERE id = ? AND status = 'PENDING'
             """, purchaseId);
     }
 
     void touch(UUID purchaseId) {
-        jdbc.update("UPDATE purchase_order SET updated_at = now() WHERE id = ?", purchaseId);
+        jdbc.update("""
+            UPDATE purchase_order SET updated_at = now(), version = version + 1 WHERE id = ?
+            """, purchaseId);
     }
 
     void addHistory(UUID purchaseId, String eventType, UUID actorId, String reason,
@@ -190,7 +222,7 @@ class PurchaseRepository {
             row.getString("status"), row.getTimestamp("created_at").toInstant(),
             confirmed == null ? null : confirmed.toInstant(),
             canceled == null ? null : canceled.toInstant(),
-            row.getTimestamp("updated_at").toInstant()
+            row.getTimestamp("updated_at").toInstant(), row.getLong("version")
         );
     }
 
@@ -206,7 +238,8 @@ class PurchaseRepository {
 
     record Purchase(UUID id, UUID requestKey, String requestHash, UUID supplierId,
                     String supplierName, LocalDate operationDate, String status,
-                    Instant createdAt, Instant confirmedAt, Instant canceledAt, Instant updatedAt) {}
+                    Instant createdAt, Instant confirmedAt, Instant canceledAt,
+                    Instant updatedAt, long version) {}
 
     record PurchaseLine(UUID id, UUID purchaseId, String categoryCode, String categoryName,
                         int lengthCm, BigDecimal agreedWeight, BigDecimal pricePerGram,

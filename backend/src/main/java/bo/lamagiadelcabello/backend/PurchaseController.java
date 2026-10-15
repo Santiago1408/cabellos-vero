@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,6 +67,12 @@ class PurchaseController {
         return detailOf(changed);
     }
 
+    @PutMapping("/{id}")
+    Detail edit(@PathVariable UUID id, @RequestBody EditRequest input, Authentication authentication) {
+        Purchase changed = purchases.edit(id, input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
     @PostMapping("/{id}/cancel")
     Detail cancel(@PathVariable UUID id, @RequestBody ReasonRequest input, Authentication authentication) {
         Purchase changed = purchases.cancel(id, input == null ? null : input.reason(), actorId(authentication));
@@ -88,7 +95,8 @@ class PurchaseController {
         return new Summary(
             purchase.id(), purchase.supplierId(), purchase.supplierName(), purchase.operationDate(),
             purchase.status(), purchase.createdAt(), purchase.confirmedAt(), purchase.canceledAt(),
-            purchase.updatedAt(), agreedWeight, receivedWeight, agreedTotal, receivedValue,
+            purchase.updatedAt(), purchase.version(), agreedWeight, receivedWeight,
+            agreedTotal, receivedValue,
             purchase.status().equals("CANCELED") ? receivedValue : agreedTotal
         );
     }
@@ -156,11 +164,27 @@ class PurchaseController {
         }
     }
 
+    record EditRequest(Long expectedVersion, UUID supplierId, LocalDate operationDate,
+                       List<EditLine> lines, String reason) {
+        PurchaseService.EditInput toService() {
+            return new PurchaseService.EditInput(expectedVersion, supplierId, operationDate,
+                lines == null ? null : lines.stream()
+                    .map(line -> line == null ? null : line.toService()).toList(), reason);
+        }
+    }
+
+    record EditLine(UUID id, String categoryCode, Integer lengthCm,
+                    BigDecimal weight, BigDecimal pricePerGram) {
+        PurchaseService.EditLineInput toService() {
+            return new PurchaseService.EditLineInput(id, categoryCode, lengthCm, weight, pricePerGram);
+        }
+    }
+
     record ReasonRequest(String reason) {}
 
     record Summary(UUID id, UUID supplierId, String supplierName, LocalDate operationDate,
                    String status, Instant createdAt, Instant confirmedAt, Instant canceledAt,
-                   Instant updatedAt, BigDecimal agreedWeight, BigDecimal receivedWeight,
+                   Instant updatedAt, long version, BigDecimal agreedWeight, BigDecimal receivedWeight,
                    BigDecimal agreedTotal, BigDecimal receivedValue, BigDecimal payableTotal) {}
 
     record Detail(Summary summary, List<LineView> lines,
