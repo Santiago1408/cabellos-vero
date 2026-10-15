@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas y entregas parciales que descuentan lotes físicos. Ventas inmediatas en una sola solicitud, corrección o anulación de entregas, pagos de ventas y reportes siguen pendientes.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. En ventas ya se registran reservas, entregas parciales que descuentan lotes físicos y ventas inmediatas en una sola solicitud. Corrección o anulación de entregas, pagos de ventas y reportes siguen pendientes.
 
 ## Requisitos locales
 
@@ -146,7 +146,7 @@ El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido
 
 ## Ventas: reservas y entregas parciales
 
-`GET /api/sales` y `GET /api/sales/{id}` permiten consultar ventas con una sesión de administrador o empleado. `POST /api/sales/reservations` registra una venta **Pendiente** con varias líneas; `PUT /api/sales/{id}` edita cliente, fecha y líneas con motivo e historial; `POST /api/sales/{id}/deliveries` registra una entrega real parcial o completa; `POST /api/sales/{id}/cancel` anula el saldo pendiente con motivo. Las escrituras requieren administrador y token CSRF. Una reserva no descuenta stock físico; cada entrega sí lo hace.
+`GET /api/sales` y `GET /api/sales/{id}` permiten consultar ventas con una sesión de administrador o empleado. `POST /api/sales` registra una venta inmediata con entrega completa; `POST /api/sales/reservations` registra una venta **Pendiente** con varias líneas; `PUT /api/sales/{id}` edita cliente, fecha y líneas con motivo e historial; `POST /api/sales/{id}/deliveries` registra una entrega real parcial o completa; `POST /api/sales/{id}/cancel` anula el saldo pendiente con motivo. Las escrituras requieren administrador y token CSRF. Una reserva no descuenta stock físico; cada entrega sí lo hace.
 
 Ejemplo de reserva:
 
@@ -164,6 +164,8 @@ Ejemplo de reserva:
 
 La API agrupa las líneas de la misma categoría y longitud antes de evaluar disponibilidad. Primero considera el stock físico libre y después el cabello pendiente de recibir, restando las reservas existentes. Si alguna línea supera ambos, rechaza toda la venta con `INSUFFICIENT_HAIR` y un desglose de pesos. Si el stock físico libre no alcanza pero el pendiente sí, responde `PENDING_STOCK_CONFIRMATION_REQUIRED`; el administrador debe aceptar ese uso y repetir la solicitud con `acceptPendingStock: true`. `requestKey` evita duplicados por reintentos. Las compras no se pueden reducir, corregir o anular si ello dejaría reservas sin respaldo. La reserva no confirma la venta: seguirá pendiente hasta registrar la entrega real.
 
+Para una venta inmediata, envía los mismos datos a `POST /api/sales`, sustituye `acceptPendingStock` por `effectiveAt` con la fecha, hora y zona de la entrega real (por ejemplo, `2026-10-14T16:30:00-04:00`). Solo usa stock físico libre. La reserva y la entrega se guardan en una misma transacción: si falta cabello o falla la asignación de lotes, se rechaza la venta completa y no queda una operación pendiente a medias. Una solicitud repetida con el mismo `requestKey` y los mismos datos devuelve la venta creada; si se reutiliza con otros datos, responde `409`.
+
 Para registrar una entrega, envía un UUID único en `requestKey`, la fecha y hora **reales** en `effectiveAt` con zona horaria, y `items` con `lineId` y `weight` por cada línea entregada. Por ejemplo:
 
 ```json
@@ -180,4 +182,4 @@ Para editar una venta pendiente, envía la `summary.version` como `expectedVersi
 
 ## Qué sigue
 
-Incorporar venta inmediata atómica, corrección y anulación de entregas, pagos de ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar corrección y anulación de entregas, pagos de ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

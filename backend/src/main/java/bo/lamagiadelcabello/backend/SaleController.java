@@ -62,6 +62,15 @@ class SaleController {
             .body(detailOf(created));
     }
 
+    @PostMapping
+    ResponseEntity<Detail> immediate(@RequestBody ImmediateRequest input,
+                                     Authentication authentication) {
+        Sale created = sales.createImmediate(input == null ? null : input.toService(),
+            actorId(authentication));
+        return ResponseEntity.created(URI.create("/api/sales/" + created.id()))
+            .body(detailOf(created));
+    }
+
     @PostMapping("/{id}/cancel")
     Detail cancel(@PathVariable UUID id, @RequestBody ReasonRequest input,
                   Authentication authentication) {
@@ -145,6 +154,15 @@ class SaleController {
                       BigDecimal pricePerGram) {
         SaleService.LineInput toService() {
             return new SaleService.LineInput(categoryCode, lengthCm, weight, pricePerGram);
+        }
+    }
+
+    record ImmediateRequest(UUID requestKey, String customerName, LocalDate operationDate,
+                            List<CreateLine> lines, OffsetDateTime effectiveAt) {
+        SaleService.ImmediateInput toService() {
+            return new SaleService.ImmediateInput(requestKey, customerName, operationDate,
+                lines == null ? null : lines.stream()
+                    .map(line -> line == null ? null : line.toService()).toList(), effectiveAt);
         }
     }
 

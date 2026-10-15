@@ -2,6 +2,7 @@ package bo.lamagiadelcabello.backend;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -101,6 +102,31 @@ class SaleService {
             throw problem(HttpStatus.CONFLICT, "SALE_CONFLICT",
                 "El catálogo o las reservas cambiaron durante el registro. Vuelve a consultar los datos.");
         }
+    }
+
+    Sale createImmediate(ImmediateInput raw, UUID actorId) {
+        if (raw == null || raw.effectiveAt() == null) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_SALE",
+                "Indica la fecha y hora real de entrega para una venta inmediata.");
+        }
+        CreateInput sale = validateCreate(new CreateInput(raw.requestKey(), raw.customerName(),
+            raw.operationDate(), raw.lines(), false));
+        if (raw.effectiveAt().toInstant().isAfter(Instant.now().plusSeconds(300))) {
+            throw problem(HttpStatus.BAD_REQUEST, "FUTURE_DELIVERY",
+                "La hora real de entrega no puede estar en el futuro.");
+        }
+        UUID reservationKey = UUID.nameUUIDFromBytes(
+            (sale.requestKey() + ":immediate-sale").getBytes(StandardCharsets.UTF_8));
+        UUID deliveryKey = UUID.nameUUIDFromBytes(
+            (sale.requestKey() + ":immediate-delivery").getBytes(StandardCharsets.UTF_8));
+        return transactions.execute(status -> {
+            Sale reserved = createReservation(new CreateInput(reservationKey,
+                sale.customerName(), sale.operationDate(), sale.lines(), false), actorId);
+            List<DeliveryItemInput> items = sales.lines(reserved.id()).stream()
+                .map(line -> new DeliveryItemInput(line.id(), line.agreedWeight())).toList();
+            return deliver(reserved.id(), new DeliveryInput(deliveryKey,
+                raw.effectiveAt(), items), actorId);
+        });
     }
 
     Sale edit(UUID saleId, EditInput raw, UUID actorId) {
@@ -511,6 +537,8 @@ class SaleService {
     record LineInput(String categoryCode, Integer lengthCm, BigDecimal weight, BigDecimal pricePerGram) {}
     record CreateInput(UUID requestKey, String customerName, LocalDate operationDate,
                        List<LineInput> lines, boolean acceptPendingStock) {}
+    record ImmediateInput(UUID requestKey, String customerName, LocalDate operationDate,
+                          List<LineInput> lines, OffsetDateTime effectiveAt) {}
     record EditLineInput(UUID id, String categoryCode, Integer lengthCm,
                          BigDecimal weight, BigDecimal pricePerGram) {}
     record EditInput(Long expectedVersion, String customerName, LocalDate operationDate,
