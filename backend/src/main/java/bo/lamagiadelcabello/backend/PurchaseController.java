@@ -29,6 +29,7 @@ import bo.lamagiadelcabello.backend.PurchaseRepository.PurchaseLine;
 import bo.lamagiadelcabello.backend.PurchaseRepository.Receipt;
 import bo.lamagiadelcabello.backend.PurchaseRepository.ReceiptItem;
 import bo.lamagiadelcabello.backend.PurchaseService.PurchaseProblem;
+import bo.lamagiadelcabello.backend.PurchasePaymentRepository.Payment;
 
 @RestController
 @RequestMapping("/api/purchases")
@@ -36,11 +37,17 @@ class PurchaseController {
 
     private final PurchaseService purchases;
     private final PurchaseRepository repository;
+    private final PurchasePaymentRepository paymentRepository;
+    private final PurchasePaymentService paymentService;
     private final ObjectMapper json;
 
-    PurchaseController(PurchaseService purchases, PurchaseRepository repository, ObjectMapper json) {
+    PurchaseController(PurchaseService purchases, PurchaseRepository repository,
+                       PurchasePaymentRepository paymentRepository,
+                       PurchasePaymentService paymentService, ObjectMapper json) {
         this.purchases = purchases;
         this.repository = repository;
+        this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
         this.json = json;
     }
 
@@ -95,6 +102,32 @@ class PurchaseController {
         return detailOf(changed);
     }
 
+    @PostMapping("/{id}/payments")
+    Detail recordPayment(@PathVariable UUID id, @RequestBody PaymentRequest input,
+                         Authentication authentication) {
+        Purchase changed = paymentService.create(id,
+            input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
+    @PutMapping("/{id}/payments/{paymentId}")
+    Detail correctPayment(@PathVariable UUID id, @PathVariable UUID paymentId,
+                          @RequestBody PaymentCorrectionRequest input,
+                          Authentication authentication) {
+        Purchase changed = paymentService.correct(id, paymentId,
+            input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
+    @PostMapping("/{id}/payments/{paymentId}/void")
+    Detail voidPayment(@PathVariable UUID id, @PathVariable UUID paymentId,
+                       @RequestBody PaymentVoidRequest input,
+                       Authentication authentication) {
+        Purchase changed = paymentService.voidPayment(id, paymentId,
+            input == null ? null : input.toService(), actorId(authentication));
+        return detailOf(changed);
+    }
+
     @ExceptionHandler(PurchaseProblem.class)
     ResponseEntity<Map<String, String>> purchaseProblem(PurchaseProblem error) {
         return ResponseEntity.status(error.status()).body(Map.of("error", error.getMessage()));
@@ -108,12 +141,14 @@ class PurchaseController {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal receivedWeight = lines.stream().map(PurchaseLine::receivedWeight)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal payableTotal = purchase.status().equals("CANCELED") ? receivedValue : agreedTotal;
+        BigDecimal paidTotal = paymentRepository.totalActive(purchase.id());
         return new Summary(
             purchase.id(), purchase.supplierId(), purchase.supplierName(), purchase.operationDate(),
             purchase.status(), purchase.createdAt(), purchase.confirmedAt(), purchase.canceledAt(),
             purchase.updatedAt(), purchase.version(), agreedWeight, receivedWeight,
-            agreedTotal, receivedValue,
-            purchase.status().equals("CANCELED") ? receivedValue : agreedTotal
+            agreedTotal, receivedValue, payableTotal, paidTotal,
+            payableTotal.subtract(paidTotal)
         );
     }
 
@@ -124,7 +159,8 @@ class PurchaseController {
         List<HistoryView> history = repository.history(purchase.id()).stream()
             .map(this::historyView).toList();
         return new Detail(summary(purchase), lines.stream().map(LineView::from).toList(),
-            receipts, history);
+            receipts, paymentRepository.list(purchase.id()).stream().map(PaymentView::from).toList(),
+            history);
     }
 
     private ReceiptView receiptView(Receipt receipt) {
@@ -213,13 +249,38 @@ class PurchaseController {
 
     record ReasonRequest(String reason) {}
 
+    record PaymentRequest(UUID requestKey, LocalDate paymentDate, BigDecimal amount,
+                          String method, String reference) {
+        PurchasePaymentService.CreateInput toService() {
+            return new PurchasePaymentService.CreateInput(requestKey, paymentDate, amount,
+                method, reference);
+        }
+    }
+
+    record PaymentCorrectionRequest(Long expectedVersion, LocalDate paymentDate,
+                                    BigDecimal amount, String method, String reference,
+                                    String reason) {
+        PurchasePaymentService.CorrectionInput toService() {
+            return new PurchasePaymentService.CorrectionInput(expectedVersion, paymentDate,
+                amount, method, reference, reason);
+        }
+    }
+
+    record PaymentVoidRequest(Long expectedVersion, String reason) {
+        PurchasePaymentService.VoidInput toService() {
+            return new PurchasePaymentService.VoidInput(expectedVersion, reason);
+        }
+    }
+
     record Summary(UUID id, UUID supplierId, String supplierName, LocalDate operationDate,
                    String status, Instant createdAt, Instant confirmedAt, Instant canceledAt,
                    Instant updatedAt, long version, BigDecimal agreedWeight, BigDecimal receivedWeight,
-                   BigDecimal agreedTotal, BigDecimal receivedValue, BigDecimal payableTotal) {}
+                   BigDecimal agreedTotal, BigDecimal receivedValue, BigDecimal payableTotal,
+                   BigDecimal paidTotal, BigDecimal balance) {}
 
     record Detail(Summary summary, List<LineView> lines,
-                  List<ReceiptView> receipts, List<HistoryView> history) {}
+                  List<ReceiptView> receipts, List<PaymentView> payments,
+                  List<HistoryView> history) {}
 
     record LineView(UUID id, String categoryCode, String categoryName, int lengthCm,
                     BigDecimal agreedWeight, BigDecimal receivedWeight, BigDecimal remainingWeight,
@@ -238,6 +299,14 @@ class PurchaseController {
     record ReceiptItemView(UUID id, UUID lineId, BigDecimal weight) {
         static ReceiptItemView from(ReceiptItem row) {
             return new ReceiptItemView(row.id(), row.purchaseLineId(), row.weight());
+        }
+    }
+
+    record PaymentView(UUID id, LocalDate paymentDate, BigDecimal amount, String method,
+                       String reference, Instant recordedAt, Instant updatedAt, Instant voidedAt) {
+        static PaymentView from(Payment row) {
+            return new PaymentView(row.id(), row.paymentDate(), row.amount(), row.method(),
+                row.reference(), row.recordedAt(), row.updatedAt(), row.voidedAt());
         }
     }
 

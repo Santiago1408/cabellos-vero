@@ -1,6 +1,6 @@
 # Backend: desarrollo local
 
-La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición y corrección de recepciones de compras. Ventas, pagos y reportes todavía no están implementados; sus rutas HTTP siguen denegadas.
+La API se inicia con Java 21, Spring Boot 4.1.1 y PostgreSQL 18.6. Ya incluye migraciones, sesiones persistidas, el comando privado del administrador, autenticación, gestión de empleados, catálogos de cabello, proveedores y registro, edición, recepciones y pagos de compras. Ventas y reportes todavía no están implementados; sus rutas HTTP siguen denegadas.
 
 ## Requisitos locales
 
@@ -105,7 +105,7 @@ Solo `name` y `phone` son obligatorios. `city`, `address` y `mapsUrl` pueden env
 
 ## Compras: registro, edición y recepciones
 
-`GET /api/purchases` y `GET /api/purchases/{id}` permiten consultar compras con una sesión de administrador o empleado. La lista muestra proveedor, fecha, estado, pesos e importes; el detalle añade líneas, progreso recibido, recepciones con fecha/hora real y de registro, e historial. Las escrituras requieren administrador y token CSRF.
+`GET /api/purchases` y `GET /api/purchases/{id}` permiten consultar compras con una sesión de administrador o empleado. La lista muestra proveedor, fecha, estado, pesos, importes, total pagado y saldo; el detalle añade líneas, progreso recibido, recepciones con fecha/hora real y de registro, pagos e historial. Las escrituras requieren administrador y token CSRF.
 
 | Método y ruta | Uso |
 | --- | --- |
@@ -115,6 +115,9 @@ Solo `name` y `phone` son obligatorios. `city`, `address` y `mapsUrl` pueden env
 | `PUT /api/purchases/{id}/receipts/{receiptId}` | Corrige fecha/hora real y pesos de una recepción, con motivo e historial. |
 | `POST /api/purchases/{id}/receipts/{receiptId}/void` | Anula una recepción errónea sin borrar su rastro. |
 | `POST /api/purchases/{id}/cancel` | Anula solo el saldo pendiente, con `{"reason":"..."}`; conserva las recepciones y lotes existentes. |
+| `POST /api/purchases/{id}/payments` | Registra un pago o anticipo. |
+| `PUT /api/purchases/{id}/payments/{paymentId}` | Corrige un pago con motivo e historial. |
+| `POST /api/purchases/{id}/payments/{paymentId}/void` | Anula un pago sin borrarlo. |
 
 Ejemplo de creación pendiente (UUID reales para `requestKey` y `supplierId`, y códigos del catálogo):
 
@@ -137,8 +140,10 @@ Para editar, lee primero el detalle y envía en `PUT` la `summary.version` como 
 
 Para corregir una recepción, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. No se cambian las líneas que componen esa recepción; cada peso debe seguir siendo positivo y el total recibido de cada línea no puede superar lo acordado. El momento de registro (`recordedAt`) permanece intacto. La corrección actualiza el lote físico y puede devolver una compra confirmada a pendiente o completar una pendiente. Para anularla, envía `{"expectedVersion": 2, "reason": "Recepción duplicada"}` al endpoint `/void`; el movimiento y sus lotes quedan marcados como anulados, se excluyen del stock efectivo y permanecen en el historial. Una recepción con cabello ya vendido no puede corregirse ni anularse hasta incorporar el recálculo de consumos y márgenes en la etapa de ventas. Las futuras consultas de inventario y asignación de lotes deben filtrar `stock_lot.voided_at IS NULL`.
 
-El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. Los pagos, ventas y cálculo de márgenes se incorporarán en las siguientes etapas, con las validaciones de stock y de historial acordadas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
+Para registrar un pago, envía `requestKey` (UUID único), `paymentDate` (`AAAA-MM-DD`), `amount`, `method` (`CASH`, `QR`, `TRANSFER` u `OTHER`) y `reference` opcional. La fecha no puede ser futura en Bolivia y el importe debe ser positivo, con dos decimales como máximo. La suma de pagos activos no puede superar el total acordado; en una compra anulada no puede superar el valor recibido. La clave de solicitud evita duplicados por reintentos. El detalle conserva también los pagos anulados con `voidedAt`, pero no los suma. Para corregir, envía todos los datos del pago más `expectedVersion` y `reason`; para anular, solo `expectedVersion` y `reason`. Ambas acciones guardan valores anteriores y nuevos. La edición del importe de la compra, la corrección de recepciones y la anulación del saldo pendiente se rechazan si dejarían el total exigible por debajo de los pagos activos.
+
+El estado `CANCELED` deja el importe exigible en el valor efectivamente recibido. Las recepciones ya realizadas permanecen como lotes. Las ventas y el cálculo de márgenes se incorporarán en las siguientes etapas, con las validaciones de stock y de historial acordadas. No uses estos endpoints para operaciones reales hasta completar esas etapas y conectar el frontend.
 
 ## Qué sigue
 
-Completar pagos de compras; después incorporar ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al incorporar ventas se debe extender la corrección de lotes vendidos con recálculo de consumos y márgenes históricos. Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Incorporar ventas, inventario, reportes, deudas y respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). Al incorporar ventas se debe extender la corrección de lotes vendidos con recálculo de consumos y márgenes históricos. Al integrar esas rutas se aplicarán también los permisos de consulta de empleados por sección. El frontend aún utiliza `DemoStore` y no consume estos endpoints.

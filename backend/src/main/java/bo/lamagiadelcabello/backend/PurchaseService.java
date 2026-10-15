@@ -36,14 +36,17 @@ class PurchaseService {
     private final PurchaseRepository purchases;
     private final SupplierRepository suppliers;
     private final CatalogRepository catalog;
+    private final PurchasePaymentRepository payments;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
 
     PurchaseService(PurchaseRepository purchases, SupplierRepository suppliers,
-                    CatalogRepository catalog, TransactionTemplate transactions, ObjectMapper json) {
+                    CatalogRepository catalog, PurchasePaymentRepository payments,
+                    TransactionTemplate transactions, ObjectMapper json) {
         this.purchases = purchases;
         this.suppliers = suppliers;
         this.catalog = catalog;
+        this.payments = payments;
         this.transactions = transactions;
         this.json = json;
     }
@@ -216,6 +219,8 @@ class PurchaseService {
                 }
                 purchases.updateHeader(purchaseId, input.supplierId(), input.operationDate());
                 List<PurchaseLine> afterLines = purchases.lines(purchaseId);
+                PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
+                    PurchasePaymentService.payableTotal(before, afterLines));
                 boolean completed = afterLines.stream()
                     .allMatch(line -> line.receivedWeight().compareTo(line.agreedWeight()) == 0);
                 if (before.status().equals("PENDING") && completed) purchases.confirm(purchaseId);
@@ -298,6 +303,8 @@ class PurchaseService {
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
             Purchase after = get(purchaseId);
+            PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
+                PurchasePaymentService.payableTotal(after, afterLines));
             purchases.addHistory(purchaseId, "RECEIPT_CORRECTED", actorId, input.reason(),
                 oldValues, snapshotMovementJson(after, afterLines,
                     purchases.findReceiptById(receiptId).orElseThrow(), purchases.receiptItems(receiptId)));
@@ -334,6 +341,8 @@ class PurchaseService {
             List<PurchaseLine> afterLines = purchases.lines(purchaseId);
             purchases.reconcileStatusAfterReceiptChange(purchaseId, isCompleted(afterLines));
             Purchase after = get(purchaseId);
+            PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
+                PurchasePaymentService.payableTotal(after, afterLines));
             purchases.addHistory(purchaseId, "RECEIPT_VOIDED", actorId, reason,
                 oldValues, snapshotMovementJson(after, afterLines,
                     purchases.findReceiptById(receiptId).orElseThrow(), oldItems));
@@ -353,6 +362,8 @@ class PurchaseService {
             String oldValues = snapshotJson(before, lines);
             purchases.cancel(purchaseId);
             Purchase after = get(purchaseId);
+            PurchasePaymentService.requireWithinPayable(payments.totalActive(purchaseId),
+                PurchasePaymentService.payableTotal(after, lines));
             purchases.addHistory(purchaseId, "PURCHASE_CANCELED", actorId, reason,
                 oldValues, snapshotJson(after, lines));
             return after;
