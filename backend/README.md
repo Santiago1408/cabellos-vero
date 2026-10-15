@@ -233,6 +233,12 @@ Los importes de recepciones y entregas parciales se calculan como diferencias en
 
 Los importes admiten hasta dos decimales. La fecha del abono va desde el registro de la deuda hasta hoy. La suma de abonos vigentes nunca puede superar el total; al editar la deuda tampoco se puede reducir el total por debajo de lo ya pagado ni mover la fecha de registro después de cualquier abono histórico. Las claves `requestKey` hacen idempotentes las creaciones. Los cambios, correcciones y anulaciones conservan valor anterior, valor nuevo, usuario y motivo. Un abono anulado deja de contar en el saldo y sigue visible en el detalle.
 
+## Respaldo integral
+
+Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/settings` devuelve `intervalDays`, `lastConfirmedAt`, `pendingExportAt`, `nextReminderAt` y `due`. `PUT /api/backups/settings` acepta `{ "intervalDays": 7 }`, entre 1 y 365. `POST /api/backups/export` descarga el CSV integral y deja pendiente la confirmación; `POST /api/backups/confirm` registra que el administrador comprobó que el archivo quedó guardado. El sistema no puede comprobar por sí mismo si el archivo sigue en la computadora.
+
+La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 3, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La versión 2 del archivo generado por el prototipo usa otra estructura; el backend comienza con datos nuevos y no la importa automáticamente.
+
 ## Qué sigue
 
-Incorporar respaldo/restauración según [las decisiones del proyecto](../docs/decisiones-backend.md). El frontend aún utiliza `DemoStore` y no consume estos endpoints.
+Implementar la vista previa y la restauración transaccional del CSV versión 3 según [las decisiones del proyecto](../docs/decisiones-backend.md). El frontend aún utiliza `DemoStore` y no consume estos endpoints.

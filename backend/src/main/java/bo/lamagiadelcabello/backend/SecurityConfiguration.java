@@ -41,6 +41,7 @@ class SecurityConfiguration {
                 .requestMatchers("/api/catalog/**").hasRole("ADMIN")
                 .requestMatchers("/api/suppliers", "/api/suppliers/**").hasRole("ADMIN")
                 .requestMatchers("/api/debts", "/api/debts/**").hasRole("ADMIN")
+                .requestMatchers("/api/backups", "/api/backups/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/purchases", "/api/purchases/**").authenticated()
                 .requestMatchers("/api/purchases", "/api/purchases/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/sales", "/api/sales/**").authenticated()
