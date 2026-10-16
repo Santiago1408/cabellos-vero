@@ -63,7 +63,7 @@ sudo docker compose -p cabello_demo --env-file .env.deploy -f compose.deploy.yam
 sudo docker compose -p cabello_demo --env-file .env.deploy -f compose.deploy.yaml logs --tail=80 web
 ```
 
-Esperar a que Flyway y Spring terminen de iniciar. Comprobar desde el navegador `https://TU_SUBDOMINIO/sistema`. La URL `https://TU_SUBDOMINIO/` debe conducir al mismo acceso real. `https://TU_SUBDOMINIO/ingresar` también redirige a ese acceso. Los archivos de la antigua demostración pueden permanecer en el repositorio, pero no están enlazados desde las rutas publicadas.
+Esperar a que Flyway y Spring terminen de iniciar. Comprobar desde el navegador `https://TU_SUBDOMINIO/sistema`. La URL `https://TU_SUBDOMINIO/` presenta la landing pública provisional y su enlace «Acceso al sistema» lleva a `/sistema`. El contacto, las redes y la identidad visual definitiva se completarán después de que el cliente revise la propuesta. Los archivos de la antigua demostración pueden permanecer en el repositorio, pero no están enlazados desde las rutas publicadas.
 
 ## 5. Crear el administrador de la demostración
 
