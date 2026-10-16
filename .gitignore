@@ -38,6 +38,11 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+__pycache__/
+
+# Variables privadas del despliegue
+/.env.deploy
+/.env.production
 
 # System files
 .DS_Store

@@ -1,0 +1,10 @@
+.git
+.github
+.angular
+node_modules
+dist
+coverage
+backend
+docs
+.env*
+!.env.deploy.example
