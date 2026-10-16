@@ -34,14 +34,19 @@
 .connected-delete app-icon { width: 17px; height: 17px; }
 .connected-delete:hover { color: var(--color-delete); opacity: .75; }
 .connected-success { padding: 11px 14px; border-radius: 7px; color: #17652b; background: #eaf8ee; }
-.connected-brand { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; }
-.desktop-sidebar-toggle { display: inline-flex; }
+.connected-sidebar-header { display: flex; align-items: center; gap: 6px; min-height: 46px; }
+.connected-brand { flex: 1; min-width: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.connected-sidebar-toggle { flex: none; width: 40px; height: 40px; color: var(--color-muted); }
+.connected-sidebar-toggle app-icon { width: 20px; height: 20px; }
+.connected-sidebar-mobile-icon { display: none; }
 @media (min-width: 721px) {
   .app-frame.sidebar-collapsed .sidebar { width: 78px; padding-inline: 11px; }
   .app-frame.sidebar-collapsed .main-wrap { margin-left: 78px; }
-  .app-frame.sidebar-collapsed .connected-brand { justify-content: center; padding: 0; }
+  .app-frame.sidebar-collapsed .connected-sidebar-header { flex-direction: column; gap: 8px; }
+  .app-frame.sidebar-collapsed .connected-brand { flex: none; justify-content: center; width: 100%; padding: 0; }
+  .app-frame.sidebar-collapsed .connected-sidebar-toggle { width: 44px; height: 40px; }
   .app-frame.sidebar-collapsed .brand-label, .app-frame.sidebar-collapsed .nav-list button span, .app-frame.sidebar-collapsed .sidebar-bottom button span { display: none; }
-  .app-frame.sidebar-collapsed .sidebar-caption { height: 1px; margin: 50px 9px 18px; padding: 0; overflow: hidden; background: var(--color-border); color: transparent; }
+  .app-frame.sidebar-collapsed .sidebar-caption { height: 1px; margin: 23px 9px 18px; padding: 0; overflow: hidden; background: var(--color-border); color: transparent; }
   .app-frame.sidebar-collapsed .nav-list button, .app-frame.sidebar-collapsed .sidebar-bottom button { justify-content: center; padding: 0; }
   .app-frame.sidebar-collapsed .nav-list button app-icon, .app-frame.sidebar-collapsed .sidebar-bottom button app-icon { width: 22px; height: 22px; }
 }
@@ -75,7 +80,11 @@
   .connected-types-content { padding: 10px 18px 22px; }
 }
 @media (max-width: 720px) {
-  .desktop-sidebar-toggle { display: none; }
+  .connected-sidebar-header { gap: 8px; }
+  .connected-brand { padding-left: 5px; }
+  .connected-sidebar-toggle { width: 44px; height: 44px; }
+  .connected-sidebar-desktop-icon { display: none; }
+  .connected-sidebar-mobile-icon { display: block; }
   .nav-list button { min-height: 52px; font-size: 15px; }
   .nav-list button app-icon { width: 22px; height: 22px; }
 }

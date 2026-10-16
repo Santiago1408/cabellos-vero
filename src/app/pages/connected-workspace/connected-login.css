@@ -21,10 +21,10 @@ main.connected-auth-page .connected-form-panel {
   padding: 34px;
   border: 1px solid #ffffffac;
   border-radius: 20px;
-  background: #ffffffd9;
+  background: #ffffffb8;
   box-shadow: 0 26px 90px #00000060;
-  backdrop-filter: blur(24px) saturate(125%);
-  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  backdrop-filter: blur(28px) saturate(135%);
+  -webkit-backdrop-filter: blur(28px) saturate(135%);
 }
 main.connected-auth-page .connected-form-panel h1 { font-size: 31px; }
 main.connected-auth-page .connected-form-panel .field-label { font-size: 13px; color: #3b3532; }
