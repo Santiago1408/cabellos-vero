@@ -70,7 +70,11 @@ class InventoryOpeningService {
     @Transactional(readOnly = true)
     public Preview preview(CreateInput input) {
         Validated validated = validate(input, false);
-        if (get() == null
+        OpeningView current = get();
+        if (current != null && !validated.cutoffAt().equals(current.header().cutoffAt())) {
+            requireCutoffBeforeOperations(validated.cutoffAt());
+        }
+        if (current == null
             && (jdbc.queryForObject("SELECT count(*) FROM purchase_order", Integer.class) > 0
                 || jdbc.queryForObject("SELECT count(*) FROM sale_order", Integer.class) > 0)) {
             throw problem(HttpStatus.CONFLICT,
@@ -103,7 +107,7 @@ class InventoryOpeningService {
             """, openingId, java.sql.Timestamp.from(validated.cutoffAt()), actorId);
         for (LotInput lot : validated.lots()) insertLot(openingId, validated.cutoffAt(), lot);
         OpeningView result = get();
-        history(openingId, actorId, null, null, result.lots());
+        history(openingId, actorId, null, null, snapshot(result));
         return get();
     }
 
@@ -115,8 +119,7 @@ class InventoryOpeningService {
             || input.reason().trim().length() > 500) {
             throw problem(HttpStatus.BAD_REQUEST, "Indica un motivo de 3 a 500 caracteres.");
         }
-        Validated validated = validate(new CreateInput(
-            OffsetDateTime.ofInstant(previous.header().cutoffAt(), BUSINESS_ZONE), input.lots()), true);
+        Validated validated = validate(new CreateInput(input.cutoffAt(), input.lots()), true);
         Map<UUID, OpeningLot> oldById = previous.lots().stream()
             .collect(Collectors.toMap(OpeningLot::id, lot -> lot));
         Set<UUID> seen = new HashSet<>();
@@ -141,6 +144,9 @@ class InventoryOpeningService {
                 "La apertura cambió mientras la editabas. Recarga el detalle antes de corregirla.");
         }
         previous = get();
+        if (!validated.cutoffAt().equals(previous.header().cutoffAt())) {
+            requireCutoffBeforeOperations(validated.cutoffAt());
+        }
         jdbc.update("""
             DELETE FROM stock_consumption c USING stock_lot l
             WHERE c.stock_lot_id = l.id AND l.opening_id = ?
@@ -151,16 +157,19 @@ class InventoryOpeningService {
             }
         }
         for (LotInput lot : validated.lots()) {
-            if (lot.id() == null) insertLot(previous.header().id(), previous.header().cutoffAt(), lot);
+            if (lot.id() == null) insertLot(previous.header().id(), validated.cutoffAt(), lot);
             else jdbc.update("""
                 UPDATE stock_lot SET category_code = ?, length_cm = ?,
                     cost_per_gram = ?, original_weight = ?, remaining_weight = ?,
-                    opening_order = ?, origin_date = ?, cost_estimated = ?, opening_note = ?
+                    opening_order = ?, origin_date = ?, cost_estimated = ?, opening_note = ?,
+                    effective_at = ?
                 WHERE id = ? AND opening_id = ?
                 """, lot.categoryCode(), lot.lengthCm(), lot.costPerGram(), lot.weight(),
                 lot.weight(), lot.order(), lot.originDate(), lot.costEstimated(), lot.note(),
-                lot.id(), previous.header().id());
+                java.sql.Timestamp.from(validated.cutoffAt()), lot.id(), previous.header().id());
         }
+        jdbc.update("UPDATE inventory_opening SET cutoff_at = ? WHERE id = ?",
+            java.sql.Timestamp.from(validated.cutoffAt()), previous.header().id());
         try {
             allocations.rebuild(types);
         } catch (StockAllocationService.AllocationProblem impossible) {
@@ -177,7 +186,7 @@ class InventoryOpeningService {
             previous.header().id());
         OpeningView changed = get();
         history(previous.header().id(), actorId, input.reason().trim(),
-            previous.lots(), changed.lots());
+            snapshot(previous), snapshot(changed));
         return get();
     }
 
@@ -260,6 +269,26 @@ class InventoryOpeningService {
             newValues == null ? null : json.writeValueAsString(newValues));
     }
 
+    private static Object snapshot(OpeningView opening) {
+        return Map.of("cutoffAt", opening.header().cutoffAt().toString(),
+            "lots", opening.lots());
+    }
+
+    private void requireCutoffBeforeOperations(Instant cutoff) {
+        LocalDate cutoffDate = cutoff.atZone(BUSINESS_ZONE).toLocalDate();
+        Long earlier = jdbc.queryForObject("""
+            SELECT (SELECT count(*) FROM purchase_order WHERE operation_date < ?)
+                 + (SELECT count(*) FROM sale_order WHERE operation_date < ?)
+                 + (SELECT count(*) FROM purchase_receipt WHERE effective_at <= ?)
+                 + (SELECT count(*) FROM sale_delivery WHERE effective_at <= ?)
+            """, Long.class, cutoffDate, cutoffDate,
+            java.sql.Timestamp.from(cutoff), java.sql.Timestamp.from(cutoff));
+        if (earlier != null && earlier > 0) {
+            throw problem(HttpStatus.CONFLICT,
+                "La nueva fecha de corte debe ser anterior a todas las compras, ventas, recepciones y entregas registradas.");
+        }
+    }
+
     private void lockOperations() {
         jdbc.execute("LOCK TABLE purchase_order, sale_order, stock_lot, stock_consumption "
             + "IN SHARE ROW EXCLUSIVE MODE");
@@ -270,7 +299,8 @@ class InventoryOpeningService {
     }
 
     record CreateInput(OffsetDateTime cutoffAt, List<LotInput> lots) {}
-    record CorrectionInput(Long expectedVersion, String reason, List<LotInput> lots) {}
+    record CorrectionInput(Long expectedVersion, String reason,
+                           OffsetDateTime cutoffAt, List<LotInput> lots) {}
     record LotInput(UUID id, String categoryCode, int lengthCm, Integer order,
                     BigDecimal weight, BigDecimal costPerGram, Boolean costEstimated,
                     LocalDate originDate, String note) {}

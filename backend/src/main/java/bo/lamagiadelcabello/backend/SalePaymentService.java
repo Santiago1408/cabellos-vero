@@ -121,7 +121,7 @@ class SalePaymentService {
     static BigDecimal payableTotal(Sale sale, List<SaleLine> lines) {
         boolean deliveredOnly = sale.status().equals("CANCELED");
         return lines.stream().map(line -> PurchaseService.lineTotal(
-                deliveredOnly ? line.deliveredWeight() : line.agreedWeight(),
+                deliveredOnly ? line.deliveredFinalWeight() : line.finalWeight(),
                 line.pricePerGram()))
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
     }

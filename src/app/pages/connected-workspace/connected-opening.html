@@ -18,12 +18,12 @@
           </div>
           <details class="opening-history"><summary>Historial de cambios</summary>@for (entry of current.history; track entry.id) { <div><strong>{{ entry.changedAt | date:'dd/MM/yyyy HH:mm':'-0400' }}</strong> · {{ entry.reason || 'Apertura registrada' }}<details><summary>Valores guardados</summary><pre>Anterior: {{ entry.oldValues || 'Sin apertura' }}
 Nuevo: {{ entry.newValues }}</pre></details></div> }</details>
-          <div class="opening-actions"><button type="button" class="btn btn-outline" (click)="startCorrection()"><app-icon name="edit" /> Corregir apertura</button></div>
+          <div class="opening-actions"><button type="button" class="btn btn-primary" (click)="startCorrection()"><app-icon name="edit" /> Editar inventario inicial</button></div>
         </div>
       } @else if (editing()) {
         <form class="opening-content" (ngSubmit)="preview()">
           <p>Registra el cabello contado en la fecha de corte. Coloca primero el lote más antiguo de cada tipo. Cada peso y costo admite dos decimales.</p>
-          <label class="field-label">Fecha y hora de corte (Bolivia)<input class="field-input" type="datetime-local" name="cutoff" [(ngModel)]="cutoffLocal" (ngModelChange)="changed()" [disabled]="!!opening()" required /></label>
+          <label class="field-label">Fecha y hora de corte (Bolivia)<input class="field-input" type="datetime-local" name="cutoff" [(ngModel)]="cutoffLocal" (ngModelChange)="changed()" required /></label>
           @if (opening()) { <label class="field-label">Motivo de la corrección<textarea class="field-input" name="reason" [(ngModel)]="reason" minlength="3" maxlength="500" required></textarea></label> }
           <div class="opening-lots">
             @for (lot of lots; track $index; let index = $index) {

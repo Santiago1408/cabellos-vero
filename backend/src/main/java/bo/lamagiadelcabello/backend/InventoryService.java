@@ -51,7 +51,7 @@ class InventoryService {
             running = running.add(signed);
             movements.add(new MovementView(movement.movementId(), movement.kind(),
                 movement.effectiveAt(), movement.recordedAt(), movement.operationId(),
-                movement.partyName(), movement.weight(), signed,
+                movement.partyName(), movement.weight(), movement.finalWeight(), signed,
                 movement.pricePerGram(), movement.movementValue(),
                 movement.stockLotId(), movement.lotRemaining(), running));
         }
@@ -81,9 +81,9 @@ class InventoryService {
                 row.customerName(), row.lineId(), row.categoryCode(), row.categoryName(),
                 row.lengthCm(), row.agreedWeight(), row.deliveredWeight(),
                 row.remainingWeight(), row.pricePerGram(),
-                PurchaseService.lineTotal(row.agreedWeight(), row.pricePerGram())
+                PurchaseService.lineTotal(row.finalWeight(), row.pricePerGram())
                     .subtract(PurchaseService.lineTotal(
-                        row.deliveredWeight(), row.pricePerGram())))
+                        row.deliveredFinalWeight(), row.pricePerGram())))
         ).toList();
     }
 
@@ -108,6 +108,7 @@ class InventoryService {
 
     record MovementView(UUID id, String kind, Instant effectiveAt, Instant recordedAt,
                         UUID operationId, String partyName, BigDecimal weight,
+                        BigDecimal finalWeight,
                         BigDecimal signedWeight, BigDecimal pricePerGram,
                         BigDecimal total, UUID stockLotId, BigDecimal lotRemaining,
                         BigDecimal runningPhysicalStock) {}

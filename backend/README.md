@@ -68,7 +68,7 @@ Abre `http://127.0.0.1:4201/sistema`. Ese puerto usa el proxy `src/proxy.test.co
 sudo docker compose --env-file .env.test -f compose.test.yaml down
 ```
 
-Esta base permite practicar los flujos sin afectar la base de desarrollo. Empieza vacía; el administrador puede cargar el stock físico anterior al sistema desde **Inventario → Apertura de inventario**. El procedimiento está en [stock-inicial.md](../docs/stock-inicial.md).
+Esta base permite practicar los flujos sin afectar la base de desarrollo. Empieza vacía; el administrador puede cargar el stock físico anterior al sistema desde **Inventario → Ver o corregir inventario inicial**. El procedimiento está en [stock-inicial.md](../docs/stock-inicial.md).
 
 ## Crear el primer administrador
 
@@ -96,7 +96,8 @@ La ruta Angular `/sistema` usa `ApiClient` y `AuthSession` para ingresar con una
 2. `POST /api/auth/login` recibe JSON con `username` y `password`, más la cookie y el encabezado CSRF. Devuelve el identificador, nombre visible, rol y estado de cambio obligatorio. Al ingresar, cambia el identificador de sesión y descarta el token CSRF anterior; el cliente debe solicitar uno nuevo.
 3. `GET /api/auth/me` devuelve la cuenta asociada a la sesión vigente. Para empleados incluye nombre visible, CI, fecha de nacimiento y celular, de solo lectura.
 4. `POST /api/auth/logout` requiere el token CSRF actualizado y cierra la sesión.
-5. `POST /api/auth/password` requiere la sesión y el token CSRF actualizado. Recibe `currentPassword` y `newPassword` (mínimo ocho caracteres), mantiene la sesión actual y cierra las demás. El historial registra el evento sin guardar contraseñas ni hashes.
+5. `PUT /api/auth/profile` permite al administrador actualizar su `fullName` visible sin cambiar el `username` de acceso. Guarda el valor anterior y el nuevo en el historial de la cuenta.
+6. `POST /api/auth/password` requiere la sesión y el token CSRF actualizado. Recibe `currentPassword` y `newPassword` (mínimo ocho caracteres), mantiene la sesión actual y cierra las demás. El historial registra el evento sin guardar contraseñas ni hashes.
 
 La sesión se guarda en PostgreSQL, vence después de 24 horas sin actividad o 7 días desde el ingreso y su cookie persiste al cerrar el navegador. Cada solicitud protegida vuelve a consultar si la cuenta está activa, cuál es su rol y si su versión de acceso sigue vigente. Tras varios intentos fallidos, el servidor exige esperas progresivas de hasta cinco minutos y responde `429` con `Retry-After` cuando corresponde. En desarrollo local la cookie permite HTTP; en producción exige HTTPS.
 
@@ -203,26 +204,28 @@ Ejemplo de reserva:
   "operationDate": "2026-10-14",
   "acceptPendingStock": false,
   "lines": [
-    {"categoryCode": "normal", "lengthCm": 38, "weight": "200.00", "pricePerGram": "21.00"}
+    {"categoryCode": "normal", "lengthCm": 38, "weight": "200.00", "finalWeight": "210.00", "pricePerGram": "21.00"}
   ]
 }
 ```
+
+`weight` representa los gramos de cabello que se reservan y salen del inventario. `finalWeight` representa los gramos facturables después de agregar las ligas; debe ser igual o mayor que `weight`. El ingreso acordado de la línea es `finalWeight × pricePerGram`, mientras que el costo se obtiene únicamente del cabello consumido de los lotes. Los registros previos a esta corrección mantienen el importe anterior porque la migración iguala inicialmente ambos pesos.
 
 La API agrupa las líneas de la misma categoría y longitud antes de evaluar disponibilidad. Primero considera el stock físico libre y después el cabello pendiente de recibir, restando las reservas existentes. Si alguna línea supera ambos, rechaza toda la venta con `INSUFFICIENT_HAIR` y un desglose de pesos. Si el stock físico libre no alcanza pero el pendiente sí, responde `PENDING_STOCK_CONFIRMATION_REQUIRED`; el administrador debe aceptar ese uso y repetir la solicitud con `acceptPendingStock: true`. `requestKey` evita duplicados por reintentos. Las compras no se pueden reducir, corregir o anular si ello dejaría reservas sin respaldo. La reserva no confirma la venta: seguirá pendiente hasta registrar la entrega real.
 
 Para una venta inmediata, envía los mismos datos a `POST /api/sales`, sustituye `acceptPendingStock` por `effectiveAt` con la fecha, hora y zona de la entrega real (por ejemplo, `2026-10-14T16:30:00-04:00`). Solo usa stock físico libre. La reserva y la entrega se guardan en una misma transacción: si falta cabello o falla la asignación de lotes, se rechaza la venta completa y no queda una operación pendiente a medias. Una solicitud repetida con el mismo `requestKey` y los mismos datos devuelve la venta creada; si se reutiliza con otros datos, responde `409`.
 
-Para registrar una entrega, envía un UUID único en `requestKey`, la fecha y hora **reales** en `effectiveAt` con zona horaria, y `items` con `lineId` y `weight` por cada línea entregada. Por ejemplo:
+Para registrar una entrega, envía un UUID único en `requestKey`, la fecha y hora **reales** en `effectiveAt` con zona horaria, y `items` con `lineId`, `weight` (cabello) y `finalWeight` (peso con ligas) por cada línea entregada. Por ejemplo:
 
 ```json
 {
   "requestKey": "9bd81dac-70b5-4568-b06e-dc9cad2f688f",
   "effectiveAt": "2026-10-14T16:30:00-04:00",
-  "items": [{"lineId": "UUID de la línea", "weight": "100.00"}]
+  "items": [{"lineId": "UUID de la línea", "weight": "100.00", "finalWeight": "105.00"}]
 }
 ```
 
-La entrega no puede exceder lo pendiente ni el stock físico. Además, el stock debe haber existido en la fecha real indicada. El detalle muestra cuánto se entregó, cuánto falta, cuándo se entregó y registró cada movimiento, y de cuáles lotes salió el cabello. La venta pasa a `CONFIRMED` solo cuando se entregan todas las líneas. El mismo `requestKey` evita registrar dos veces un reintento.
+La entrega descuenta solo `weight` del stock. Su ingreso es `finalWeight × pricePerGram`; cada entrega parcial lleva sus dos pesos y no puede dejar menos peso final pendiente que cabello pendiente. La entrega no puede exceder lo pendiente ni el stock físico. Además, el stock debe haber existido en la fecha real indicada. El detalle muestra cuánto se entregó, cuánto falta, cuándo se entregó y registró cada movimiento, y de cuáles lotes salió el cabello. La venta pasa a `CONFIRMED` solo cuando se entregan todas las líneas. El mismo `requestKey` evita registrar dos veces un reintento.
 
 Para corregir una entrega, envía `expectedVersion`, `effectiveAt`, `reason` y `items` con **todas las mismas líneas originales** y sus pesos corregidos. Cada peso debe seguir siendo positivo; ninguna línea puede superar la cantidad acordada. Para anularla, envía `{"expectedVersion": 2, "reason": "Entrega duplicada"}` al endpoint `/void`. La hora de registro original se conserva. Ambos cambios recalculan los lotes consumidos por todas las entregas afectadas según sus fechas reales y vuelven a comprobar reservas y cobros. Si alguna entrega histórica queda sin stock, se rechaza todo con `409`. La corrección puede devolver una venta confirmada a pendiente o completar una pendiente; el detalle conserva el movimiento anulado y sus valores anteriores.
 
@@ -243,13 +246,13 @@ Estas rutas son de solo lectura y están disponibles para administrador y emplea
 
 Cada fila indica `physicalStock`, `pendingPurchase` y `reservedSale` en gramos. También desglosa cuánto de la reserva se cubre con cabello físico (`reservedFromPhysical`) y cuánto con compras pendientes (`reservedFromPending`), además de `freePhysical` y `freePending`. Una combinación nueva aparece cuando se registra una compra o un lote de apertura de ese tipo; agregarla solo al catálogo no crea una fila de stock vacío.
 
-El detalle muestra la apertura como `OPENING`, las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, origen o cliente, peso con signo, precio por gramo, importe y saldo físico acumulado. Las entradas incluyen el lote y su peso restante. Los importes de movimientos parciales reparten los centavos del total de su línea sin duplicarlos. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
+El detalle muestra la apertura como `OPENING`, las recepciones activas como `PURCHASE` y las entregas activas como `SALE`, ordenadas por fecha y hora reales. Cada movimiento incluye operación, origen o cliente, peso de cabello con signo, precio por gramo, importe y saldo físico acumulado. Las salidas muestran además el peso final facturado con ligas. Las entradas incluyen el lote y su peso restante. Los importes de movimientos parciales reparten los centavos del total de su línea sin duplicarlos. Los movimientos anulados se consultan desde el detalle y el historial de su compra o venta, pues no forman parte del stock efectivo. Inventario no ofrece endpoints para modificar cantidades directamente.
 
 ### Apertura de inventario
 
 Solo el administrador puede usar `GET /api/inventory/opening`, `POST /api/inventory/opening/preview`, `POST /api/inventory/opening` y `PUT /api/inventory/opening`. La apertura se crea **una vez y antes de la primera compra o venta**. La fecha y hora de corte se indican con zona horaria; cada lote lleva categoría, longitud, `weight`, `costPerGram`, `costEstimated`, `order` (orden de antigüedad), `originDate` opcional y `note` opcional. Los pesos y costos admiten dos decimales. La vista previa devuelve lotes, peso y valor total; luego el administrador confirma la carga en Inventario. Las ventas consumen estos lotes según el orden registrado, y su costo contribuye al margen bruto. Su valor inicial no figura como compra del periodo.
 
-El detalle de apertura devuelve `header.version`, lotes con peso inicial y restante e historial. `PUT` acepta los lotes completos (con `id` para los existentes), `expectedVersion` y un motivo de 3 a 500 caracteres. Puede agregar, reordenar, corregir o quitar lotes. Recalcula consumos y márgenes; rechaza la corrección completa con `409` si deja entregas o reservas sin respaldo. La fecha de corte no se modifica después de crearla. La interfaz muestra el historial como información secundaria.
+El detalle de apertura devuelve `header.version`, lotes con peso inicial y restante e historial. `PUT` acepta los lotes completos (con `id` para los existentes), `expectedVersion` y un motivo de 3 a 500 caracteres. Puede agregar, reordenar, corregir o quitar lotes. Recalcula consumos y márgenes; rechaza la corrección completa con `409` si deja entregas o reservas sin respaldo. La fecha de corte también puede corregirse; debe continuar siendo anterior a todas las operaciones y movimientos registrados. Cada corrección conserva el valor anterior, el nuevo y su motivo en el historial. La interfaz muestra el historial como información secundaria.
 
 ## Reportes
 
@@ -283,7 +286,7 @@ Los importes admiten hasta dos decimales. La fecha del abono va desde el registr
 
 Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/settings` devuelve `intervalDays`, `lastConfirmedAt`, `pendingExportAt`, `nextReminderAt` y `due`. `PUT /api/backups/settings` acepta `{ "intervalDays": 7 }`, entre 1 y 365. `POST /api/backups/export` descarga el CSV integral y deja pendiente la confirmación; `POST /api/backups/confirm` registra que el administrador comprobó que el archivo quedó guardado. El sistema no puede comprobar por sí mismo si el archivo sigue en la computadora.
 
-La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 4, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite la versión 3 anterior a la apertura. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
+La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 5, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite las versiones 3 y 4 anteriores; los respaldos sin peso final de venta reciben el mismo valor que el peso de cabello. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
 
 ### Restauración
 

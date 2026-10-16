@@ -22,6 +22,7 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,6 +31,8 @@ import org.springframework.web.server.ResponseStatusException;
 import bo.lamagiadelcabello.backend.AccountRepository.Account;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -96,6 +99,19 @@ class AuthController {
         return AccountView.from(currentAccount(authentication));
     }
 
+    @PutMapping("/profile")
+    AccountView changeProfile(@RequestBody ProfileRequest input, Authentication authentication) {
+        Account account = currentAccount(authentication);
+        if (!account.role().equals("ADMIN")) throw new ResponseStatusException(FORBIDDEN);
+        String fullName = input == null || input.fullName() == null
+            ? "" : input.fullName().trim().replaceAll("\\s+", " ");
+        if (fullName.isBlank() || fullName.length() > 160) {
+            throw new ResponseStatusException(BAD_REQUEST,
+                "El nombre completo debe tener entre 1 y 160 caracteres.");
+        }
+        return AccountView.from(accounts.changeAdminFullName(account.id(), fullName));
+    }
+
     @PostMapping("/logout")
     ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         csrfTokens.saveToken(null, request, response);
@@ -149,6 +165,8 @@ class AuthController {
         @NotBlank @Size(max = 1024) String currentPassword,
         @NotBlank @Size(min = 8, max = 1024) String newPassword
     ) {}
+
+    record ProfileRequest(String fullName) {}
 
     record CsrfView(String headerName, String token) {}
 

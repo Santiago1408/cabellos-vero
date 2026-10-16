@@ -59,4 +59,10 @@ export class AuthSession {
     await this.api.write<void>('POST', '/api/auth/password', { currentPassword, newPassword });
     await this.restore();
   }
+
+  async changeDisplayName(fullName: string): Promise<Account> {
+    const account = await this.api.write<Account>('PUT', '/api/auth/profile', { fullName });
+    this.account.set(account);
+    return account;
+  }
 }

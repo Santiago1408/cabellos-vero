@@ -16,13 +16,13 @@ Una planilla de toma de datos puede usar las columnas: categoría, longitud en c
 ## Flujo en el sistema
 
 1. Crear el administrador y comprobar que el catálogo coincide con los tipos físicos del cliente.
-2. El administrador entra a **Inventario → Apertura de inventario**, fija la fecha y hora de corte, y carga las partidas contadas.
+2. El administrador entra a **Inventario → Ver o corregir inventario inicial**, fija la fecha y hora de corte, y carga las partidas contadas.
 3. Revisa cada lote, el peso total y el valor calculado. Confirma la apertura y conserva una copia del recuento acordado.
 4. Comprueba que Inventario muestra el peso físico contado y que el detalle identifica cada lote como «Apertura de inventario».
 5. Registra desde entonces compras, recepciones, ventas y entregas normales.
 
 Los lotes de apertura se usan antes que los lotes de compras posteriores, respetando la antigüedad conocida entre ellos. Una venta consume su costo por gramo para calcular el margen bruto. La apertura no aparece como compra ni genera pagos, deudas o proveedores. El respaldo integral CSV contiene la apertura y todos sus lotes para poder restaurar el mismo stock y los mismos márgenes.
 
-Una corrección posterior del peso, costo u orden de un lote requiere motivo y queda en el historial. El sistema recalcula las asignaciones y márgenes afectados, y rechaza el cambio si deja entregas históricas o reservas sin respaldo. El respaldo CSV versión 4 incluye la apertura; la restauración también acepta los CSV versión 3 anteriores a esta función.
+Una corrección posterior del peso, costo, orden o fecha de corte requiere motivo y queda en el historial. El sistema recalcula las asignaciones y márgenes afectados, y rechaza el cambio si deja entregas históricas o reservas sin respaldo. El respaldo CSV versión 5 incluye la apertura; la restauración también acepta los CSV anteriores compatibles.
 
 Antes del despliegue con datos reales, recorre este flujo completo en la base local de pruebas y compara el resultado con el recuento acordado con el cliente.

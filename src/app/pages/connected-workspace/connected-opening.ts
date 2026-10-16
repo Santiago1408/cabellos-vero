@@ -154,7 +154,7 @@ export class ConnectedOpening implements OnInit {
       const previous = this.opening();
       const body = previous
         ? { expectedVersion: previous.header.version, reason: this.reason.trim(),
-            lots: this.payload(true).lots }
+            cutoffAt: this.payload(true).cutoffAt, lots: this.payload(true).lots }
         : this.payload(false);
       const result = await this.api.write<OpeningView>(previous ? 'PUT' : 'POST',
         '/api/inventory/opening', body);

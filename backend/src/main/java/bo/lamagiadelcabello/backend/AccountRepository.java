@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 class AccountRepository {
@@ -86,6 +87,24 @@ class AccountRepository {
             """, id, id);
         if (newVersion == null) throw new IllegalStateException("No se pudo actualizar la versión de acceso.");
         return newVersion;
+    }
+
+    @Transactional
+    public Account changeAdminFullName(UUID id, String fullName) {
+        Account before = findByIdForUpdate(id).orElseThrow();
+        if (!before.role().equals("ADMIN")) throw new IllegalStateException("Solo el administrador puede editar este nombre.");
+        if (!fullName.equals(before.fullName())) {
+            jdbc.update("UPDATE app_user SET full_name = ?, updated_at = now() WHERE id = ?",
+                fullName, id);
+            jdbc.update("""
+                INSERT INTO app_user_history
+                    (user_id, event_type, source, actor_user_id, old_values, new_values)
+                VALUES (?, 'DISPLAY_NAME_CHANGED', 'SELF_SERVICE', ?,
+                    jsonb_build_object('fullName', ?::text),
+                    jsonb_build_object('fullName', ?::text))
+                """, id, id, before.fullName(), fullName);
+        }
+        return findById(id).orElseThrow();
     }
 
     void closeOtherSessions(UUID id, String currentSessionId) {

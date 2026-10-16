@@ -36,6 +36,7 @@ class SecurityConfiguration {
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/csrf", "/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/password").authenticated()
+                .requestMatchers("/api/auth/profile").hasRole("ADMIN")
                 .requestMatchers("/api/employees", "/api/employees/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/catalog/**").authenticated()
                 .requestMatchers("/api/catalog/**").hasRole("ADMIN")

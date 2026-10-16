@@ -148,20 +148,24 @@ class SaleController {
         List<SaleLine> lines = repository.lines(sale.id());
         BigDecimal weight = lines.stream().map(SaleLine::agreedWeight)
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        BigDecimal finalWeight = lines.stream().map(SaleLine::finalWeight)
+            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         BigDecimal total = lines.stream().map(line -> PurchaseService.lineTotal(
-                line.agreedWeight(), line.pricePerGram()))
+                line.finalWeight(), line.pricePerGram()))
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         BigDecimal delivered = lines.stream().map(SaleLine::deliveredWeight)
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+        BigDecimal deliveredFinal = lines.stream().map(SaleLine::deliveredFinalWeight)
+            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         BigDecimal deliveredValue = lines.stream().map(line -> PurchaseService.lineTotal(
-                line.deliveredWeight(), line.pricePerGram()))
+                line.deliveredFinalWeight(), line.pricePerGram()))
             .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
         BigDecimal payable = sale.status().equals("CANCELED") ? deliveredValue : total;
         BigDecimal paid = paymentRepository.totalActive(sale.id());
         return new Summary(sale.id(), sale.customerName(), sale.operationDate(),
             sale.acceptedPendingStock(), sale.status(), sale.createdAt(),
             sale.confirmedAt(), sale.canceledAt(), sale.updatedAt(), sale.version(),
-            weight, delivered, total, deliveredValue, payable, paid,
+            weight, delivered, finalWeight, deliveredFinal, total, deliveredValue, payable, paid,
             payable.subtract(paid));
     }
 
@@ -179,7 +183,7 @@ class SaleController {
     }
 
     private DeliveryItemView deliveryItemView(DeliveryItem row) {
-        return new DeliveryItemView(row.id(), row.saleLineId(), row.weight(),
+        return new DeliveryItemView(row.id(), row.saleLineId(), row.weight(), row.finalWeight(),
             repository.consumptions(row.id()).stream().map(ConsumptionView::from).toList());
     }
 
@@ -204,9 +208,9 @@ class SaleController {
     }
 
     record CreateLine(String categoryCode, Integer lengthCm, BigDecimal weight,
-                      BigDecimal pricePerGram) {
+                      BigDecimal finalWeight, BigDecimal pricePerGram) {
         SaleService.LineInput toService() {
-            return new SaleService.LineInput(categoryCode, lengthCm, weight, pricePerGram);
+            return new SaleService.LineInput(categoryCode, lengthCm, weight, finalWeight, pricePerGram);
         }
     }
 
@@ -230,9 +234,10 @@ class SaleController {
     }
 
     record EditLine(UUID id, String categoryCode, Integer lengthCm,
-                    BigDecimal weight, BigDecimal pricePerGram) {
+                    BigDecimal weight, BigDecimal finalWeight, BigDecimal pricePerGram) {
         SaleService.EditLineInput toService() {
-            return new SaleService.EditLineInput(id, categoryCode, lengthCm, weight, pricePerGram);
+            return new SaleService.EditLineInput(id, categoryCode, lengthCm, weight,
+                finalWeight, pricePerGram);
         }
     }
 
@@ -247,9 +252,9 @@ class SaleController {
         }
     }
 
-    record DeliveryItemRequest(UUID lineId, BigDecimal weight) {
+    record DeliveryItemRequest(UUID lineId, BigDecimal weight, BigDecimal finalWeight) {
         SaleService.DeliveryItemInput toService() {
-            return new SaleService.DeliveryItemInput(lineId, weight);
+            return new SaleService.DeliveryItemInput(lineId, weight, finalWeight);
         }
     }
 
@@ -295,6 +300,7 @@ class SaleController {
                    boolean acceptedPendingStock, String status, Instant createdAt,
                    Instant confirmedAt, Instant canceledAt, Instant updatedAt,
                    long version, BigDecimal agreedWeight, BigDecimal deliveredWeight,
+                   BigDecimal finalWeight, BigDecimal deliveredFinalWeight,
                    BigDecimal agreedTotal, BigDecimal deliveredValue,
                    BigDecimal payableTotal, BigDecimal paidTotal, BigDecimal balance) {}
 
@@ -304,21 +310,25 @@ class SaleController {
 
     record LineView(UUID id, String categoryCode, String categoryName, int lengthCm,
                     BigDecimal agreedWeight, BigDecimal deliveredWeight,
-                    BigDecimal remainingWeight, BigDecimal pricePerGram,
+                    BigDecimal remainingWeight, BigDecimal finalWeight,
+                    BigDecimal deliveredFinalWeight, BigDecimal remainingFinalWeight,
+                    BigDecimal pricePerGram,
                     BigDecimal agreedTotal, BigDecimal deliveredValue) {
         static LineView from(SaleLine row) {
             return new LineView(row.id(), row.categoryCode(), row.categoryName(), row.lengthCm(),
                 row.agreedWeight(), row.deliveredWeight(),
                 row.agreedWeight().subtract(row.deliveredWeight()),
+                row.finalWeight(), row.deliveredFinalWeight(),
+                row.finalWeight().subtract(row.deliveredFinalWeight()),
                 row.pricePerGram(), PurchaseService.lineTotal(
-                    row.agreedWeight(), row.pricePerGram()),
-                PurchaseService.lineTotal(row.deliveredWeight(), row.pricePerGram()));
+                    row.finalWeight(), row.pricePerGram()),
+                PurchaseService.lineTotal(row.deliveredFinalWeight(), row.pricePerGram()));
         }
     }
 
     record DeliveryView(UUID id, Instant effectiveAt, Instant recordedAt, Instant voidedAt,
                         List<DeliveryItemView> items) {}
-    record DeliveryItemView(UUID id, UUID lineId, BigDecimal weight,
+    record DeliveryItemView(UUID id, UUID lineId, BigDecimal weight, BigDecimal finalWeight,
                             List<ConsumptionView> consumedLots) {}
     record PaymentView(UUID id, LocalDate paymentDate, BigDecimal amount, String method,
                        String reference, Instant recordedAt, Instant updatedAt, Instant voidedAt) {

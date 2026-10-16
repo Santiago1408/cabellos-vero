@@ -16,11 +16,13 @@ type Length = { centimeters: number };
 type SortKey = 'customer' | 'value' | 'weight' | 'date' | 'status';
 type LineDraft = {
   id?: string; categoryCode: string; lengthCm: number | null;
-  weight: number | null; deliveredWeight?: number; pricePerGram: number | null;
+  weight: number | null; finalWeight: number | null;
+  deliveredWeight?: number; pricePerGram: number | null;
 };
 type PaymentMethod = SalePayment['method'];
 
-const emptyLine = (): LineDraft => ({ categoryCode: '', lengthCm: null, weight: null, pricePerGram: null });
+const emptyLine = (): LineDraft => ({ categoryCode: '', lengthCm: null, weight: null,
+  finalWeight: null, pricePerGram: null });
 const boliviaNow = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -101,6 +103,7 @@ export class ConnectedSales implements OnInit {
   deliveryDate = boliviaNow().date;
   deliveryTime = boliviaNow().time;
   deliveryWeights: Record<string, number | null> = {};
+  deliveryFinalWeights: Record<string, number | null> = {};
   correctionDeliveryId: string | null = null;
   correctionReason = '';
   private pendingDeliveryRequest: { fingerprint: string; key: string } | null = null;
@@ -202,7 +205,8 @@ export class ConnectedSales implements OnInit {
     this.acceptedPendingStock = detail.summary.acceptedPendingStock;
     this.lines = detail.lines.map(line => ({
       id: line.id, categoryCode: line.categoryCode, lengthCm: line.lengthCm,
-      weight: line.agreedWeight, deliveredWeight: line.deliveredWeight,
+      weight: line.agreedWeight, finalWeight: line.finalWeight,
+      deliveredWeight: line.deliveredWeight,
       pricePerGram: line.pricePerGram,
     }));
     this.editReason = '';
@@ -215,7 +219,8 @@ export class ConnectedSales implements OnInit {
   addLine(): void { this.lines.push(emptyLine()); this.clearAvailability(); }
   removeLine(index: number): void { if (this.lines.length > 1) { this.lines.splice(index, 1); this.clearAvailability(); } }
   get draftTotal(): number {
-    return sumMoney(this.lines.map(line => lineValue(Number(line.weight) || 0, Number(line.pricePerGram) || 0)));
+    return sumMoney(this.lines.map(line => lineValue(Number(line.finalWeight) || 0,
+      Number(line.pricePerGram) || 0)));
   }
   clearAvailability(resetAcceptance = true): void {
     this.pendingIssues.set([]);
@@ -224,23 +229,27 @@ export class ConnectedSales implements OnInit {
     if (resetAcceptance) this.acceptedPendingStock = false;
     this.formError.set('');
   }
-  private draftLines(): { id?: string; categoryCode: string; lengthCm: number; weight: number; pricePerGram: number }[] | null {
+  private draftLines(): { id?: string; categoryCode: string; lengthCm: number;
+    weight: number; finalWeight: number; pricePerGram: number }[] | null {
     const used = new Set<string>();
     const lines = [];
     for (const line of this.lines) {
       const weight = Number(line.weight);
+      const finalWeight = Number(line.finalWeight);
       const pricePerGram = Number(line.pricePerGram);
       if (!this.categories().some(category => category.code === line.categoryCode)
         || !this.lengths().some(length => length.centimeters === Number(line.lengthCm))
         || !Number.isFinite(weight) || weight <= 0 || !hasTwoDecimalPlaces(weight)
+        || !Number.isFinite(finalWeight) || finalWeight < weight || !hasTwoDecimalPlaces(finalWeight)
         || !Number.isFinite(pricePerGram) || pricePerGram <= 0 || !hasTwoDecimalPlaces(pricePerGram)) {
-        this.formError.set('Cada cabello necesita calidad, longitud, peso y precio positivos con hasta dos decimales.');
+        this.formError.set('Cada cabello necesita tipo, peso de cabello, peso final con ligas y precio con hasta dos decimales. El peso final debe ser igual o mayor que el cabello.');
         return null;
       }
       const key = `${line.categoryCode}:${line.lengthCm}`;
       if (used.has(key)) { this.formError.set('Cada combinación de calidad y longitud debe aparecer una sola vez.'); return null; }
       used.add(key);
-      lines.push({ id: line.id, categoryCode: line.categoryCode, lengthCm: Number(line.lengthCm), weight, pricePerGram });
+      lines.push({ id: line.id, categoryCode: line.categoryCode,
+        lengthCm: Number(line.lengthCm), weight, finalWeight, pricePerGram });
     }
     return lines;
   }
@@ -292,8 +301,8 @@ export class ConnectedSales implements OnInit {
         });
       } else {
         const body = { customerName: this.customerName.trim(), operationDate: this.operationDate,
-          lines: lines.map(({ categoryCode, lengthCm, weight, pricePerGram }) =>
-            ({ categoryCode, lengthCm, weight, pricePerGram })),
+          lines: lines.map(({ categoryCode, lengthCm, weight, finalWeight, pricePerGram }) =>
+            ({ categoryCode, lengthCm, weight, finalWeight, pricePerGram })),
           ...(this.saleMode === 'immediate' ? { effectiveAt }
             : { acceptPendingStock: this.acceptedPendingStock }) };
         const path = this.saleMode === 'immediate' ? '/api/sales' : '/api/sales/reservations';
@@ -339,7 +348,7 @@ export class ConnectedSales implements OnInit {
 
   deliveryTotal(delivery: SaleDelivery): number { return sumMoney(delivery.items.map(item => item.weight)); }
   deliveryValue(delivery: SaleDelivery, lines: SaleLine[]): number {
-    return sumMoney(delivery.items.map(item => lineValue(item.weight,
+    return sumMoney(delivery.items.map(item => lineValue(item.finalWeight,
       lines.find(line => line.id === item.lineId)?.pricePerGram ?? 0)));
   }
   deliveryItemLabel(detail: SaleDetail, lineId: string): string {
@@ -354,12 +363,15 @@ export class ConnectedSales implements OnInit {
   fillRemaining(detail: SaleDetail): void {
     this.deliveryWeights = Object.fromEntries(detail.lines.filter(line => line.remainingWeight > 0)
       .map(line => [line.id, line.remainingWeight]));
+    this.deliveryFinalWeights = Object.fromEntries(detail.lines.filter(line => line.remainingWeight > 0)
+      .map(line => [line.id, line.remainingFinalWeight]));
   }
   resetDelivery(): void {
     const now = boliviaNow();
     this.deliveryDate = now.date;
     this.deliveryTime = now.time;
     this.deliveryWeights = {};
+    this.deliveryFinalWeights = {};
     this.correctionDeliveryId = null;
     this.correctionReason = '';
     this.pendingDeliveryRequest = null;
@@ -371,6 +383,8 @@ export class ConnectedSales implements OnInit {
     this.deliveryDate = at.date;
     this.deliveryTime = at.time;
     this.deliveryWeights = Object.fromEntries(delivery.items.map(item => [item.lineId, item.weight]));
+    this.deliveryFinalWeights = Object.fromEntries(delivery.items.map(item =>
+      [item.lineId, item.finalWeight]));
     this.correctionReason = '';
     this.detailError.set('');
   }
@@ -380,10 +394,12 @@ export class ConnectedSales implements OnInit {
     const effectiveAt = this.effectiveAt(this.deliveryDate, this.deliveryTime);
     if (!effectiveAt) { this.detailError.set('Indica la fecha y hora reales de entrega.'); return; }
     const items = this.deliveryLines(detail).map(line =>
-      ({ lineId: line.id, weight: Number(this.deliveryWeights[line.id]) || 0 }));
+      ({ lineId: line.id, weight: Number(this.deliveryWeights[line.id]) || 0,
+        finalWeight: Number(this.deliveryFinalWeights[line.id]) || 0 }));
     if (!this.correctionDeliveryId) items.splice(0, items.length, ...items.filter(item => item.weight > 0));
-    if (!items.length || items.some(item => item.weight <= 0 || !hasTwoDecimalPlaces(item.weight))) {
-      this.detailError.set('Indica al menos un peso positivo con hasta dos decimales.'); return;
+    if (!items.length || items.some(item => item.weight <= 0 || !hasTwoDecimalPlaces(item.weight)
+      || item.finalWeight < item.weight || !hasTwoDecimalPlaces(item.finalWeight))) {
+      this.detailError.set('Indica peso de cabello y peso final con ligas para cada entrega. El peso final debe ser igual o mayor.'); return;
     }
     if (this.correctionDeliveryId && !this.correctionReason.trim()) {
       this.detailError.set('Indica el motivo de la corrección.'); return;

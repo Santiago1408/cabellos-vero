@@ -13,6 +13,8 @@ export type SaleSummary = {
   version: number;
   agreedWeight: number;
   deliveredWeight: number;
+  finalWeight: number;
+  deliveredFinalWeight: number;
   agreedTotal: number;
   deliveredValue: number;
   payableTotal: number;
@@ -28,6 +30,9 @@ export type SaleLine = {
   agreedWeight: number;
   deliveredWeight: number;
   remainingWeight: number;
+  finalWeight: number;
+  deliveredFinalWeight: number;
+  remainingFinalWeight: number;
   pricePerGram: number;
   agreedTotal: number;
   deliveredValue: number;
@@ -47,7 +52,7 @@ export type SaleDelivery = {
   effectiveAt: string;
   recordedAt: string;
   voidedAt: string | null;
-  items: { id: string; lineId: string; weight: number; consumedLots: SaleConsumption[] }[];
+  items: { id: string; lineId: string; weight: number; finalWeight: number; consumedLots: SaleConsumption[] }[];
 };
 
 export type SalePayment = {

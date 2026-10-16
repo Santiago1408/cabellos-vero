@@ -56,7 +56,8 @@ class InventoryRepository {
                 row.getTimestamp("effective_at").toInstant(),
                 row.getTimestamp("recorded_at").toInstant(),
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
-                row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("weight"), row.getBigDecimal("weight"),
+                row.getBigDecimal("price_per_gram"),
                 row.getBigDecimal("movement_value"),
                 (UUID) row.getObject("stock_lot_id"), row.getBigDecimal("lot_remaining"), null
             ), type.categoryCode(), type.lengthCm());
@@ -77,7 +78,8 @@ class InventoryRepository {
                 row.getTimestamp("effective_at").toInstant(),
                 row.getTimestamp("recorded_at").toInstant(),
                 (UUID) row.getObject("operation_id"), "Inventario inicial",
-                row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("weight"), row.getBigDecimal("weight"),
+                row.getBigDecimal("price_per_gram"),
                 row.getBigDecimal("movement_value"),
                 (UUID) row.getObject("movement_id"), row.getBigDecimal("lot_remaining"),
                 row.getInt("opening_order")
@@ -85,6 +87,7 @@ class InventoryRepository {
         List<Movement> outgoing = jdbc.query("""
             SELECT dl.id AS movement_id, sd.effective_at, sd.recorded_at,
                    s.id AS operation_id, s.customer_name AS party_name, dl.weight,
+                   dl.final_weight,
                    l.price_per_gram, dv.revenue_value AS movement_value
             FROM sale_delivery_line dl
             JOIN sale_delivery sd ON sd.id = dl.delivery_id
@@ -97,7 +100,8 @@ class InventoryRepository {
                 row.getTimestamp("effective_at").toInstant(),
                 row.getTimestamp("recorded_at").toInstant(),
                 (UUID) row.getObject("operation_id"), row.getString("party_name"),
-                row.getBigDecimal("weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("weight"), row.getBigDecimal("final_weight"),
+                row.getBigDecimal("price_per_gram"),
                 row.getBigDecimal("movement_value"),
                 null, null, null
             ), type.categoryCode(), type.lengthCm());
@@ -153,12 +157,16 @@ class InventoryRepository {
                    c.display_name AS category_name, l.length_cm, l.agreed_weight,
                    COALESCE(d.delivered_weight, 0) AS delivered_weight,
                    l.agreed_weight - COALESCE(d.delivered_weight, 0) AS remaining_weight,
+                   l.final_weight,
+                   COALESCE(d.delivered_final_weight, 0) AS delivered_final_weight,
+                   l.final_weight - COALESCE(d.delivered_final_weight, 0) AS remaining_final_weight,
                    l.price_per_gram
             FROM sale_line l
             JOIN sale_order s ON s.id = l.sale_id
             JOIN hair_category c ON c.code = l.category_code
             LEFT JOIN (
-                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight
+                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight,
+                       SUM(dl.final_weight) AS delivered_final_weight
                 FROM sale_delivery_line dl
                 JOIN sale_delivery sd ON sd.id = dl.delivery_id
                 WHERE sd.voided_at IS NULL GROUP BY dl.sale_line_id
@@ -174,7 +182,8 @@ class InventoryRepository {
                 row.getString("category_code"), row.getString("category_name"),
                 row.getInt("length_cm"), row.getBigDecimal("agreed_weight"),
                 row.getBigDecimal("delivered_weight"), row.getBigDecimal("remaining_weight"),
-                row.getBigDecimal("price_per_gram")
+                row.getBigDecimal("final_weight"), row.getBigDecimal("delivered_final_weight"),
+                row.getBigDecimal("remaining_final_weight"), row.getBigDecimal("price_per_gram")
             ));
     }
 
@@ -184,6 +193,7 @@ class InventoryRepository {
 
     record Movement(UUID movementId, String kind, Instant effectiveAt, Instant recordedAt,
                     UUID operationId, String partyName, BigDecimal weight,
+                    BigDecimal finalWeight,
                     BigDecimal pricePerGram, BigDecimal movementValue,
                     UUID stockLotId, BigDecimal lotRemaining, Integer openingOrder) {}
 
@@ -197,5 +207,6 @@ class InventoryRepository {
                         String customerName, UUID lineId, String categoryCode,
                         String categoryName, int lengthCm, BigDecimal agreedWeight,
                         BigDecimal deliveredWeight, BigDecimal remainingWeight,
-                        BigDecimal pricePerGram) {}
+                        BigDecimal finalWeight, BigDecimal deliveredFinalWeight,
+                        BigDecimal remainingFinalWeight, BigDecimal pricePerGram) {}
 }

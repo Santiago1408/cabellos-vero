@@ -148,7 +148,7 @@ class RestoreService {
         for (String table : BackupService.sourceTables()) {
             for (Row row : file.rows().getOrDefault(table, List.of())) {
                 String data = table.equals("app_user")
-                    ? accountJson(row, credentials) : row.data();
+                    ? accountJson(row, credentials) : legacySaleWeights(table, row);
                 jdbc.update("INSERT INTO " + table + " OVERRIDING SYSTEM VALUE "
                     + "SELECT * FROM jsonb_populate_record(NULL::" + table + ", ?::jsonb)", data);
             }
@@ -182,12 +182,28 @@ class RestoreService {
                     expected.removeAll(Set.of("opening_id", "opening_order", "origin_date",
                         "cost_estimated", "opening_note"));
                 }
+                if ((table.equals("sale_line") || table.equals("sale_delivery_line"))
+                    && !Integer.valueOf(5).equals(file.manifest().get("version"))) {
+                    expected.remove("final_weight");
+                }
+                if ((table.equals("sale_line") || table.equals("sale_delivery_line"))
+                    && row.values().containsKey("final_weight")) {
+                    expected.add("final_weight");
+                }
                 if (!expected.equals(row.values().keySet())) {
                     throw problem(HttpStatus.BAD_REQUEST,
                         "Las columnas de " + table + " no coinciden con esta versión del backend.");
                 }
             }
         }
+    }
+
+    private String legacySaleWeights(String table, Row row) {
+        if (!table.equals("sale_line") && !table.equals("sale_delivery_line")) return row.data();
+        if (row.values().containsKey("final_weight")) return row.data();
+        Map<String, Object> values = new LinkedHashMap<>(row.values());
+        values.put("final_weight", values.get(table.equals("sale_line") ? "agreed_weight" : "weight"));
+        return json.writeValueAsString(values);
     }
 
     private Map<UUID, Credential> currentCredentials() {
@@ -352,14 +368,14 @@ class RestoreService {
         }
         Long excessSalePayments = jdbc.queryForObject("""
             WITH delivered AS (
-                SELECT item.sale_line_id, SUM(item.weight) AS weight
+                SELECT item.sale_line_id, SUM(item.final_weight) AS weight
                 FROM sale_delivery_line item
                 JOIN sale_delivery delivery ON delivery.id = item.delivery_id
                 WHERE delivery.voided_at IS NULL GROUP BY item.sale_line_id
             ), payable AS (
                 SELECT line.sale_id,
                     SUM(ROUND((CASE WHEN operation.status = 'CANCELED'
-                        THEN COALESCE(delivered.weight, 0) ELSE line.agreed_weight END)
+                        THEN COALESCE(delivered.weight, 0) ELSE line.final_weight END)
                         * line.price_per_gram, 2)) AS total
                 FROM sale_line line
                 JOIN sale_order operation ON operation.id = line.sale_id
@@ -400,6 +416,29 @@ class RestoreService {
             || (excessiveSaleDeliveries != null && excessiveSaleDeliveries > 0)) {
             throw problem(HttpStatus.BAD_REQUEST,
                 "Hay operaciones con más peso recibido o entregado que el acordado.");
+        }
+        Long invalidFinalWeights = jdbc.queryForObject("""
+            SELECT (SELECT count(*) FROM sale_line line
+                    JOIN sale_order operation ON operation.id = line.sale_id
+                    LEFT JOIN (SELECT item.sale_line_id,
+                        SUM(item.weight) AS hair_weight,
+                        SUM(item.final_weight) AS final_weight
+                        FROM sale_delivery_line item
+                        JOIN sale_delivery movement ON movement.id = item.delivery_id
+                        WHERE movement.voided_at IS NULL GROUP BY item.sale_line_id) delivered
+                        ON delivered.sale_line_id = line.id
+                    WHERE COALESCE(delivered.final_weight, 0) > line.final_weight
+                       OR line.final_weight - COALESCE(delivered.final_weight, 0)
+                          < line.agreed_weight - COALESCE(delivered.hair_weight, 0)
+                       OR (operation.status = 'CONFIRMED'
+                           AND (COALESCE(delivered.hair_weight, 0) <> line.agreed_weight
+                                OR COALESCE(delivered.final_weight, 0) <> line.final_weight)))
+                 + (SELECT count(*) FROM sale_delivery_line
+                    WHERE final_weight < weight)
+            """, Long.class);
+        if (invalidFinalWeights != null && invalidFinalWeights > 0) {
+            throw problem(HttpStatus.BAD_REQUEST,
+                "El respaldo tiene pesos finales de venta incompatibles con el cabello entregado.");
         }
         Long uncoveredReservations = jdbc.queryForObject("""
             WITH delivered AS (

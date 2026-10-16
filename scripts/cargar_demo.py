@@ -43,6 +43,11 @@ def line(category, length, weight, price):
             "weight": weight, "pricePerGram": price}
 
 
+def sale_line(category, length, hair_weight, final_weight, price):
+    return {**line(category, length, hair_weight, price),
+            "finalWeight": final_weight}
+
+
 def instant(day, hour):
     return datetime.combine(day, time(hour, 0), tzinfo=ZONE).isoformat()
 
@@ -159,21 +164,21 @@ def main():
     request(opener, base, "POST", "/api/sales", {
         "requestKey": key(), "customerName": "Demo · Estilista del Centro",
         "operationDate": str(today - timedelta(days=42)),
-        "lines": [line("normal", 38, "150.00", "3.25"),
-                  line("choco", 40, "100.00", "4.60")],
+        "lines": [sale_line("normal", 38, "150.00", "158.00", "3.25"),
+                  sale_line("choco", 40, "100.00", "105.00", "4.60")],
         "effectiveAt": instant(today - timedelta(days=42), 11),
     }, csrf)
     delivered = request(opener, base, "POST", "/api/sales", {
         "requestKey": key(), "customerName": "Demo · Salón Renueva",
         "operationDate": str(today - timedelta(days=4)),
-        "lines": [line("normal", 38, "600.00", "3.20"),
-                  line("premium", 60, "200.00", "9.70")],
+        "lines": [sale_line("normal", 38, "600.00", "630.00", "3.20"),
+                  sale_line("premium", 60, "200.00", "210.00", "9.70")],
         "effectiveAt": instant(today - timedelta(days=4), 11),
     }, csrf)
     request(opener, base, "POST", "/api/sales/reservations", {
         "requestKey": key(), "customerName": "Demo · Exportadora Andina",
         "operationDate": str(today - timedelta(days=1)),
-        "lines": [line("premium", 60, "700.00", "9.70")],
+        "lines": [sale_line("premium", 60, "700.00", "735.00", "9.70")],
         "acceptPendingStock": True,
     }, csrf)
     print("4/7 Ventas históricas, actual y reserva creadas.")

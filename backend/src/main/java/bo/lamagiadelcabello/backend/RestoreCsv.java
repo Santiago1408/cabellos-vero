@@ -54,13 +54,14 @@ final class RestoreCsv {
         Map<String, Object> manifest = object(csvRows.getFirst().get(2), json);
         Object version = manifest.get("version");
         if (!"la-magia-del-cabello-csv".equals(manifest.get("format"))
-            || (!Integer.valueOf(3).equals(version) && !Integer.valueOf(4).equals(version))
+            || (!Integer.valueOf(3).equals(version) && !Integer.valueOf(4).equals(version)
+                && !Integer.valueOf(5).equals(version))
             || !"backend-relational".equals(manifest.get("schema"))
             || !"BOB".equals(manifest.get("currency"))
             || !"g".equals(manifest.get("weightUnit"))
             || !"America/La_Paz".equals(manifest.get("businessTimeZone"))
             || !(manifest.get("counts") instanceof Map<?, ?> counts)) {
-            throw invalid("El respaldo no es una exportación compatible de las versiones 3 o 4.");
+            throw invalid("El respaldo no es una exportación compatible de las versiones 3, 4 o 5.");
         }
         try { Instant.parse(String.valueOf(manifest.get("exportedAt"))); }
         catch (RuntimeException badDate) {

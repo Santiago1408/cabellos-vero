@@ -30,7 +30,8 @@ type StockRow = {
 };
 type StockMovement = {
   id: string; kind: string; effectiveAt: string; recordedAt: string; operationId: string;
-  partyName: string; weight: number; signedWeight: number; pricePerGram: number;
+  partyName: string; weight: number; finalWeight: number;
+  signedWeight: number; pricePerGram: number;
   total: number; runningPhysicalStock: number;
 };
 type StockDetail = { stock: StockRow; movements: StockMovement[] };

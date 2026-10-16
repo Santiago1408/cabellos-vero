@@ -94,7 +94,7 @@ class SaleService {
                     input.operationDate(), input.acceptPendingStock());
                 for (LineInput line : input.lines()) {
                     sales.addLine(UUID.randomUUID(), saleId, line.categoryCode(),
-                        line.lengthCm(), line.weight(), line.pricePerGram());
+                        line.lengthCm(), line.weight(), line.finalWeight(), line.pricePerGram());
                 }
                 sales.addHistory(saleId, "SALE_RESERVED", actorId, null,
                     null, snapshotJson(saleId));
@@ -127,7 +127,8 @@ class SaleService {
             Sale reserved = createReservation(new CreateInput(reservationKey,
                 sale.customerName(), sale.operationDate(), sale.lines(), false), actorId);
             List<DeliveryItemInput> items = sales.lines(reserved.id()).stream()
-                .map(line -> new DeliveryItemInput(line.id(), line.agreedWeight())).toList();
+                .map(line -> new DeliveryItemInput(line.id(), line.agreedWeight(),
+                    line.finalWeight())).toList();
             return deliver(reserved.id(), new DeliveryInput(deliveryKey,
                 raw.effectiveAt(), items), actorId);
         });
@@ -177,14 +178,18 @@ class SaleService {
                     if (confirmed && (original == null
                         || !original.categoryCode().equals(line.categoryCode())
                         || original.lengthCm() != line.lengthCm()
-                        || original.agreedWeight().compareTo(line.weight()) != 0)) {
+                        || original.agreedWeight().compareTo(line.weight()) != 0
+                        || original.finalWeight().compareTo(line.finalWeight()) != 0)) {
                         throw problem(HttpStatus.CONFLICT, "CONFIRMED_SALE_IMMUTABLE",
                             "Solo puedes corregir datos generales y precios en una venta confirmada.");
                     }
                     if (original != null && original.deliveredWeight().signum() > 0) {
                         if (!original.categoryCode().equals(line.categoryCode())
                             || original.lengthCm() != line.lengthCm()
-                            || line.weight().compareTo(original.deliveredWeight()) < 0) {
+                            || line.weight().compareTo(original.deliveredWeight()) < 0
+                            || line.finalWeight().compareTo(original.deliveredFinalWeight()) < 0
+                            || line.finalWeight().subtract(original.deliveredFinalWeight())
+                                .compareTo(line.weight().subtract(original.deliveredWeight())) < 0) {
                             throw problem(HttpStatus.CONFLICT, "DELIVERED_LINE_IMMUTABLE",
                                 "No puedes cambiar el tipo ni reducir el peso por debajo de lo ya entregado.");
                         }
@@ -222,7 +227,7 @@ class SaleService {
                 for (EditLineInput line : input.lines()) {
                     if (line.id() == null) {
                         sales.addLine(UUID.randomUUID(), saleId, line.categoryCode(),
-                            line.lengthCm(), line.weight(), line.pricePerGram());
+                            line.lengthCm(), line.weight(), line.finalWeight(), line.pricePerGram());
                         changed = true;
                         continue;
                     }
@@ -230,9 +235,10 @@ class SaleService {
                     if (old.categoryCode().equals(line.categoryCode())
                         && old.lengthCm() == line.lengthCm()
                         && old.agreedWeight().compareTo(line.weight()) == 0
+                        && old.finalWeight().compareTo(line.finalWeight()) == 0
                         && old.pricePerGram().compareTo(line.pricePerGram()) == 0) continue;
                     sales.updateLine(line.id(), line.categoryCode(), line.lengthCm(),
-                        line.weight(), line.pricePerGram());
+                        line.weight(), line.finalWeight(), line.pricePerGram());
                     changed = true;
                 }
                 if (!changed) {
@@ -311,6 +317,8 @@ class SaleService {
                             "La entrega de " + line.categoryName() + " " + line.lengthCm()
                                 + " cm supera los " + remaining + " g pendientes.");
                     }
+                    requireFinalDeliveryWeight(line, item.weight(), item.finalWeight(),
+                        line.deliveredWeight(), line.deliveredFinalWeight());
                     requested.merge(new HairType(line.categoryCode(), line.lengthCm()),
                         item.weight(), BigDecimal::add);
                 }
@@ -338,7 +346,7 @@ class SaleService {
                     input.effectiveAt().toInstant());
                 for (DeliveryItemInput item : input.items()) {
                     sales.addDeliveryLine(UUID.randomUUID(), deliveryId, saleId,
-                        item.lineId(), item.weight());
+                        item.lineId(), item.weight(), item.finalWeight());
                 }
                 try {
                     allocation.rebuild(requested.keySet());
@@ -347,8 +355,7 @@ class SaleService {
                         conflict.getMessage());
                 }
                 List<SaleLine> afterLines = sales.lines(saleId);
-                boolean completed = afterLines.stream().allMatch(line ->
-                    line.deliveredWeight().compareTo(line.agreedWeight()) == 0);
+                boolean completed = isCompleted(afterLines);
                 if (completed) sales.confirm(saleId);
                 else sales.touch(saleId);
                 Sale after = get(saleId);
@@ -407,7 +414,11 @@ class SaleService {
                         "La corrección de " + line.categoryName() + " " + line.lengthCm()
                             + " cm supera los " + line.agreedWeight() + " g acordados.");
                 }
-                if (item.weight().compareTo(original.weight()) != 0) changed = true;
+                BigDecimal otherHair = line.deliveredWeight().subtract(original.weight());
+                BigDecimal otherFinal = line.deliveredFinalWeight().subtract(original.finalWeight());
+                requireFinalDeliveryWeight(line, item.weight(), item.finalWeight(), otherHair, otherFinal);
+                if (item.weight().compareTo(original.weight()) != 0
+                    || item.finalWeight().compareTo(original.finalWeight()) != 0) changed = true;
             }
             if (!changed) {
                 throw problem(HttpStatus.BAD_REQUEST, "NO_CHANGES",
@@ -419,8 +430,9 @@ class SaleService {
             }
             for (DeliveryItemInput item : input.items()) {
                 DeliveryItem original = itemByLine.get(item.lineId());
-                if (item.weight().compareTo(original.weight()) != 0) {
-                    sales.updateDeliveryItem(original.id(), item.weight());
+                if (item.weight().compareTo(original.weight()) != 0
+                    || item.finalWeight().compareTo(original.finalWeight()) != 0) {
+                    sales.updateDeliveryItem(original.id(), item.weight(), item.finalWeight());
                 }
             }
             rebuildAllocations(affectedTypes);
@@ -495,7 +507,22 @@ class SaleService {
 
     private static boolean isCompleted(List<SaleLine> lines) {
         return lines.stream().allMatch(line ->
-            line.deliveredWeight().compareTo(line.agreedWeight()) == 0);
+            line.deliveredWeight().compareTo(line.agreedWeight()) == 0
+                && line.deliveredFinalWeight().compareTo(line.finalWeight()) == 0);
+    }
+
+    private static void requireFinalDeliveryWeight(SaleLine line, BigDecimal hair,
+                                                    BigDecimal finalWeight,
+                                                    BigDecimal alreadyHair,
+                                                    BigDecimal alreadyFinal) {
+        BigDecimal remainingHair = line.agreedWeight().subtract(alreadyHair).subtract(hair);
+        BigDecimal remainingFinal = line.finalWeight().subtract(alreadyFinal).subtract(finalWeight);
+        if (remainingFinal.compareTo(remainingHair) < 0 || remainingFinal.signum() < 0
+            || (remainingHair.signum() == 0 && remainingFinal.signum() != 0)) {
+            throw problem(HttpStatus.CONFLICT, "EXCESS_FINAL_WEIGHT",
+                "El peso final de " + line.categoryName() + " " + line.lengthCm()
+                    + " cm no deja peso facturable suficiente para el cabello pendiente.");
+        }
     }
 
     private static Set<HairType> typesOf(List<SaleLine> lines) {
@@ -576,8 +603,13 @@ class SaleService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                     "Cada línea de entrega debe aparecer una sola vez.");
             }
-            return new DeliveryItemInput(item.lineId(),
-                positiveTwoDecimals(item.weight(), "peso entregado"));
+            BigDecimal hair = positiveTwoDecimals(item.weight(), "peso de cabello entregado");
+            BigDecimal finalWeight = positiveTwoDecimals(item.finalWeight(), "peso final entregado");
+            if (finalWeight.compareTo(hair) < 0) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_FINAL_WEIGHT",
+                    "El peso final con ligas no puede ser menor que el peso del cabello.");
+            }
+            return new DeliveryItemInput(item.lineId(), hair, finalWeight);
         }).toList();
     }
 
@@ -657,8 +689,13 @@ class SaleService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                     "Cada línea necesita categoría y longitud válidas.");
             }
-            return new LineInput(line.categoryCode(), line.lengthCm(),
-                positiveTwoDecimals(line.weight(), "peso"),
+            BigDecimal hair = positiveTwoDecimals(line.weight(), "peso de cabello");
+            BigDecimal finalWeight = positiveTwoDecimals(line.finalWeight(), "peso final con ligas");
+            if (finalWeight.compareTo(hair) < 0) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_FINAL_WEIGHT",
+                    "El peso final con ligas no puede ser menor que el peso del cabello.");
+            }
+            return new LineInput(line.categoryCode(), line.lengthCm(), hair, finalWeight,
                 positiveTwoDecimals(line.pricePerGram(), "precio por gramo"));
         }).toList();
         return new CreateInput(raw.requestKey(), customer, raw.operationDate(), lines,
@@ -684,9 +721,14 @@ class SaleService {
                 throw problem(HttpStatus.BAD_REQUEST, "INVALID_LINE",
                     "Cada línea necesita categoría y longitud válidas.");
             }
-            return new EditLineInput(line.id(), line.categoryCode(), line.lengthCm(),
-                positiveTwoDecimals(line.weight(), "peso"),
-                positiveTwoDecimals(line.pricePerGram(), "precio por gramo"));
+            BigDecimal hair = positiveTwoDecimals(line.weight(), "peso de cabello");
+            BigDecimal finalWeight = positiveTwoDecimals(line.finalWeight(), "peso final con ligas");
+            if (finalWeight.compareTo(hair) < 0) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_FINAL_WEIGHT",
+                    "El peso final con ligas no puede ser menor que el peso del cabello.");
+            }
+            return new EditLineInput(line.id(), line.categoryCode(), line.lengthCm(), hair,
+                finalWeight, positiveTwoDecimals(line.pricePerGram(), "precio por gramo"));
         }).toList();
         return new EditInput(raw.expectedVersion(), customer, raw.operationDate(), lines,
             raw.acceptPendingStock(), reason);
@@ -725,7 +767,9 @@ class SaleService {
                 "categoryCode", line.categoryCode(),
                 "lengthCm", line.lengthCm(),
                 "agreedWeight", line.agreedWeight(),
+                "finalWeight", line.finalWeight(),
                 "deliveredWeight", line.deliveredWeight(),
+                "deliveredFinalWeight", line.deliveredFinalWeight(),
                 "pricePerGram", line.pricePerGram()
             )).toList()
         ));
@@ -743,6 +787,7 @@ class SaleService {
             "deliveryItemId", item.id().toString(),
             "saleLineId", item.saleLineId().toString(),
             "weight", item.weight(),
+            "finalWeight", item.finalWeight(),
             "consumedLots", sales.consumptions(item.id())
         )).toList());
         return json.writeValueAsString(Map.of(
@@ -764,16 +809,17 @@ class SaleService {
         return new SaleProblem(status, code, message, List.of());
     }
 
-    record LineInput(String categoryCode, Integer lengthCm, BigDecimal weight, BigDecimal pricePerGram) {}
+    record LineInput(String categoryCode, Integer lengthCm, BigDecimal weight,
+                     BigDecimal finalWeight, BigDecimal pricePerGram) {}
     record CreateInput(UUID requestKey, String customerName, LocalDate operationDate,
                        List<LineInput> lines, boolean acceptPendingStock) {}
     record ImmediateInput(UUID requestKey, String customerName, LocalDate operationDate,
                           List<LineInput> lines, OffsetDateTime effectiveAt) {}
     record EditLineInput(UUID id, String categoryCode, Integer lengthCm,
-                         BigDecimal weight, BigDecimal pricePerGram) {}
+                         BigDecimal weight, BigDecimal finalWeight, BigDecimal pricePerGram) {}
     record EditInput(Long expectedVersion, String customerName, LocalDate operationDate,
                      List<EditLineInput> lines, boolean acceptPendingStock, String reason) {}
-    record DeliveryItemInput(UUID lineId, BigDecimal weight) {}
+    record DeliveryItemInput(UUID lineId, BigDecimal weight, BigDecimal finalWeight) {}
     record DeliveryInput(UUID requestKey, OffsetDateTime effectiveAt,
                          List<DeliveryItemInput> items) {}
     record CorrectionInput(Long expectedVersion, OffsetDateTime effectiveAt,

@@ -30,8 +30,26 @@ export class ConnectedSettings implements OnInit {
   confirmPassword = '';
   restoreFile: File | null = null;
   restoreConfirmation = '';
+  adminFullName = '';
 
-  ngOnInit(): void { if (this.session.account()?.role === 'ADMIN') void this.loadBackup(); }
+  ngOnInit(): void {
+    this.adminFullName = this.session.account()?.displayName ?? '';
+    if (this.session.account()?.role === 'ADMIN') void this.loadBackup();
+  }
+  async saveAdminName(): Promise<void> {
+    if (this.busy() || this.session.account()?.role !== 'ADMIN') return;
+    const fullName = this.adminFullName.trim().replace(/\s+/g, ' ');
+    if (!fullName || fullName.length > 160) {
+      this.error.set('El nombre completo debe tener entre 1 y 160 caracteres.'); return;
+    }
+    this.busy.set(true); this.error.set(''); this.message.set('');
+    try {
+      await this.session.changeDisplayName(fullName);
+      this.adminFullName = fullName;
+      this.message.set('Nombre visible actualizado. El usuario de acceso sigue igual.');
+    } catch (error) { this.error.set(this.errorMessage(error)); }
+    finally { this.busy.set(false); }
+  }
   async loadBackup(): Promise<void> {
     try { const settings = await this.api.get<BackupSettings>('/api/backups/settings'); this.backup.set(settings); this.backupState.emit(settings.due); this.intervalDays = settings.intervalDays; }
     catch (error) { this.error.set(this.errorMessage(error)); }

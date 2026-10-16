@@ -26,7 +26,7 @@ class BackupService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/La_Paz");
     private static final String FORMAT = "la-magia-del-cabello-csv";
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     // Lista cerrada: ninguna tabla de sesiones, migraciones ni hashes de contraseña se exporta.
     private static final List<Source> SOURCES = List.of(

@@ -51,12 +51,14 @@ class SaleRepository {
     List<SaleLine> lines(UUID saleId) {
         return jdbc.query("""
             SELECT l.id, l.sale_id, l.category_code, c.display_name AS category_name,
-                   l.length_cm, l.agreed_weight, l.price_per_gram,
-                   COALESCE(d.delivered_weight, 0) AS delivered_weight
+                   l.length_cm, l.agreed_weight, l.final_weight, l.price_per_gram,
+                   COALESCE(d.delivered_weight, 0) AS delivered_weight,
+                   COALESCE(d.delivered_final_weight, 0) AS delivered_final_weight
             FROM sale_line l
             JOIN hair_category c ON c.code = l.category_code
             LEFT JOIN (
-                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight
+                SELECT dl.sale_line_id, SUM(dl.weight) AS delivered_weight,
+                       SUM(dl.final_weight) AS delivered_final_weight
                 FROM sale_delivery_line dl JOIN sale_delivery sd ON sd.id = dl.delivery_id
                 WHERE sd.voided_at IS NULL GROUP BY dl.sale_line_id
             ) d ON d.sale_line_id = l.id
@@ -66,7 +68,8 @@ class SaleRepository {
                 (UUID) row.getObject("id"), (UUID) row.getObject("sale_id"),
                 row.getString("category_code"), row.getString("category_name"),
                 row.getInt("length_cm"), row.getBigDecimal("agreed_weight"),
-                row.getBigDecimal("price_per_gram"), row.getBigDecimal("delivered_weight")
+                row.getBigDecimal("final_weight"), row.getBigDecimal("price_per_gram"),
+                row.getBigDecimal("delivered_weight"), row.getBigDecimal("delivered_final_weight")
             ), saleId);
     }
 
@@ -89,10 +92,11 @@ class SaleRepository {
 
     List<DeliveryItem> deliveryItems(UUID deliveryId) {
         return jdbc.query("""
-            SELECT dl.id, dl.sale_line_id, dl.weight
+            SELECT dl.id, dl.sale_line_id, dl.weight, dl.final_weight
             FROM sale_delivery_line dl WHERE dl.delivery_id = ? ORDER BY dl.id
             """, (row, number) -> new DeliveryItem((UUID) row.getObject("id"),
-                (UUID) row.getObject("sale_line_id"), row.getBigDecimal("weight")), deliveryId);
+                (UUID) row.getObject("sale_line_id"), row.getBigDecimal("weight"),
+                row.getBigDecimal("final_weight")), deliveryId);
     }
 
     List<Consumption> consumptions(UUID deliveryLineId) {
@@ -140,12 +144,12 @@ class SaleRepository {
     }
 
     void addLine(UUID id, UUID saleId, String categoryCode, int lengthCm,
-                 BigDecimal weight, BigDecimal pricePerGram) {
+                 BigDecimal weight, BigDecimal finalWeight, BigDecimal pricePerGram) {
         jdbc.update("""
             INSERT INTO sale_line
-                (id, sale_id, category_code, length_cm, agreed_weight, price_per_gram)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """, id, saleId, categoryCode, lengthCm, weight, pricePerGram);
+                (id, sale_id, category_code, length_cm, agreed_weight, final_weight, price_per_gram)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, id, saleId, categoryCode, lengthCm, weight, finalWeight, pricePerGram);
     }
 
     void updateHeader(UUID saleId, String customerName, LocalDate operationDate,
@@ -157,11 +161,11 @@ class SaleRepository {
     }
 
     void updateLine(UUID id, String categoryCode, int lengthCm,
-                    BigDecimal weight, BigDecimal pricePerGram) {
+                    BigDecimal weight, BigDecimal finalWeight, BigDecimal pricePerGram) {
         jdbc.update("""
             UPDATE sale_line SET category_code = ?, length_cm = ?,
-                agreed_weight = ?, price_per_gram = ? WHERE id = ?
-            """, categoryCode, lengthCm, weight, pricePerGram, id);
+                agreed_weight = ?, final_weight = ?, price_per_gram = ? WHERE id = ?
+            """, categoryCode, lengthCm, weight, finalWeight, pricePerGram, id);
     }
 
     void deleteLine(UUID id) {
@@ -191,11 +195,11 @@ class SaleRepository {
     }
 
     void addDeliveryLine(UUID id, UUID deliveryId, UUID saleId,
-                         UUID saleLineId, BigDecimal weight) {
+                         UUID saleLineId, BigDecimal weight, BigDecimal finalWeight) {
         jdbc.update("""
-            INSERT INTO sale_delivery_line (id, delivery_id, sale_id, sale_line_id, weight)
-            VALUES (?, ?, ?, ?, ?)
-            """, id, deliveryId, saleId, saleLineId, weight);
+            INSERT INTO sale_delivery_line (id, delivery_id, sale_id, sale_line_id, weight, final_weight)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, id, deliveryId, saleId, saleLineId, weight, finalWeight);
     }
 
     void updateDeliveryTime(UUID deliveryId, Instant effectiveAt) {
@@ -203,9 +207,9 @@ class SaleRepository {
             effectiveAt, deliveryId);
     }
 
-    void updateDeliveryItem(UUID deliveryLineId, BigDecimal weight) {
-        jdbc.update("UPDATE sale_delivery_line SET weight = ? WHERE id = ?",
-            weight, deliveryLineId);
+    void updateDeliveryItem(UUID deliveryLineId, BigDecimal weight, BigDecimal finalWeight) {
+        jdbc.update("UPDATE sale_delivery_line SET weight = ?, final_weight = ? WHERE id = ?",
+            weight, finalWeight, deliveryLineId);
     }
 
     void voidDelivery(UUID deliveryId) {
@@ -273,12 +277,13 @@ class SaleRepository {
                 Instant updatedAt, long version) {}
 
     record SaleLine(UUID id, UUID saleId, String categoryCode, String categoryName,
-                    int lengthCm, BigDecimal agreedWeight, BigDecimal pricePerGram,
-                    BigDecimal deliveredWeight) {}
+                    int lengthCm, BigDecimal agreedWeight, BigDecimal finalWeight,
+                    BigDecimal pricePerGram, BigDecimal deliveredWeight,
+                    BigDecimal deliveredFinalWeight) {}
 
     record Delivery(UUID id, UUID saleId, UUID requestKey, String requestHash,
                     Instant effectiveAt, Instant recordedAt, Instant voidedAt) {}
-    record DeliveryItem(UUID id, UUID saleLineId, BigDecimal weight) {}
+    record DeliveryItem(UUID id, UUID saleLineId, BigDecimal weight, BigDecimal finalWeight) {}
     record Consumption(UUID stockLotId, BigDecimal weight, BigDecimal costPerGram,
                        Instant receivedAt, UUID purchaseId, String supplierName) {}
 
