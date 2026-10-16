@@ -35,6 +35,16 @@
 .connected-delete:hover { color: var(--color-delete); opacity: .75; }
 .connected-success { padding: 11px 14px; border-radius: 7px; color: #17652b; background: #eaf8ee; }
 .connected-brand { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.desktop-sidebar-toggle { display: inline-flex; }
+@media (min-width: 721px) {
+  .app-frame.sidebar-collapsed .sidebar { width: 78px; padding-inline: 11px; }
+  .app-frame.sidebar-collapsed .main-wrap { margin-left: 78px; }
+  .app-frame.sidebar-collapsed .connected-brand { justify-content: center; padding: 0; }
+  .app-frame.sidebar-collapsed .brand-label, .app-frame.sidebar-collapsed .nav-list button span, .app-frame.sidebar-collapsed .sidebar-bottom button span { display: none; }
+  .app-frame.sidebar-collapsed .sidebar-caption { height: 1px; margin: 50px 9px 18px; padding: 0; overflow: hidden; background: var(--color-border); color: transparent; }
+  .app-frame.sidebar-collapsed .nav-list button, .app-frame.sidebar-collapsed .sidebar-bottom button { justify-content: center; padding: 0; }
+  .app-frame.sidebar-collapsed .nav-list button app-icon, .app-frame.sidebar-collapsed .sidebar-bottom button app-icon { width: 22px; height: 22px; }
+}
 .nav-list button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 46px; padding: 0 16px; border: 0; border-radius: 9px; background: transparent; color: #737373; font-size: 13px; font-weight: 580; text-align: left; cursor: pointer; }
 .nav-list button:hover { background: var(--color-subtle); color: var(--color-primary); }
 .nav-list button.active { background: var(--color-primary-soft); color: var(--color-primary); font-weight: 750; }
@@ -65,6 +75,7 @@
   .connected-types-content { padding: 10px 18px 22px; }
 }
 @media (max-width: 720px) {
+  .desktop-sidebar-toggle { display: none; }
   .nav-list button { min-height: 52px; font-size: 15px; }
   .nav-list button app-icon { width: 22px; height: 22px; }
 }

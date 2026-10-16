@@ -254,6 +254,10 @@ Solo el administrador puede usar `GET /api/inventory/opening`, `POST /api/invent
 
 El detalle de apertura devuelve `header.version`, lotes con peso inicial y restante e historial. `PUT` acepta los lotes completos (con `id` para los existentes), `expectedVersion` y un motivo de 3 a 500 caracteres. Puede agregar, reordenar, corregir o quitar lotes. Recalcula consumos y márgenes; rechaza la corrección completa con `409` si deja entregas o reservas sin respaldo. La fecha de corte también puede corregirse; debe continuar siendo anterior a todas las operaciones y movimientos registrados. Cada corrección conserva el valor anterior, el nuevo y su motivo en el historial. La interfaz muestra el historial como información secundaria.
 
+## Apariencia
+
+`GET /api/theme` devuelve el color principal incluso antes de iniciar sesión para aplicarlo en la pantalla de acceso. Solo el administrador puede cambiarlo con `PUT /api/theme` y `{ "primaryColor": "#171717" }`. Se guarda en PostgreSQL y forma parte del respaldo CSV desde la versión 6. Se aceptan colores hexadecimales oscuros que mantengan el contraste de los textos blancos.
+
 ## Reportes
 
 `GET /api/reports/overview`, `GET /api/reports/results`, `GET /api/reports/top-products` y `GET /api/reports/top-categories` son consultas disponibles para administrador y empleados. No incluyen deudas independientes ni usan fechas o importes de pagos para reconocer resultados.
@@ -286,7 +290,7 @@ Los importes admiten hasta dos decimales. La fecha del abono va desde el registr
 
 Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/settings` devuelve `intervalDays`, `lastConfirmedAt`, `pendingExportAt`, `nextReminderAt` y `due`. `PUT /api/backups/settings` acepta `{ "intervalDays": 7 }`, entre 1 y 365. `POST /api/backups/export` descarga el CSV integral y deja pendiente la confirmación; `POST /api/backups/confirm` registra que el administrador comprobó que el archivo quedó guardado. El sistema no puede comprobar por sí mismo si el archivo sigue en la computadora.
 
-La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 5, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite las versiones 3 y 4 anteriores; los respaldos sin peso final de venta reciben el mismo valor que el peso de cabello. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
+La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 6, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración, color principal e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite las versiones 3, 4 y 5 anteriores; los respaldos sin peso final de venta reciben el mismo valor que el peso de cabello y los respaldos sin color reciben el predeterminado. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
 
 ### Restauración
 

@@ -1,5 +1,5 @@
-.opening-modal { width: min(900px, calc(100vw - 32px)); max-height: min(90vh, 950px); overflow-y: auto; }
-.opening-content { display: grid; gap: 18px; padding: 20px 24px 28px; }
+.opening-modal { width: min(900px, calc(100vw - 32px)); max-height: min(90vh, 950px); display: flex; flex-direction: column; overflow: hidden; }
+.opening-content { display: grid; gap: 18px; min-height: 0; overflow-y: auto; padding: 20px 24px 28px; }
 .opening-loading { padding: 24px; }
 .opening-totals { display: flex; flex-wrap: wrap; gap: 12px; }
 .opening-totals span { display: grid; gap: 4px; min-width: 150px; padding: 12px 16px; border: 1px solid var(--color-border); border-radius: 12px; }
@@ -18,7 +18,9 @@
 .opening-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .opening-check { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .connected-delete { color: var(--color-delete); border: 0; background: transparent; cursor: pointer; }
-.opening-preview { padding: 16px; border: 1px solid var(--color-primary); border-radius: 12px; }
-.opening-preview h3 { margin: 0 0 8px; }
+.opening-preview { display: grid; gap: 3px; min-width: 0; font-size: 13px; }
+.opening-preview small { color: var(--color-muted); }
 .opening-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-@media (max-width: 640px) { .opening-content { padding: 16px; } .opening-grid { grid-template-columns: 1fr; } .opening-summary-row { flex-direction: column; } .opening-amount { text-align: left; } }
+.opening-toolbar { flex: none; align-items: center; justify-content: space-between; padding: 14px 24px; border-top: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 -8px 24px #0000000b; }
+.opening-toolbar-buttons { display: flex; gap: 10px; margin-left: auto; }
+@media (max-width: 640px) { .opening-content { padding: 16px; } .opening-grid { grid-template-columns: 1fr; } .opening-summary-row { flex-direction: column; } .opening-amount { text-align: left; } .opening-toolbar { padding: 12px 16px; } .opening-toolbar-buttons { width: 100%; } .opening-toolbar-buttons .btn { flex: 1; } }

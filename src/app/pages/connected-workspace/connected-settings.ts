@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiClient } from '../../data/api-client';
 import { AuthSession } from '../../data/auth-session';
 import { BackupSettings, RestorePreview, RestoreResult } from '../../data/backup-api';
+import { Theme } from '../../data/theme';
 
 @Component({
   selector: 'app-connected-settings', standalone: true,
@@ -14,6 +15,7 @@ import { BackupSettings, RestorePreview, RestoreResult } from '../../data/backup
 })
 export class ConnectedSettings implements OnInit {
   private readonly api = inject(ApiClient);
+  readonly theme = inject(Theme);
   readonly session = inject(AuthSession);
   readonly backupState = output<boolean>();
   readonly busy = signal(false);
@@ -31,10 +33,22 @@ export class ConnectedSettings implements OnInit {
   restoreFile: File | null = null;
   restoreConfirmation = '';
   adminFullName = '';
+  primaryColor = '#171717';
 
   ngOnInit(): void {
     this.adminFullName = this.session.account()?.displayName ?? '';
+    this.primaryColor = this.theme.primaryColor();
     if (this.session.account()?.role === 'ADMIN') void this.loadBackup();
+  }
+  async saveColor(): Promise<void> {
+    if (this.busy() || this.session.account()?.role !== 'ADMIN') return;
+    this.busy.set(true); this.error.set(''); this.message.set('');
+    try {
+      await this.theme.save(this.primaryColor);
+      this.primaryColor = this.theme.primaryColor();
+      this.message.set('Color principal actualizado para el sistema.');
+    } catch (error) { this.error.set(this.errorMessage(error)); }
+    finally { this.busy.set(false); }
   }
   async saveAdminName(): Promise<void> {
     if (this.busy() || this.session.account()?.role !== 'ADMIN') return;
@@ -114,7 +128,7 @@ export class ConnectedSettings implements OnInit {
     if (!id || !file || !this.preBackupConfirmed() || this.busy()) return;
     if (this.restoreConfirmation !== 'RESTAURAR') { this.error.set('Escribe RESTAURAR exactamente para confirmar el reemplazo.'); return; }
     this.busy.set(true); this.error.set('');
-    try { const result = await this.api.upload<RestoreResult>(`/api/backups/restore/${id}`, file, { confirmation: 'RESTAURAR' }); this.restored.set(result); this.preview.set(null); this.restoreFile = null; this.restoreConfirmation = ''; await this.loadBackup(); this.message.set(result.message); }
+    try { const result = await this.api.upload<RestoreResult>(`/api/backups/restore/${id}`, file, { confirmation: 'RESTAURAR' }); this.restored.set(result); this.preview.set(null); this.restoreFile = null; this.restoreConfirmation = ''; await this.loadBackup(); await this.theme.load(); this.primaryColor = this.theme.primaryColor(); this.message.set(result.message); }
     catch (error) { this.error.set(this.errorMessage(error)); }
     finally { this.busy.set(false); }
   }

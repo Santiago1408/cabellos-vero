@@ -1,10 +1,10 @@
 @if (loading() || !session.account() || session.account()?.mustChangePassword) {
-  <main class="connected-page"><div class="connected-frame">
+  <main class="connected-page connected-auth-page"><div class="connected-frame">
     <header class="connected-header"><div><span class="connected-mark">MC</span><div><strong>La Magia del Cabello</strong><span>Acceso al sistema</span></div></div></header>
     @if (loading()) { <section class="card connected-panel"><p>Comprobando la sesión…</p></section> }
     @else if (!session.account()) {
       <section class="card connected-panel connected-form-panel"><h1>Ingresar al sistema</h1><p>Ingresa con tu usuario y contraseña.</p>
-        <form (ngSubmit)="login()"><label class="field-label">Usuario<input class="field-input" name="username" [(ngModel)]="username" autocomplete="username" required /></label><label class="field-label">Contraseña<input class="field-input" type="password" name="password" [(ngModel)]="password" autocomplete="current-password" required /></label>@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }<button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Ingresar' }}</button></form>
+        <form (ngSubmit)="login()"><label class="field-label">Usuario<input class="field-input" name="username" [(ngModel)]="username" autocomplete="username" required /></label><div class="login-password-group"><label class="field-label" for="connected-password">Contraseña</label><div class="login-password-wrap"><input id="connected-password" class="field-input" [type]="passwordVisible() ? 'text' : 'password'" name="password" [(ngModel)]="password" autocomplete="current-password" required /><button type="button" class="login-password-toggle" [attr.aria-label]="passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'" [attr.aria-pressed]="passwordVisible()" (click)="passwordVisible.set(!passwordVisible())"><app-icon [name]="passwordVisible() ? 'eye-off' : 'eye'" /></button></div></div>@if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }<button type="submit" class="btn btn-primary" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Ingresar' }}</button></form>
       </section>
     } @else {
       <section class="card connected-panel connected-form-panel"><h1>Cambiar contraseña temporal</h1><p>Debes crear tu contraseña antes de acceder a los datos.</p>
@@ -14,25 +14,25 @@
     }
   </div></main>
 } @else {
-  <div class="app-frame">
+  <div class="app-frame" [class.sidebar-collapsed]="sidebarCollapsed()">
     @if (mobileOpen()) { <button type="button" class="mobile-scrim" aria-label="Cerrar menú" (click)="mobileOpen.set(false)"></button> }
     <aside class="sidebar" [class.sidebar-open]="mobileOpen()">
-      <button type="button" class="brand connected-brand" (click)="selectSection(session.account()?.role === 'ADMIN' ? 'dashboard' : 'inventory')"><span class="brand-mark">MC<span class="brand-mark-dot"></span></span><span>La Magia del <strong>Cabello</strong></span></button>
+      <button type="button" class="brand connected-brand" title="Ir al inicio" (click)="selectSection(session.account()?.role === 'ADMIN' ? 'dashboard' : 'inventory')"><span class="brand-mark">MC<span class="brand-mark-dot"></span></span><span class="brand-label">La Magia del <strong>Cabello</strong></span></button>
       <div class="sidebar-caption">MENÚ PRINCIPAL</div>
       <nav class="nav-list" aria-label="Navegación principal">
-        @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'dashboard'" (click)="selectSection('dashboard')"><app-icon name="home" /><span>Inicio</span></button> }
-        <button type="button" [class.active]="section() === 'inventory'" (click)="selectSection('inventory')"><app-icon name="box" /><span>Inventario</span></button>
-        @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'suppliers'" (click)="selectSection('suppliers')"><app-icon name="users" /><span>Proveedores</span></button> }
-        <button type="button" [class.active]="section() === 'purchases'" (click)="selectSection('purchases')"><app-icon name="truck" /><span>Compras</span></button>
-        <button type="button" [class.active]="section() === 'sales'" (click)="selectSection('sales')"><app-icon name="store" /><span>Ventas</span></button>
-        <button type="button" [class.active]="section() === 'reports'" (click)="selectSection('reports')"><app-icon name="chart" /><span>Reportes</span></button>
-        @if (session.account()?.role === 'ADMIN') { <button type="button" [class.active]="section() === 'debts'" (click)="selectSection('debts')"><app-icon name="wallet" /><span>Deudas</span></button><button type="button" [class.active]="section() === 'employees'" (click)="selectSection('employees')"><app-icon name="users" /><span>Empleados</span></button> }
-        <button type="button" [class.active]="section() === 'settings'" (click)="selectSection('settings')"><app-icon name="settings" /><span>Configuración</span></button>
+        @if (session.account()?.role === 'ADMIN') { <button type="button" title="Inicio" aria-label="Inicio" [class.active]="section() === 'dashboard'" (click)="selectSection('dashboard')"><app-icon name="dashboard" /><span>Inicio</span></button> }
+        <button type="button" title="Inventario" aria-label="Inventario" [class.active]="section() === 'inventory'" (click)="selectSection('inventory')"><app-icon name="inventory" /><span>Inventario</span></button>
+        @if (session.account()?.role === 'ADMIN') { <button type="button" title="Proveedores" aria-label="Proveedores" [class.active]="section() === 'suppliers'" (click)="selectSection('suppliers')"><app-icon name="supplier" /><span>Proveedores</span></button> }
+        <button type="button" title="Compras" aria-label="Compras" [class.active]="section() === 'purchases'" (click)="selectSection('purchases')"><app-icon name="purchase" /><span>Compras</span></button>
+        <button type="button" title="Ventas" aria-label="Ventas" [class.active]="section() === 'sales'" (click)="selectSection('sales')"><app-icon name="sale" /><span>Ventas</span></button>
+        <button type="button" title="Reportes" aria-label="Reportes" [class.active]="section() === 'reports'" (click)="selectSection('reports')"><app-icon name="chart" /><span>Reportes</span></button>
+        @if (session.account()?.role === 'ADMIN') { <button type="button" title="Deudas" aria-label="Deudas" [class.active]="section() === 'debts'" (click)="selectSection('debts')"><app-icon name="wallet" /><span>Deudas</span></button><button type="button" title="Empleados" aria-label="Empleados" [class.active]="section() === 'employees'" (click)="selectSection('employees')"><app-icon name="users" /><span>Empleados</span></button> }
+        <button type="button" title="Configuración" aria-label="Configuración" [class.active]="section() === 'settings'" (click)="selectSection('settings')"><app-icon name="settings" /><span>Configuración</span></button>
       </nav>
-      <div class="sidebar-bottom"><button type="button" class="sidebar-logout" [disabled]="busy()" (click)="logout()"><app-icon name="logout" /><span>Cerrar sesión</span></button></div>
+      <div class="sidebar-bottom"><button type="button" class="sidebar-logout" aria-label="Cerrar sesión" title="Cerrar sesión" [disabled]="busy()" (click)="logout()"><app-icon name="logout" /><span>Cerrar sesión</span></button></div>
     </aside>
     <div class="main-wrap">
-      <header class="topbar"><button type="button" class="icon-button mobile-menu" aria-label="Abrir menú" (click)="mobileOpen.set(true)"><app-icon name="menu" /></button><div class="topbar-right"><button type="button" class="profile-button" aria-label="Opciones del perfil" (click)="profileOpen.set(!profileOpen())"><span class="avatar">{{ initials }}</span><span class="profile-copy"><strong>{{ session.account()?.displayName }}</strong><small>{{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }}</small></span><span class="profile-caret">⌄</span></button></div>
+      <header class="topbar"><button type="button" class="icon-button mobile-menu" aria-label="Abrir menú" (click)="mobileOpen.set(true)"><app-icon name="menu" /></button><button type="button" class="icon-button desktop-sidebar-toggle" [attr.aria-label]="sidebarCollapsed() ? 'Mostrar menú lateral completo' : 'Ocultar textos del menú lateral'" [attr.title]="sidebarCollapsed() ? 'Expandir menú' : 'Contraer menú'" [attr.aria-expanded]="!sidebarCollapsed()" (click)="toggleSidebar()"><app-icon [name]="sidebarCollapsed() ? 'sidebar-expand' : 'sidebar-collapse'" /></button><div class="topbar-right"><button type="button" class="profile-button" aria-label="Opciones del perfil" (click)="profileOpen.set(!profileOpen())"><span class="avatar">{{ initials }}</span><span class="profile-copy"><strong>{{ session.account()?.displayName }}</strong><small>{{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }}</small></span><span class="profile-caret">⌄</span></button></div>
         @if (profileOpen()) { <div class="top-popover profile-popover"><strong>{{ session.account()?.displayName }}</strong><p>{{ session.account()?.role === 'ADMIN' ? 'Administrador' : 'Empleado' }} · {{ session.account()?.username }}</p><button type="button" [disabled]="busy()" (click)="logout()">Cerrar sesión</button></div> }
       </header>
       <main class="page-content">

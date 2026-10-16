@@ -42,11 +42,11 @@ Nuevo: {{ entry.newValues }}</pre></details></div> }</details>
             }
           </div>
           <button type="button" class="btn btn-outline" (click)="addLot()"><app-icon name="plus" /> Agregar lote</button>
-          @if (previewData(); as preview) {
-            <div class="opening-preview" role="status"><h3>Revisa antes de guardar</h3><p>{{ preview.lotCount }} lotes · {{ preview.totalWeight | number:'1.2-2' }} g · valor de costo {{ preview.totalValue | number:'1.2-2' }} Bs.</p><p>{{ preview.estimatedCostLots }} lotes con costo estimado. La corrección recalculará las ventas afectadas y será rechazada si falta stock.</p><button type="button" class="btn btn-primary" [disabled]="busy()" (click)="save()">{{ opening() ? 'Confirmar corrección' : 'Confirmar apertura' }}</button></div>
-          }
-          <div class="opening-actions"><button type="submit" class="btn btn-outline" [disabled]="busy()">{{ busy() ? 'Procesando…' : 'Revisar totales' }}</button>@if (opening()) { <button type="button" class="btn btn-outline" (click)="cancelCorrection()">Cancelar</button> }</div>
         </form>
+        <div class="opening-actions opening-toolbar">
+          @if (previewData(); as preview) { <div class="opening-preview" role="status"><strong>Revisa antes de confirmar</strong><span>{{ preview.lotCount }} lotes · {{ preview.totalWeight | number:'1.2-2' }} g · costo {{ preview.totalValue | number:'1.2-2' }} Bs.</span><small>Se recalcularán las ventas afectadas. La corrección se rechazará si falta stock.</small></div> }
+          <div class="opening-toolbar-buttons">@if (opening()) { <button type="button" class="btn btn-outline" (click)="cancelCorrection()">Cancelar</button> }<button type="button" class="btn btn-primary" [disabled]="busy()" (click)="previewData() ? save() : preview()">{{ busy() ? 'Procesando…' : previewData() ? (opening() ? 'Confirmar corrección' : 'Confirmar apertura') : (opening() ? 'Guardar cambios' : 'Guardar inventario inicial') }}</button></div>
+        </div>
       }
     }
   </section>

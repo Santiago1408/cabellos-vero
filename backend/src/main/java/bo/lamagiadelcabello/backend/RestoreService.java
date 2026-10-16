@@ -153,6 +153,8 @@ class RestoreService {
                     + "SELECT * FROM jsonb_populate_record(NULL::" + table + ", ?::jsonb)", data);
             }
         }
+        // Las copias anteriores a la versión 6 no incluían la apariencia.
+        jdbc.update("INSERT INTO ui_theme (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
         validateRestoredBalances();
         if (committed) {
             jdbc.update("UPDATE backup_settings SET pending_export_at = NULL WHERE id = 1");
@@ -183,7 +185,7 @@ class RestoreService {
                         "cost_estimated", "opening_note"));
                 }
                 if ((table.equals("sale_line") || table.equals("sale_delivery_line"))
-                    && !Integer.valueOf(5).equals(file.manifest().get("version"))) {
+                    && ((Number) file.manifest().get("version")).intValue() < 5) {
                     expected.remove("final_weight");
                 }
                 if ((table.equals("sale_line") || table.equals("sale_delivery_line"))

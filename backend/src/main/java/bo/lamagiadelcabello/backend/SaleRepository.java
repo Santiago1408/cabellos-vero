@@ -3,6 +3,7 @@ package bo.lamagiadelcabello.backend;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -191,7 +192,7 @@ class SaleRepository {
         jdbc.update("""
             INSERT INTO sale_delivery (id, sale_id, request_key, request_hash, effective_at)
             VALUES (?, ?, ?, ?, ?)
-            """, id, saleId, requestKey, requestHash, effectiveAt);
+            """, id, saleId, requestKey, requestHash, Timestamp.from(effectiveAt));
     }
 
     void addDeliveryLine(UUID id, UUID deliveryId, UUID saleId,
@@ -204,7 +205,7 @@ class SaleRepository {
 
     void updateDeliveryTime(UUID deliveryId, Instant effectiveAt) {
         jdbc.update("UPDATE sale_delivery SET effective_at = ? WHERE id = ?",
-            effectiveAt, deliveryId);
+            Timestamp.from(effectiveAt), deliveryId);
     }
 
     void updateDeliveryItem(UUID deliveryLineId, BigDecimal weight, BigDecimal finalWeight) {

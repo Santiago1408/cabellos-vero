@@ -55,20 +55,22 @@ final class RestoreCsv {
         Object version = manifest.get("version");
         if (!"la-magia-del-cabello-csv".equals(manifest.get("format"))
             || (!Integer.valueOf(3).equals(version) && !Integer.valueOf(4).equals(version)
-                && !Integer.valueOf(5).equals(version))
+                && !Integer.valueOf(5).equals(version) && !Integer.valueOf(6).equals(version))
             || !"backend-relational".equals(manifest.get("schema"))
             || !"BOB".equals(manifest.get("currency"))
             || !"g".equals(manifest.get("weightUnit"))
             || !"America/La_Paz".equals(manifest.get("businessTimeZone"))
             || !(manifest.get("counts") instanceof Map<?, ?> counts)) {
-            throw invalid("El respaldo no es una exportación compatible de las versiones 3, 4 o 5.");
+            throw invalid("El respaldo no es una exportación compatible de las versiones 3, 4, 5 o 6.");
         }
         try { Instant.parse(String.valueOf(manifest.get("exportedAt"))); }
         catch (RuntimeException badDate) {
             throw invalid("La fecha de exportación del manifiesto es inválida.");
         }
         List<String> tables = Integer.valueOf(3).equals(version)
-            ? BackupService.sourceTablesV3() : BackupService.sourceTables();
+            ? BackupService.sourceTablesV3()
+            : Integer.valueOf(6).equals(version)
+                ? BackupService.sourceTables() : BackupService.sourceTablesV5();
         Set<String> allowed = new HashSet<>(tables);
         if (!counts.keySet().equals(allowed)) {
             throw invalid("El manifiesto no enumera todas las tablas del respaldo.");

@@ -517,7 +517,8 @@ export class ConnectedSales implements OnInit {
       ? error.message : 'No se pudo completar la operación. Inténtalo nuevamente.';
     if (error.status === 0) return 'No se pudo conectar con la API. Comprueba que Spring Boot esté funcionando.';
     if (error.status === 401) { void this.session.restore(); return 'La sesión venció. Ingresa nuevamente.'; }
-    if (error.status === 403) return 'La operación fue rechazada. Comprueba tu sesión y vuelve a intentarlo.';
+    if (error.status === 403) return typeof error.error?.error === 'string'
+      ? error.error.error : 'No se pudo autorizar la venta. Recarga la página e inicia sesión de nuevo.';
     return typeof error.error?.error === 'string' ? error.error.error : 'El servidor no pudo completar la operación.';
   }
 }

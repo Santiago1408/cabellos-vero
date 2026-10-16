@@ -1,3 +1,5 @@
+@import './app/pages/connected-workspace/connected-login.css';
+
 /* Paleta global: modifica estas variables para cambiar los colores de toda la interfaz. */
 :root {
   --color-primary: #171717;

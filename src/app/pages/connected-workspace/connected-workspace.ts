@@ -16,6 +16,7 @@ import { ConnectedSettings } from './connected-settings';
 import { ConnectedOpening } from './connected-opening';
 import { BackupSettings } from '../../data/backup-api';
 import { Icon } from '../../shared/icon/icon';
+import { Theme } from '../../data/theme';
 
 type Category = { code: string; displayName: string };
 type Length = { centimeters: number };
@@ -50,6 +51,7 @@ registerLocaleData(localeEsBo);
 export class ConnectedWorkspace implements OnInit {
   readonly session = inject(AuthSession);
   private readonly api = inject(ApiClient);
+  private readonly theme = inject(Theme);
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly error = signal('');
@@ -71,6 +73,8 @@ export class ConnectedWorkspace implements OnInit {
   readonly stockDetailError = signal('');
   readonly section = signal<'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'>('inventory');
   readonly mobileOpen = signal(false);
+  readonly sidebarCollapsed = signal(this.readSidebarCollapsed());
+  readonly passwordVisible = signal(false);
   readonly profileOpen = signal(false);
   readonly backupDue = signal(false);
   readonly backupDismissed = signal(false);
@@ -125,7 +129,23 @@ export class ConnectedWorkspace implements OnInit {
   }
 
   ngOnInit(): void {
-    void this.restore();
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    await this.theme.load();
+    await this.restore();
+  }
+
+  toggleSidebar(): void {
+    this.sidebarCollapsed.update(value => !value);
+    try { localStorage.setItem('cabello.sidebarCollapsed', String(this.sidebarCollapsed())); }
+    catch { /* El menú sigue funcionando si el navegador bloquea el almacenamiento. */ }
+  }
+
+  private readSidebarCollapsed(): boolean {
+    try { return localStorage.getItem('cabello.sidebarCollapsed') === 'true'; }
+    catch { return false; }
   }
 
   private async restore(): Promise<void> {

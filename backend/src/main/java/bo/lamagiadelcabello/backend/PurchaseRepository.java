@@ -3,6 +3,7 @@ package bo.lamagiadelcabello.backend;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -185,7 +186,7 @@ class PurchaseRepository {
         jdbc.update("""
             INSERT INTO purchase_receipt (id, purchase_id, request_key, request_hash, effective_at)
             VALUES (?, ?, ?, ?, ?)
-            """, id, purchaseId, requestKey, requestHash, effectiveAt);
+            """, id, purchaseId, requestKey, requestHash, Timestamp.from(effectiveAt));
     }
 
     void addReceiptLine(UUID id, UUID receiptId, UUID purchaseId, UUID purchaseLineId,
@@ -205,15 +206,16 @@ class PurchaseRepository {
                  original_weight, remaining_weight, effective_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, id, receiptLineId, categoryCode, lengthCm, costPerGram,
-            weight, weight, effectiveAt);
+            weight, weight, Timestamp.from(effectiveAt));
     }
 
     void updateReceiptTime(UUID receiptId, Instant effectiveAt) {
-        jdbc.update("UPDATE purchase_receipt SET effective_at = ? WHERE id = ?", effectiveAt, receiptId);
+        jdbc.update("UPDATE purchase_receipt SET effective_at = ? WHERE id = ?",
+            Timestamp.from(effectiveAt), receiptId);
         jdbc.update("""
             UPDATE stock_lot SET effective_at = ?
             WHERE receipt_line_id IN (SELECT id FROM purchase_receipt_line WHERE receipt_id = ?)
-            """, effectiveAt, receiptId);
+            """, Timestamp.from(effectiveAt), receiptId);
     }
 
     void updateReceiptItem(UUID receiptLineId, BigDecimal weight) {

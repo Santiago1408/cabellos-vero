@@ -1,5 +1,7 @@
 package bo.lamagiadelcabello.backend;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +13,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.SecurityFilterChain;
@@ -33,8 +36,11 @@ class SecurityConfiguration {
             .httpBasic(AbstractHttpConfigurer::disable)
             .logout(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(requests -> requests
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers("/api/auth/csrf", "/api/auth/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/theme").permitAll()
+                .requestMatchers("/api/theme").hasRole("ADMIN")
                 .requestMatchers("/api/auth/me", "/api/auth/logout", "/api/auth/password").authenticated()
                 .requestMatchers("/api/auth/profile").hasRole("ADMIN")
                 .requestMatchers("/api/employees", "/api/employees/**").hasRole("ADMIN")
@@ -60,7 +66,9 @@ class SecurityConfiguration {
                 .accessDeniedHandler((request, response, error) -> {
                     response.setStatus(403);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"error\":\"Acceso denegado o token CSRF inválido.\"}");
+                    response.getWriter().write(error instanceof CsrfException
+                        ? "{\"error\":\"La verificación de seguridad de la sesión venció. Recarga la página e inténtalo de nuevo.\"}"
+                        : "{\"error\":\"Tu cuenta no tiene permiso para modificar estos datos.\"}");
                 }))
             .addFilterBefore(new AccountSessionFilter(accounts), CsrfFilter.class);
         return http.build();
