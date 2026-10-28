@@ -17,8 +17,14 @@
 # docs/despliegue-demostracion.md. If XPANDER is down, only its domain fails.
 {$XPANDER_DOMAIN:xpandertienda.duckdns.org} {
     encode zstd gzip
-    request_body {
+    # Photos and payment receipts are limited to 8 MiB by the API; landing videos,
+    # converted by the API after upload, to 100 MB.
+    @not_video_upload not path /api/admin/media/videos
+    request_body @not_video_upload {
         max_size 12MB
+    }
+    request_body /api/admin/media/videos {
+        max_size 110MB
     }
     header {
         Strict-Transport-Security "max-age=31536000"
