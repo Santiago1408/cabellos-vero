@@ -11,3 +11,30 @@
         file_server
     }
 }
+
+# XPANDER (another project on this VPS) shares this Caddy. Its containers are
+# reached through the external Docker network xpander_edge; see
+# docs/despliegue-demostracion.md. If XPANDER is down, only its domain fails.
+{$XPANDER_DOMAIN:xpandertienda.duckdns.org} {
+    encode zstd gzip
+    request_body {
+        max_size 12MB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; media-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.google.com https://google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        -Server
+    }
+
+    handle /api/* {
+        reverse_proxy xpander-api:8080
+    }
+
+    handle {
+        reverse_proxy xpander-web:3000
+    }
+}

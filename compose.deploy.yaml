@@ -51,9 +51,14 @@ services:
       - api
     networks:
       - private
+      # Shared only with XPANDER's public containers (xpander-web, xpander-api).
+      - xpander_edge
 
 networks:
   private:
+  xpander_edge:
+    external: true
+    name: xpander_edge
 
 volumes:
   database_data:

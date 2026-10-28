@@ -65,6 +65,16 @@ sudo docker compose -p cabello_demo --env-file .env.deploy -f compose.deploy.yam
 
 Esperar a que Flyway y Spring terminen de iniciar. Comprobar desde el navegador `https://TU_SUBDOMINIO/sistema`. La URL `https://TU_SUBDOMINIO/` presenta la landing pública provisional y su enlace «Acceso al sistema» lleva a `/sistema`. El contacto, las redes y la identidad visual definitiva se completarán después de que el cliente revise la propuesta. Los archivos de la antigua demostración pueden permanecer en el repositorio, pero no están enlazados desde las rutas publicadas.
 
+### Caddy compartido con XPANDER
+
+El Caddy del servicio `web` también publica la tienda XPANDER (`xpandertienda.duckdns.org`, otro proyecto en este VPS). Llega a sus contenedores `xpander-web` y `xpander-api` por la red externa `xpander_edge`, en la que no están la base ni la API de Cabello. Esa red debe existir antes de levantar Cabello; se crea una sola vez:
+
+```sh
+sudo docker network create xpander_edge
+```
+
+Si XPANDER está detenido, solo su dominio responde con error; Cabello no se ve afectado.
+
 ## 5. Crear el administrador de la demostración
 
 Con la base y la API funcionando, ejecutar en una terminal SSH **interactiva**:
