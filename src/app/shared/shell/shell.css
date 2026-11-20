@@ -257,7 +257,7 @@
     padding-inline: 24px;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .sidebar {
     transform: translateX(-100%);
     width: min(84vw, 300px);

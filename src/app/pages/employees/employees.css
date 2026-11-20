@@ -33,8 +33,10 @@
   .employee-filters .field-label { flex: 1; min-width: 0; }
   .employee-filters .field-label:first-child { flex: 2; min-width: 0; }
 }
-@media (max-width: 720px) {
-  .employee-filters { flex-direction: column; align-items: stretch; }
+@media (max-width: 1200px) {
+  .employee-filters { flex-direction: row; align-items: end; width: 100%; }
+  .employee-filters .field-label { flex: 1; min-width: 0; }
+  .employee-filters .field-label:first-child { flex: 2; min-width: 0; }
   .employee-filters .field-input { height: 44px; }
   .employee-list .employee-inactive td { background: transparent; box-shadow: none; }
   .employee-list tr.employee-inactive { background: #fafafa; border-left: 3px solid #aaa; }
@@ -46,3 +48,6 @@
   .employee-history-row { grid-template-columns: 1fr 1fr; }
   .employee-history-row > span:first-child { grid-column: 1 / -1; }
 }
+
+/* Use the same value hierarchy throughout the workspace. */
+.employee-detail dd { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

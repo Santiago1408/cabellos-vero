@@ -29,7 +29,7 @@ class AccountRepository {
 
     Optional<Account> findByNormalizedUsernameForUpdate(String normalized) {
         List<Account> accounts = jdbc.query(
-            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE username_normalized = ? FOR UPDATE",
+            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE username_normalized = ? AND deleted_at IS NULL FOR UPDATE",
             AccountRepository::mapAccount,
             normalized
         );
@@ -38,7 +38,7 @@ class AccountRepository {
 
     Optional<Account> findById(UUID id) {
         List<Account> accounts = jdbc.query(
-            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE id = ?",
+            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE id = ? AND deleted_at IS NULL",
             AccountRepository::mapAccount,
             id
         );
@@ -47,7 +47,7 @@ class AccountRepository {
 
     Optional<Account> findByIdForUpdate(UUID id) {
         List<Account> accounts = jdbc.query(
-            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE id = ? FOR UPDATE",
+            "SELECT " + ACCOUNT_COLUMNS + " FROM app_user WHERE id = ? AND deleted_at IS NULL FOR UPDATE",
             AccountRepository::mapAccount,
             id
         );

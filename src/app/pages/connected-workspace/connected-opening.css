@@ -23,4 +23,8 @@
 .opening-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .opening-toolbar { flex: none; align-items: center; justify-content: space-between; padding: 14px 24px; border-top: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 -8px 24px #0000000b; }
 .opening-toolbar-buttons { display: flex; gap: 10px; margin-left: auto; }
-@media (max-width: 640px) { .opening-content { padding: 16px; } .opening-grid { grid-template-columns: 1fr; } .opening-summary-row { flex-direction: column; } .opening-amount { text-align: left; } .opening-toolbar { padding: 12px 16px; } .opening-toolbar-buttons { width: 100%; } .opening-toolbar-buttons .btn { flex: 1; } }
+@media (max-width: 1200px) { .opening-content { padding: 16px; } .opening-grid { grid-template-columns: 1fr; } .opening-summary-row { flex-direction: column; } .opening-amount { text-align: left; } .opening-toolbar { padding: 12px 16px; } .opening-toolbar-buttons { width: 100%; } .opening-toolbar-buttons .btn { flex: 1; } }
+
+/* Use the same value hierarchy throughout the workspace. */
+.opening-totals strong { font-size: var(--data-summary-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }
+.opening-amount strong, .opening-preview strong { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

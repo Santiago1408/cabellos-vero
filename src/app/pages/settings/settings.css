@@ -127,7 +127,7 @@
 }
 
 /* Rules for this component view. */
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -136,6 +136,10 @@
   .muted, .theme-preview strong, .theme-preview small, .inline-hint { font-size: 14px; }
   .profile-data, .profile-details { font-size: 15px; }
   .password-form h3 { font-size: 17px; }
-  .backup-download-controls { display: none; }
-  .backup-mobile-note { display: block; }
+
 }
+
+@media (max-width: 720px) { .backup-download-controls { display: none; } .backup-mobile-note { display: block; } }
+
+/* Use the same value hierarchy throughout the workspace. */
+.profile-details dd, .profile-data strong, .store-info-grid strong { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

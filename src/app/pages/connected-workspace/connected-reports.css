@@ -5,4 +5,4 @@
 .connected-report-purchase { background: var(--color-primary); }
 .connected-report-sale { background: var(--color-chart-secondary); }
 .connected-report-bar small { min-height: 25px; margin-top: 6px; color: var(--color-muted); text-align: center; white-space: nowrap; overflow: hidden; font-size: 11px; }
-@media (max-width: 720px) { .connected-report-bars { gap: 5px; margin-inline: 12px; } .connected-report-bar small { font-size: 10px; } }
+@media (max-width: 1200px) { .connected-report-bars { gap: 5px; margin-inline: 12px; } .connected-report-bar small { font-size: 10px; } }

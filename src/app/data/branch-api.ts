@@ -1,0 +1,11 @@
+export type Branch = { id: string; name: string; active: boolean; ownerId: string | null; ownerName: string | null };
+export type BranchBalances = { cash: number; capital: number; advance: number; adminDue: number; ownerDue: number; operatingCash: number; stockCost: number; stockWeight: number };
+export type BranchOverview = { branch: Branch; balances: BranchBalances };
+export type BranchOwner = { id: string; username: string; fullName: string; phone: string; active: boolean; branchId: string | null; branchName: string | null };
+export type BranchPortion = { lotId: string; label: string; weight: number; cost: number };
+export type BranchLot = { id: string; kind: string; label: string; seller: string; originalWeight: number; remainingWeight: number; originalCost: number; remainingCost: number; note: string; recordedAt: string; voidedAt: string | null; sources: BranchPortion[] };
+export type BranchSale = { id: string; ownerId: string; customer: string; weight: number; amount: number; cost: number; adminShare: number; ownerShare: number; method: string; note: string; recordedAt: string; voidedAt: string | null; items: BranchPortion[] };
+export type BranchCash = { id: string; kind: string; cashDelta: number; advanceDelta: number; adminDelta: number; ownerDelta: number; ownerName: string | null; actorName: string; note: string; recordedAt: string; confirmedAt: string | null; reversed: boolean; referenceId: string | null };
+export type BranchHistory = { id: number; changedAt: string; eventType: string; actorName: string; reason: string | null; oldValues: unknown; newValues: unknown };
+export type BranchDetail = { branch: Branch; balances: BranchBalances; lots: BranchLot[]; sales: BranchSale[]; cash: BranchCash[]; owners: { ownerId: string; ownerName: string; amount: number }[]; history: BranchHistory[] };
+export type BranchReport = { quantity: number; weight: number; revenue: number; cost: number; adminShare: number; ownerShare: number; purchases: number; capital: number; advances: number; expenses: number; advanceReturns: number; adminDeliveries: number; ownerWithdrawals: number };

@@ -107,15 +107,16 @@ Estas rutas requieren una sesión de **administrador**. Todas las escrituras req
 
 | Método y ruta | Uso |
 | --- | --- |
-| `GET /api/employees` | Lista los empleados, activos y desactivados, sin contraseñas ni historial. |
+| `GET /api/employees` | Lista los empleados activos y desactivados; excluye los eliminados y no devuelve contraseñas ni historial. |
 | `GET /api/employees/{id}` | Devuelve el empleado y su historial de cambios. |
-| `POST /api/employees` | Crea una cuenta. Recibe `username`, `fullName`, `ci`, `birthDate` (`AAAA-MM-DD`) y `phone`. Devuelve `employee` y `temporaryPassword`; muestra y entrega esa clave al empleado, pues no podrá consultarse después. |
+| `POST /api/employees` | Crea una cuenta. Recibe `username`, `fullName`, `ci`, `birthDate` (`AAAA-MM-DD`), `phone` y `password`. El administrador elige la contraseña inicial (no vacía, hasta 72 bytes UTF-8, sin requisitos de complejidad). Devuelve los datos del empleado sin contraseña; este puede cambiarla después desde su perfil, sin cambio obligatorio al ingresar. |
 | `PUT /api/employees/{id}` | Modifica esos cinco datos y exige `reason`. |
 | `POST /api/employees/{id}/deactivate` | Desactiva la cuenta, cierra sus sesiones y exige `reason`. |
 | `POST /api/employees/{id}/reactivate` | Reactiva la cuenta con su contraseña vigente y exige `reason`. Si ya no conoce su clave, usa también el restablecimiento. |
-| `POST /api/employees/{id}/reset-password` | Genera una nueva clave temporal, cierra sus sesiones, obliga a cambiarla en el próximo ingreso y exige `reason`. |
+| `POST /api/employees/{id}/reset-password` | Recibe `password` elegida por el administrador y `reason`, cierra sus sesiones y devuelve el empleado sin contraseña. No exige cambio al ingresar. |
+| `POST /api/employees/{id}/delete` | Elimina el acceso y oculta la cuenta; conserva el historial y las operaciones. Recibe `reason`. |
 
-Las tres últimas acciones reciben JSON como `{"reason":"Corrección solicitada por el administrador"}`. La edición envía todos los datos del empleado más `reason`. Los usuarios y CI no se pueden repetir; las contraseñas nunca aparecen en el historial. La clave temporal generada tiene 20 caracteres y debe cambiarse en `POST /api/auth/password` antes de llamar a cualquier otra ruta protegida. Si falta o es inválido el token CSRF, la API responde `403`; si la sesión es de empleado, estas rutas responden `403`.
+Desactivar, reactivar y eliminar reciben JSON como `{"reason":"Cambio de personal"}`. Restablecer recibe `{"password":"clave elegida","reason":"Solicitud del empleado"}`. La edición envía todos los datos del empleado más `reason`. Los usuarios y CI no se pueden repetir, incluso si la cuenta fue eliminada; las contraseñas nunca aparecen en respuestas ni historiales. Si falta o es inválido el token CSRF, la API responde `403`; si la sesión es de empleado, estas rutas responden `403`.
 
 ## Catálogos de cabello
 
@@ -290,7 +291,7 @@ Los importes admiten hasta dos decimales. La fecha del abono va desde el registr
 
 Las rutas `/api/backups/**` son exclusivas del administrador. `GET /api/backups/settings` devuelve `intervalDays`, `lastConfirmedAt`, `pendingExportAt`, `nextReminderAt` y `due`. `PUT /api/backups/settings` acepta `{ "intervalDays": 7 }`, entre 1 y 365. `POST /api/backups/export` descarga el CSV integral y deja pendiente la confirmación; `POST /api/backups/confirm` registra que el administrador comprobó que el archivo quedó guardado. El sistema no puede comprobar por sí mismo si el archivo sigue en la computadora.
 
-La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 6, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración, color principal e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite las versiones 3, 4 y 5 anteriores; los respaldos sin peso final de venta reciben el mismo valor que el peso de cabello y los respaldos sin color reciben el predeterminado. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
+La exportación toma una instantánea coherente de PostgreSQL. Usa UTF-8 con BOM, punto y coma y las columnas `Tipo de registro`, `Identificador`, `Datos completos JSON`. El manifiesto tiene versión 8, fecha, zona horaria y cantidad de filas de cada tabla. Incluye cuentas sin credenciales, catálogo, proveedores, apertura de inventario, operaciones, recepciones, entregas, pagos, lotes, asignaciones de costo, deudas, configuración, color principal e historiales. Excluye hashes de contraseña, metadatos de acceso y sesiones. La restauración también admite las versiones 3 a 7 anteriores; los respaldos sin peso final de venta reciben el mismo valor que el peso de cabello y los respaldos sin color reciben el predeterminado. La versión 2 del archivo generado por el prototipo usa otra estructura y no se importa automáticamente.
 
 ### Restauración
 
@@ -301,10 +302,99 @@ El administrador prepara una restauración en cuatro pasos. Los archivos se env�
 3. `POST /api/backups/restore/{preparationId}/confirm-pre-backup`: el administrador confirma que guardó la copia previa en su computadora.
 4. `POST /api/backups/restore/{preparationId}`: envía otra vez el mismo archivo y el campo de formulario `confirmation=RESTAURAR`. Si el estado actual cambió desde la copia previa, rechaza la solicitud y exige repetir el proceso. Si coincide, bloquea las tablas del negocio y las reemplaza en una transacción. Un error revierte todo.
 
-La restauración conserva las credenciales, la obligación vigente de cambiar contraseña y la versión de sesión de las cuentas con el mismo identificador. Una cuenta previamente desactivada continúa desactivada. Una cuenta nueva del archivo recibe una contraseña aleatoria desconocida: el administrador puede restablecer la de un empleado; si el administrador es nuevo, se recupera mediante el comando privado `recover`. No se cierran sesiones por la restauración; cada solicitud vuelve a comprobar la cuenta. Las restauraciones completadas quedan en `restore_event`, fuera de los datos de negocio exportados.
+La restauración conserva las credenciales, la obligación vigente de cambiar contraseña y la versión de sesión de las cuentas con el mismo identificador. Una cuenta previamente desactivada continúa desactivada. Una cuenta eliminada permanece eliminada si vuelve a aparecer en la copia; tampoco se restaura su asignación activa a una sucursal. Una cuenta nueva del archivo recibe una contraseña aleatoria desconocida: el administrador puede restablecer la de un empleado; si el administrador es nuevo, se recupera mediante el comando privado `recover`. No se cierran sesiones por la restauración; cada solicitud vuelve a comprobar la cuenta. Las restauraciones completadas quedan en `restore_event`, fuera de los datos de negocio exportados.
 
 La vista previa y el reemplazo toman bloqueos exclusivos breves sobre las tablas del negocio; otras lecturas o escrituras pueden esperar mientras terminan. [PostgreSQL garantiza la reversión de `TRUNCATE` dentro de una transacción](https://www.postgresql.org/docs/18/sql-truncate.html). La Configuración de `/sistema` ya consume estos endpoints; las rutas de demostración siguen usando `DemoStore`.
 
 ## Qué sigue
 
 La interfaz `/sistema` ya incluye Inicio, Inventario, Proveedores, Compras, Ventas, Reportes, Deudas, Empleados y Configuración conectados a PostgreSQL. Antes de sustituir las rutas de demostración, revisar los flujos completos con datos locales y ajustar los detalles de presentación que surjan.
+
+## Cambios posteriores a v0
+
+Los empleados solo consultan Compras, Ventas y su perfil; Inventario y Reportes requieren administrador también en la API. Las cuentas nuevas usan la contraseña elegida por el administrador sin cambio obligatorio. El restablecimiento también usa una contraseña escrita por el administrador, sin cambio obligatorio. No se modifican las contraseñas ni el estado de cambio obligatorio de las cuentas existentes.
+
+## Sucursales: cabezas y movimientos de dinero
+
+El módulo usa la misma API y base de datos de La Magia del Cabello, con tablas `branch*` propias. Sus existencias y resultados se consultan desde **Sucursales**, separados del inventario por gramos y de los reportes de la tienda principal. El administrador conserva acceso a todas las sucursales; `BRANCH_OWNER` accede exclusivamente a su sucursal y a su perfil. Los empleados no acceden a este módulo.
+
+### Primer uso
+
+1. Ingresar como administrador y abrir **Sucursales → Nuevo dueño**. Elegir usuario y contraseña inicial. No se exige cambio obligatorio; el dueño puede cambiarla desde Configuración.
+2. Crear la sucursal y usar **Cambiar dueño** para asignarla. Cada sucursal admite un dueño actual y cada dueño una sucursal. Una sucursal sin asignación puede conservar datos, pero no admite nuevas ventas.
+3. Desde **Registrar dinero**, registrar el aporte de capital y, cuando se entreguen, los anticipos. Solo el administrador puede registrar estas entradas.
+4. El dueño entra directamente en **Mi sucursal**. Registra cada cabeza con identificación, peso y total pagado. Las compras se pagan completas y las ventas se cobran completas al registrarlas.
+5. Para vender, seleccionar las cabezas o mezclas y el peso de cada porción. La interfaz calcula el precio por gramo a partir del total introducido. El backend decide el costo y rechaza una venta por debajo de ese costo. No existen precios preestablecidos por categoría o longitud.
+6. Los gastos, retiros, devoluciones de anticipos y entregas de utilidad se registran al mover realmente el dinero. Solo el administrador registra devoluciones de anticipos y entregas de utilidad; no existe un paso adicional de confirmación. El dueño solo registra gastos y retiros de su propia utilidad.
+
+### Reglas de dinero y costo
+
+- `cash`: dinero registrado en la sucursal, considerando todos los métodos de cobro; no es un conteo físico de billetes.
+- `capital`: suma de los aportes permanentes registrados por el administrador. No incluye anticipos ni utilidades.
+- `advance`: anticipos entregados menos devoluciones reales registradas; no se amortiza automáticamente al vender.
+- `adminDue`: utilidad generada para el administrador menos entregas registradas.
+- `ownerDue`: utilidad generada para los dueños menos retiros reales registrados.
+- `operatingCash = cash - adminDue - ownerDue`: dinero disponible para comprar, pagar gastos o devolver anticipos. Las utilidades pendientes se reservan; no se permite gastar esas cantidades por error.
+- `stockCost` y `stockWeight`: costo y peso del cabello disponible, incluyendo mezclas.
+
+Cada venta genera `utilidad = total cobrado - costo de las porciones vendidas`. El costo recuperado vuelve a quedar disponible para comprar. Los gastos no disminuyen el reparto. La mitad para el administrador se trunca a centavos y el centavo indivisible, si existe, queda para el dueño; ambas partes suman exactamente la utilidad. Una venta al costo es válida y deja utilidad cero.
+
+Las porciones consumen costo proporcional al peso disponible en ese momento. La última porción recibe todo el costo residual, evitando perder centavos al dividir muchas veces una cabeza. Una mezcla conserva sus componentes y costos: no crea ingresos ni nuevas compras. Se accede desde la acción secundaria **Mezclar cabezas o porciones** en Inventario de cabezas.
+
+Los gastos financiados por un anticipo reducen el dinero disponible, sin reducir la utilidad repartible. Devolver ese anticipo es otra salida de dinero que reduce el saldo del anticipo. El sistema rechaza saldos negativos y movimientos que dejen sin respaldo utilidades pendientes. No hay cálculo de utilidad neta después de gastos.
+
+### Personal, correcciones e historial
+
+Las asignaciones de dueño tienen fechas de inicio y fin. Reasignar una sucursal cierra las sesiones de los dueños involucrados y retira el acceso anterior. Las ventas conservan al dueño asignado al registrarlas; sus utilidades pendientes no se transfieren a la siguiente persona. El administrador puede registrar retiros a favor de un dueño anterior, seleccionándolo por nombre y saldo.
+
+Las operaciones usan fecha y responsable del servidor y claves de solicitud para evitar duplicados en reintentos. Se bloquea la sucursal durante las escrituras, de forma que dos ventas o compras concurrentes no puedan consumir el mismo stock o dinero.
+
+Las correcciones se realizan por **anulación con motivo y nueva operación**. Solo el administrador puede anular. Se conserva el original y su historial; las anulaciones de dinero generan un movimiento inverso. Si ya se utilizó el cabello o se repartió la utilidad, es necesario revertir primero los movimientos dependientes. Una mezcla puede anularse si todo su cabello sigue disponible, recuperando las porciones de origen. Una sucursal desactivada conserva sus datos y se vuelve de solo lectura para operaciones comerciales; el administrador puede reactivarla.
+
+Una venta a la tienda principal se registra como venta cobrada en la sucursal. La compra correspondiente se registra por el procedimiento habitual de la tienda principal, usando un proveedor que identifique a la sucursal y una referencia común en los detalles. No se transfiere stock directamente ni se crea automáticamente esa segunda operación. Los reportes principales no suman automáticamente las ventas de sucursales: la participación del administrador está identificada en el módulo para evitar interpretar toda la venta como ingreso propio.
+
+### API
+
+Las rutas de escritura usan la cookie de sesión y CSRF habituales. No se aceptan decisiones de sucursal, rol o responsable del navegador como prueba de autorización.
+
+| Método y ruta | Uso |
+| --- | --- |
+| `GET /api/branches` | Sucursales y saldos permitidos para la cuenta. |
+| `POST /api/branches` | Crear sucursal: `{name}` (administrador). |
+| `PUT /api/branches/{id}` | Modificar `{name, active, reason}` (administrador). |
+| `POST /api/branches/{id}/owner` | Asignar o retirar dueño: `{ownerId, reason}` (administrador). |
+| `GET /api/branch-owners` | Usuarios dueños y su asignación actual (administrador). |
+| `POST /api/branch-owners` | Crear `{username, fullName, phone, password}` (administrador). |
+| `PUT /api/branch-owners/{id}` | Editar `{username, fullName, phone, active, reason}` (administrador). |
+| `POST /api/branch-owners/{id}/password` | Asignar `{password, reason}` y cerrar sesiones (administrador). |
+| `GET /api/branches/{id}` | Sucursal, saldos, cabezas, últimas 100 ventas, dinero e historial. |
+| `GET /api/branches/{id}/sales?offset=100` | Página de hasta 100 ventas, incluidas las anuladas. |
+| `POST /api/branches/{id}/purchases` | Compra `{requestKey, label, seller, weight, amount, note}`. |
+| `POST /api/branches/{id}/sales` | Venta `{requestKey, items:[{lotId,weight}], amount, method, customer, note}`. |
+| `POST /api/branches/{id}/mixes` | Mezcla `{requestKey, label, items:[{lotId,weight}], note}`. |
+| `POST /api/branches/{id}/cash` | Dinero `{requestKey, kind, amount, ownerId, note}`. |
+| `POST /api/branches/{id}/reverse` | Anular `{requestKey, kind, id, reason}` (administrador). |
+| `GET /api/branches/{id}/report?from=2026-11-01&to=2026-11-30` | Resumen general solo para administrador. Sin fechas incluye todos los registros; con ambas fechas aplica el filtro inclusivo de Bolivia. |
+
+`requestKey` es un UUID nuevo por operación, conservado al reintentar la misma solicitud. Los pesos se expresan en gramos y los importes en bolivianos, positivos y con hasta dos decimales. `method` acepta `CASH`, `QR`, `TRANSFER`, `OTHER`. `kind` para dinero acepta `CAPITAL`, `ADVANCE` (solo administrador), `EXPENSE`, `OWNER_WITHDRAWAL`; `ADVANCE_RETURN` y `ADMIN_PROFIT` son exclusivos del administrador. El dueño solo puede retirar su propia utilidad; el administrador debe especificar `ownerId`. Para anular se usan los tipos `PURCHASE`, `SALE`, `MIX` o `CASH`.
+
+### Migración, copias y comprobaciones
+
+La migración V23 amplía los roles y crea las tablas del módulo. No convierte las operaciones de la tienda principal en operaciones de sucursales. Antes de desplegar, guardar un respaldo completo de PostgreSQL y el CSV actual.
+
+Los respaldos integrales nuevos usan **versión 8** e incluyen sucursales, asignaciones, cabezas, mezclas, ventas, dinero e historiales. Se validan referencias, inventario, costos, repartos, reversiones y saldos al restaurar. Las versiones 3 a 7 siguen siendo legibles; como en toda restauración integral, una copia antigua reemplaza el estado completo y elimina los datos de sucursales que no existían en ella. Se debe revisar la vista previa y guardar la copia previa antes de confirmar.
+
+Pruebas: `./mvnw test` inicia PostgreSQL temporal local mediante Embedded Postgres, aplica las migraciones y comprueba compras, ventas parciales, mezclas, dinero, cambios de dueño, concurrencia, permisos y restauración. La dependencia de PostgreSQL embebido es exclusiva de pruebas. En entornos que solo tengan Java 21 sin `ct.sym`, se puede comprobar con `./mvnw -Dmaven.compiler.release= -Dmaven.compiler.source=21 -Dmaven.compiler.target=21 test`; para producción y CI se utiliza un JDK completo.
+
+Los dueños no reciben el historial de auditoría ni pueden consultar reportes. La vista de reportes del administrador carga inicialmente todos los datos y admite filtros opcionales de fechas.
+
+
+## Eliminar cuentas y asignar contraseñas
+
+El administrador define la contraseña inicial y la de restablecimiento de empleados y dueños de sucursal. Se admite una contraseña no vacía de hasta 72 bytes UTF-8, sin requisitos de complejidad. El cambio posterior desde el perfil sigue disponible; no es obligatorio al ingresar. Restablecer cierra las sesiones anteriores. Nunca se devuelven ni se auditan contraseñas.
+
+Empleados: abrir el detalle para restablecer o eliminar con motivo. Dueños: usar los botones **Contraseña** o **Eliminar** de Sucursales. Las rutas `POST /api/branch-owners/{id}/password` (`password`, `reason`) y `POST /api/branch-owners/{id}/delete` (`reason`) son exclusivas del administrador.
+
+La eliminación usa `app_user.deleted_at`, desactiva la cuenta y revoca sus sesiones. Se oculta del listado y no se puede reactivar, editar, reasignar ni restablecer desde el panel. Se mantienen su identidad, compras, ventas, auditoría y saldos. El nombre de usuario y el CI siguen reservados. Eliminar un dueño finaliza su asignación; la sucursal permanece y puede recibir otro dueño. El administrador puede registrar el retiro de la utilidad pendiente del dueño anterior.
+
+Los respaldos CSV v8 incluyen la marca de eliminación. Las copias v3–v7 siguen siendo compatibles. Restaurar una copia anterior a una eliminación no vuelve a habilitar esa cuenta ni su asignación. El reinicio completo de producción es un procedimiento independiente: borra los datos, incluidas las cuentas, y requiere crear de nuevo al administrador.

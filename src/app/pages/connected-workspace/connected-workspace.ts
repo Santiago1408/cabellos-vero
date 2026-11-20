@@ -1,3 +1,4 @@
+import { ConnectedBranches } from './connected-branches';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe, registerLocaleData } from '@angular/common';
 import localeEsBo from '@angular/common/locales/es-BO';
@@ -43,7 +44,7 @@ registerLocaleData(localeEsBo);
 @Component({
   selector: 'app-connected-workspace',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, ConnectedReports, ConnectedDashboard, ConnectedDebts, ConnectedEmployees, ConnectedSettings, ConnectedOpening, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, ConnectedSuppliers, ConnectedPurchases, ConnectedSales, ConnectedReports, ConnectedDashboard, ConnectedDebts, ConnectedEmployees, ConnectedSettings, ConnectedOpening, ConnectedBranches, Icon],
   providers: [{ provide: LOCALE_ID, useValue: 'es-BO' }],
   templateUrl: './connected-workspace.html',
   styleUrls: ['./connected-workspace.css', '../../shared/shell/shell.css', '../../shared/operation.css'],
@@ -71,7 +72,7 @@ export class ConnectedWorkspace implements OnInit {
   readonly openingOpen = signal(false);
   readonly stockDetail = signal<StockDetail | null>(null);
   readonly stockDetailError = signal('');
-  readonly section = signal<'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'>('inventory');
+  readonly section = signal<'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings' | 'branches'>('inventory');
   readonly mobileOpen = signal(false);
   readonly sidebarCollapsed = signal(this.readSidebarCollapsed());
   readonly passwordVisible = signal(false);
@@ -92,8 +93,9 @@ export class ConnectedWorkspace implements OnInit {
       .map(part => part[0] ?? '').join('').toUpperCase();
   }
 
-  selectSection(value: 'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings'): void {
-    if (this.session.account()?.role !== 'ADMIN' && ['dashboard', 'suppliers', 'debts', 'employees'].includes(value)) return;
+  selectSection(value: 'dashboard' | 'inventory' | 'suppliers' | 'purchases' | 'sales' | 'reports' | 'debts' | 'employees' | 'settings' | 'branches'): void {
+    if (this.session.account()?.role === 'BRANCH_OWNER' && !['branches', 'settings'].includes(value)) return;
+    if (this.session.account()?.role === 'EMPLOYEE' && ['dashboard', 'inventory', 'reports', 'suppliers', 'debts', 'employees', 'branches'].includes(value)) return;
     this.section.set(value);
     if (value !== 'inventory') this.openingOpen.set(false);
     this.mobileOpen.set(false);
@@ -151,7 +153,7 @@ export class ConnectedWorkspace implements OnInit {
   private async restore(): Promise<void> {
     try {
       const account = await this.session.restore();
-      if (account && !account.mustChangePassword) { this.section.set(account.role === 'ADMIN' ? 'dashboard' : 'inventory'); await this.loadData(); }
+      if (account && !account.mustChangePassword) { this.section.set(account.role === 'BRANCH_OWNER' ? 'branches' : account.role === 'ADMIN' ? 'dashboard' : 'purchases'); await this.loadData(); }
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -169,7 +171,7 @@ export class ConnectedWorkspace implements OnInit {
     this.error.set('');
     try {
       const account = await this.session.login(this.username.trim(), this.password);
-      if (!account.mustChangePassword) { this.section.set(account.role === 'ADMIN' ? 'dashboard' : 'inventory'); await this.loadData(); }
+      if (!account.mustChangePassword) { this.section.set(account.role === 'BRANCH_OWNER' ? 'branches' : account.role === 'ADMIN' ? 'dashboard' : 'purchases'); await this.loadData(); }
     } catch (error) {
       this.error.set(this.errorMessage(error));
     } finally {
@@ -193,7 +195,7 @@ export class ConnectedWorkspace implements OnInit {
     try {
       await this.session.changePassword(this.currentPassword, this.newPassword);
       await this.loadData();
-      this.section.set(this.session.account()?.role === 'ADMIN' ? 'dashboard' : 'inventory');
+      this.section.set(this.session.account()?.role === 'BRANCH_OWNER' ? 'branches' : this.session.account()?.role === 'ADMIN' ? 'dashboard' : 'purchases');
       this.currentPassword = '';
       this.newPassword = '';
       this.confirmPassword = '';
@@ -290,11 +292,12 @@ export class ConnectedWorkspace implements OnInit {
   }
 
   private async loadData(): Promise<void> {
+    if (this.session.account()?.role === 'BRANCH_OWNER') { this.categories.set([]); this.lengths.set([]); this.stock.set([]); this.backupDue.set(false); this.dataLoaded.set(true); return; }
     try {
       const [categories, lengths, stock, backup] = await Promise.all([
         this.api.get<Category[]>('/api/catalog/categories'),
         this.api.get<Length[]>('/api/catalog/lengths'),
-        this.api.get<StockRow[]>('/api/inventory'),
+        this.session.account()?.role === 'ADMIN' ? this.api.get<StockRow[]>('/api/inventory') : Promise.resolve([]),
         this.session.account()?.role === 'ADMIN' ? this.api.get<BackupSettings>('/api/backups/settings') : Promise.resolve(null),
       ]);
       this.categories.set(categories);

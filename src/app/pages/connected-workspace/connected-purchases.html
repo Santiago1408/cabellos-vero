@@ -112,7 +112,7 @@
           </div>
         }
       </section>
-      <details class="payment-history"><summary>Historial de cambios ({{ purchase.history.length }})</summary>@for (change of purchase.history; track change.id) { <p><strong>{{ change.changedAt | date:'dd/MM/yyyy HH:mm':'-0400':'es-BO' }} · {{ change.eventType }}</strong>@if (change.reason) { · {{ change.reason }} }<br /><small>Antes: {{ change.oldValues ? (change.oldValues | json) : '—' }}<br />Después: {{ change.newValues ? (change.newValues | json) : '—' }}</small></p> }</details>
+      <app-audit-history [entries]="purchase.history" [names]="historyNames" />
       @if (detailError()) { <p class="form-error" role="alert">{{ detailError() }}</p> }
       @if (session.account()?.role === 'ADMIN' && purchase.summary.status !== 'CANCELED') { <div class="detail-actions"><button type="button" class="btn btn-outline" (click)="openEdit(purchase.summary.id)"><app-icon name="edit" /> Editar compra</button></div>
         @if (purchase.summary.status === 'PENDING') { <button type="button" class="btn btn-delete purchase-cancel-toggle" (click)="showCancel = !showCancel">Anular saldo pendiente</button>@if (showCancel) { <div class="fulfillment-form"><p class="cancel-warning">El saldo no recibido dejará de estar pendiente. Las recepciones y pagos anteriores seguirán en el historial.</p><label class="field-label">Motivo de anulación<input class="field-input" [(ngModel)]="cancelReason" maxlength="300" /></label><button type="button" class="btn btn-delete" [disabled]="busy()" (click)="cancelPurchase()">Confirmar anulación</button></div> } }

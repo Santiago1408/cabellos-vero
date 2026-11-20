@@ -67,7 +67,7 @@
 .debt-detail .status-partial { background: #fff0d1; color: #865a08; }
 .debt-detail .status-warn { background: #fee5e5; color: #b42323; }
 .debt-detail .status-bad { background: #f8cccc; color: #961919; }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .operation-list.mobile-list-table tr:is(.debt-overdue, .debt-pending, .debt-partial) td {
     background: transparent;
     box-shadow: none;
@@ -83,3 +83,6 @@
   .payment-change-values { grid-template-columns: 1fr; }
   .payment-change-log { font-size: 13px; }
 }
+
+/* Use the same value hierarchy throughout the workspace. */
+.debt-detail dd, .payment-values strong { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

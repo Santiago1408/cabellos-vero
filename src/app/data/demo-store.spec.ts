@@ -48,7 +48,7 @@ describe('stock y costo FIFO', () => {
     const result = sale(store, 'VTA-FIFO', '2026-09-12', [line(store, 'ondulado', 70, 500, 20)]);
     expect(result).toEqual({ kind: 'saved', status: 'Confirmado' });
     expect(store.fifo().allocations.filter(item => item.saleId === 'VTA-FIFO').map(item => [item.lotId, item.quantity])).toEqual([
-      ['COMP-A', 400], ['COMP-B', 100],
+      ['COMP-A-completo', 400], ['COMP-B-completo', 100],
     ]);
     expect(store.saleCost('VTA-FIFO')).toBe(6700);
     expect(operationValue(store.sales().find(item => item.id === 'VTA-FIFO')!.items) - store.saleCost('VTA-FIFO')).toBe(3300);
@@ -63,13 +63,14 @@ describe('stock y costo FIFO', () => {
     expect(store.saleCost('VTA-2087')).toBeGreaterThan(0);
   });
 
-  it('impide mover una compra después de una venta que depende de su lote', () => {
+  it('exige corregir la fecha de una recepción desde su historial', () => {
     const store = new DemoStore();
     store.addCategory('ondulado');
     purchase(store, 'COMP-A', '2026-09-10', 'ondulado', 70, 400, 13);
     sale(store, 'VTA-A', '2026-09-11', [line(store, 'ondulado', 70, 100, 20)]);
     const order = store.orders().find(item => item.id === 'COMP-A')!;
-    expect(store.updateOrder({ ...order, date: '2026-09-12' })).toContain('fecha de la venta');
+    expect(store.updateOrder({ ...order, date: '2026-09-12' })).toContain('motivo');
+    expect(store.updateOrder({ ...order, date: '2026-09-12' }, 'Edición', 'Corregir fecha')).toContain('propio historial');
     expect(store.orders().find(item => item.id === 'COMP-A')?.date).toBe('2026-09-10');
   });
 

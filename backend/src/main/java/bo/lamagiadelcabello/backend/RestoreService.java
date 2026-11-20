@@ -33,7 +33,7 @@ class RestoreService {
     private static final List<String> HISTORY_TABLES = List.of(
         "app_user_history", "supplier_history", "purchase_history", "sale_history",
         "inventory_opening_history",
-        "cash_debt_history");
+        "cash_debt_history", "branch_history");
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -144,6 +144,7 @@ class RestoreService {
         validateColumns(file);
         lockBusinessTables();
         Map<UUID, Credential> credentials = currentCredentials();
+        jdbc.execute("SET CONSTRAINTS branch_cash_entry_reversal_of_fkey DEFERRED");
         jdbc.execute("TRUNCATE TABLE " + String.join(", ", BackupService.sourceTables()));
         for (String table : BackupService.sourceTables()) {
             for (Row row : file.rows().getOrDefault(table, List.of())) {
@@ -153,9 +154,15 @@ class RestoreService {
                     + "SELECT * FROM jsonb_populate_record(NULL::" + table + ", ?::jsonb)", data);
             }
         }
+        // Una copia anterior a una eliminación no vuelve a asignar esa cuenta a su sucursal.
+        jdbc.update("""
+            UPDATE branch_assignment SET ended_at=now()
+            WHERE ended_at IS NULL AND user_id IN (SELECT id FROM app_user WHERE deleted_at IS NOT NULL)
+            """);
         // Las copias anteriores a la versión 6 no incluían la apariencia.
         jdbc.update("INSERT INTO ui_theme (id) VALUES (1) ON CONFLICT (id) DO NOTHING");
         validateRestoredBalances();
+        BranchIntegrity.validate(jdbc);
         if (committed) {
             jdbc.update("UPDATE backup_settings SET pending_export_at = NULL WHERE id = 1");
             synchronizeHistorySequences();
@@ -179,6 +186,7 @@ class RestoreService {
             }
             for (Row row : file.rows().getOrDefault(table, List.of())) {
                 Set<String> expected = new HashSet<>(columns);
+                if (table.equals("app_user") && ((Number) file.manifest().get("version")).intValue()<8) expected.remove("deleted_at");
                 if (table.equals("stock_lot") &&
                     Integer.valueOf(3).equals(file.manifest().get("version"))) {
                     expected.removeAll(Set.of("opening_id", "opening_order", "origin_date",
@@ -211,7 +219,7 @@ class RestoreService {
     private Map<UUID, Credential> currentCredentials() {
         Map<UUID, Credential> current = new HashMap<>();
         jdbc.query("""
-            SELECT id, role, password_hash, active, must_change_password, session_version,
+            SELECT id, role, password_hash, active, must_change_password, session_version, deleted_at,
                 failed_login_count, next_login_at, last_login_at, password_changed_at
             FROM app_user
             """, row -> {
@@ -219,7 +227,7 @@ class RestoreService {
                 var last = row.getTimestamp("last_login_at");
                 current.put((UUID) row.getObject("id"), new Credential(
                     row.getString("role"), row.getString("password_hash"), row.getBoolean("active"),
-                    row.getBoolean("must_change_password"), row.getLong("session_version"),
+                    row.getBoolean("must_change_password"), row.getLong("session_version"), instant(row.getTimestamp("deleted_at")),
                     row.getInt("failed_login_count"),
                     next == null ? null : next.toInstant(),
                     last == null ? null : last.toInstant(),
@@ -237,6 +245,9 @@ class RestoreService {
         Credential previous = current.get(id);
         Map<String, Object> values = new LinkedHashMap<>(row.values());
         boolean importedActive = Boolean.TRUE.equals(values.get("active"));
+        values.putIfAbsent("deleted_at",null);
+        if(previous!=null && previous.deletedAt()!=null) values.put("deleted_at",previous.deletedAt());
+        if(values.get("deleted_at")!=null) importedActive=false;
         if (previous == null) {
             values.put("password_hash", passwords.encode(UUID.randomUUID().toString()
                 + UUID.randomUUID()));
@@ -523,7 +534,7 @@ class RestoreService {
     }
 
     private record Credential(String role, String passwordHash, boolean active, boolean mustChangePassword,
-                              long sessionVersion, int failedLoginCount, Instant nextLoginAt,
+                              long sessionVersion, Instant deletedAt, int failedLoginCount, Instant nextLoginAt,
                               Instant lastLoginAt, Instant passwordChangedAt) {}
 
     record Preview(UUID preparationId, Instant expiresAt, String fileSha256,

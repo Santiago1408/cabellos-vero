@@ -19,7 +19,7 @@
 .supplier-history-entry strong { color: var(--color-text); margin-right: 10px; }
 .supplier-history-entry p { margin: 6px 0 0; overflow-wrap: anywhere; }
 .table-card .form-error { margin: 0 20px 14px; }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .supplier-detail-content { padding: 10px 18px 22px; }
   .supplier-data { grid-template-columns: 1fr; }
   .supplier-data dt { font-size: 14px; }
@@ -28,3 +28,6 @@
   .row-delete-button { width: 44px; height: 44px; }
   .row-delete-button app-icon { width: 21px; height: 21px; }
 }
+
+/* Use the same value hierarchy throughout the workspace. */
+.supplier-data dd { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

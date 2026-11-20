@@ -6,7 +6,7 @@ export type Account = {
   id: string;
   username: string;
   displayName: string;
-  role: 'ADMIN' | 'EMPLOYEE';
+  role: 'ADMIN' | 'EMPLOYEE' | 'BRANCH_OWNER';
   ci: string | null;
   birthDate: string | null;
   phone: string | null;

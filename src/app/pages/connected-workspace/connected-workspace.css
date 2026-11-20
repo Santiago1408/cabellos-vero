@@ -40,7 +40,7 @@
 .sidebar .connected-sidebar-toggle { flex: none; width: 40px; height: 40px; color: var(--color-muted); }
 .connected-sidebar-toggle app-icon { width: 20px; height: 20px; }
 .connected-sidebar-mobile-icon { display: none; }
-@media (min-width: 721px) {
+@media (min-width: 1201px) {
   .app-frame.sidebar-collapsed .sidebar { width: 78px; padding-inline: 11px; }
   .app-frame.sidebar-collapsed .main-wrap { margin-left: 78px; }
   .app-frame.sidebar-collapsed .connected-sidebar-header { flex-direction: column; gap: 8px; }
@@ -68,7 +68,7 @@
 .stock-outcome > span { color: var(--color-delete); font-weight: 800; }
 .connected-backup-reminder { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; padding: 9px 12px 9px 16px; border: 1px solid #e6d58f; border-radius: 8px; background: #fff9df; color: #634f00; font-size: 13px; }
 .connected-backup-reminder .icon-button { flex: none; color: inherit; }
-@media (max-width: 650px) {
+@media (max-width: 1200px) {
   .connected-page { padding: 18px; }
   .connected-header, .connected-title { align-items: flex-start; flex-direction: column; }
   .connected-grid { grid-template-columns: 1fr; }
@@ -80,7 +80,7 @@
   .connected-inline-form .btn { width: 100%; }
   .connected-types-content { padding: 10px 18px 22px; }
 }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .connected-sidebar-header { gap: 8px; }
   .sidebar .connected-brand { padding-left: 5px; }
   .sidebar .connected-sidebar-toggle { width: 44px; height: 44px; }

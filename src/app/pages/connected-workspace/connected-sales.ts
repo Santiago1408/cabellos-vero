@@ -1,4 +1,5 @@
-import { DatePipe, DecimalPipe, JsonPipe } from '@angular/common';
+import { AuditHistory } from '../../shared/audit-history/audit-history';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -43,7 +44,7 @@ const dateTimeInput = (instant: string) => {
 @Component({
   selector: 'app-connected-sales',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, JsonPipe, Icon],
+  imports: [FormsModule, DatePipe, DecimalPipe, Icon, AuditHistory],
   templateUrl: './connected-sales.html',
   styleUrls: ['./connected-sales.css', '../../shared/operation.css'],
 })
@@ -82,6 +83,7 @@ export class ConnectedSales implements OnInit {
       return direction * (comparison || left.createdAt.localeCompare(right.createdAt));
     });
   });
+  get historyNames(): Record<string, string> { return Object.fromEntries([...this.categories().map(item => [item.code, item.displayName])]); }
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.filtered().length / 7)));
   readonly pageItems = computed(() => this.filtered().slice((this.page() - 1) * 7, this.page() * 7));
   readonly lineValue = lineValue;

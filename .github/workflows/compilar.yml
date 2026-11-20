@@ -29,6 +29,8 @@ jobs:
           cache: npm
       - name: Instalar dependencias
         run: npm ci
+      - name: Probar aplicación
+        run: npm test -- --watch=false
       - name: Compilar aplicación
         run: npm run build
 
@@ -50,4 +52,4 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
       - name: Compilar API
-        run: ./mvnw -B -ntp -Dmaven.test.skip=true package
+        run: ./mvnw -B -ntp verify

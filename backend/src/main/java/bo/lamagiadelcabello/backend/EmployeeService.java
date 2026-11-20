@@ -1,6 +1,5 @@
 package bo.lamagiadelcabello.backend;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,14 +23,10 @@ import bo.lamagiadelcabello.backend.EmployeeRepository.History;
 class EmployeeService {
 
     private static final Pattern USERNAME = Pattern.compile("[\\p{L}\\p{N}._-]{1,80}");
-    private static final char[] PASSWORD_CHARS =
-        "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_".toCharArray();
-
     private final EmployeeRepository employees;
     private final PasswordEncoder passwords;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
-    private final SecureRandom random = new SecureRandom();
 
     EmployeeService(EmployeeRepository employees, PasswordEncoder passwords,
                     TransactionTemplate transactions, ObjectMapper json) {
@@ -54,10 +49,13 @@ class EmployeeService {
         return employees.history(id);
     }
 
-    Created create(EmployeeData raw, UUID actorId) {
+    Created create(EmployeeData raw, String initialPassword, UUID actorId) {
         EmployeeData data = validate(raw);
-        String temporaryPassword = generatePassword();
-        String hash = passwords.encode(temporaryPassword);
+        String chosenPassword = initialPassword;
+        if (chosenPassword == null || chosenPassword.isBlank() || chosenPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw problem(HttpStatus.BAD_REQUEST, "Indica una contraseña no vacía de hasta 72 bytes, sin requisitos de complejidad.");
+        }
+        String hash = passwords.encode(chosenPassword);
         UUID id = UUID.randomUUID();
         try {
             Employee employee = transactions.execute(status -> {
@@ -69,7 +67,7 @@ class EmployeeService {
                     null, snapshotJson(saved));
                 return saved;
             });
-            return new Created(employee, temporaryPassword);
+            return new Created(employee);
         } catch (DataIntegrityViolationException conflict) {
             throw problem(HttpStatus.CONFLICT, "El usuario o CI ya está registrado.");
         }
@@ -114,10 +112,11 @@ class EmployeeService {
         });
     }
 
-    Reset resetPassword(UUID id, String rawReason, UUID actorId) {
+    Employee resetPassword(UUID id, String initialPassword, String rawReason, UUID actorId) {
         String reason = validateReason(rawReason);
-        String temporaryPassword = generatePassword();
-        String hash = passwords.encode(temporaryPassword);
+        String chosenPassword = initialPassword;
+        if (chosenPassword == null || chosenPassword.isBlank() || chosenPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) throw problem(HttpStatus.BAD_REQUEST,"Indica una contraseña no vacía de hasta 72 bytes.");
+        String hash = passwords.encode(chosenPassword);
         Employee employee = transactions.execute(status -> {
             Employee before = locked(id);
             if (!before.active()) {
@@ -128,10 +127,10 @@ class EmployeeService {
             Employee after = get(id);
             employees.addHistory(id, "PASSWORD_RESET", actorId, reason,
                 json.writeValueAsString(Map.of("mustChangePassword", before.mustChangePassword())),
-                json.writeValueAsString(Map.of("mustChangePassword", true)));
+                json.writeValueAsString(Map.of("mustChangePassword", false)));
             return after;
         });
-        return new Reset(employee, temporaryPassword);
+        return employee;
     }
 
     private Employee locked(UUID id) {
@@ -181,10 +180,12 @@ class EmployeeService {
         return reason;
     }
 
-    private String generatePassword() {
-        char[] value = new char[20];
-        for (int i = 0; i < value.length; i++) value[i] = PASSWORD_CHARS[random.nextInt(PASSWORD_CHARS.length)];
-        return new String(value);
+    void delete(UUID id, String rawReason, UUID actorId) {
+        String reason=validateReason(rawReason);
+        transactions.executeWithoutResult(status -> {
+            Employee before=locked(id); employees.delete(id); employees.closeAllSessions(id);
+            employees.addHistory(id,"ACCOUNT_DELETED",actorId,reason,snapshotJson(before),null);
+        });
     }
 
     private String snapshotJson(Employee employee) {
@@ -214,8 +215,7 @@ class EmployeeService {
     }
 
     record EmployeeData(String username, String fullName, String ci, LocalDate birthDate, String phone) {}
-    record Created(Employee employee, String temporaryPassword) {}
-    record Reset(Employee employee, String temporaryPassword) {}
+    record Created(Employee employee) {}
 
     static final class EmployeeProblem extends RuntimeException {
         private final HttpStatus status;

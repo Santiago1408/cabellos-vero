@@ -243,7 +243,7 @@
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .header-date {
     display: none;
   }
@@ -298,3 +298,7 @@
   .metric-row.four .metric, .metric-row.two .metric { border-right: 0; padding-inline: 0; }
   .metric-row.four .metric:not(:last-child), .metric-row.two .metric:not(:last-child) { border-bottom: 1px solid var(--color-border); padding-bottom: 14px; }
 }
+
+/* Use the same value hierarchy throughout the workspace. */
+.metric strong { font-size: var(--data-summary-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }
+.pending-link strong, .low-stock-item small b, .quick-counts strong { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

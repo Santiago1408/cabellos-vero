@@ -26,7 +26,7 @@ class BackupService {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/La_Paz");
     private static final String FORMAT = "la-magia-del-cabello-csv";
-    private static final int VERSION = 6;
+    private static final int VERSION = 8;
 
     // Lista cerrada: ninguna tabla de sesiones, migraciones ni hashes de contraseña se exporta.
     private static final List<Source> SOURCES = List.of(
@@ -57,7 +57,15 @@ class BackupService {
         new Source("cash_debt_payment", "id::text", "to_jsonb(t)"),
         new Source("cash_debt_history", "id::text", "to_jsonb(t)"),
         new Source("backup_settings", "id::text", "to_jsonb(t)"),
-        new Source("ui_theme", "id::text", "to_jsonb(t)")
+        new Source("ui_theme", "id::text", "to_jsonb(t)"),
+        new Source("branch", "id::text", "to_jsonb(t)"),
+        new Source("branch_assignment", "id::text", "to_jsonb(t)"),
+        new Source("branch_lot", "id::text", "to_jsonb(t)"),
+        new Source("branch_sale", "id::text", "to_jsonb(t)"),
+        new Source("branch_sale_item", "id::text", "to_jsonb(t)"),
+        new Source("branch_mix_item", "id::text", "to_jsonb(t)"),
+        new Source("branch_cash_entry", "id::text", "to_jsonb(t)"),
+        new Source("branch_history", "id::text", "to_jsonb(t)")
     );
 
     private final JdbcTemplate jdbc;
@@ -129,9 +137,11 @@ class BackupService {
 
     static List<String> sourceTables() { return SOURCES.stream().map(Source::table).toList(); }
 
+    static List<String> sourceTablesV6() { return sourceTables().stream().filter(table -> !table.startsWith("branch")).toList(); }
+
     static List<String> sourceTablesV3() {
         return SOURCES.stream().map(Source::table)
-            .filter(table -> !table.equals("inventory_opening")
+            .filter(table -> !table.startsWith("branch") && !table.equals("inventory_opening")
                 && !table.equals("inventory_opening_history")
                 && !table.equals("ui_theme"))
             .toList();
@@ -139,7 +149,7 @@ class BackupService {
 
     static List<String> sourceTablesV5() {
         return SOURCES.stream().map(Source::table)
-            .filter(table -> !table.equals("ui_theme"))
+            .filter(table -> !table.startsWith("branch") && !table.equals("ui_theme"))
             .toList();
     }
 

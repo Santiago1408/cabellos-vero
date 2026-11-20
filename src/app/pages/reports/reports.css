@@ -124,7 +124,7 @@
   }
   .monthly-card { grid-column: auto; }
 }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .page-period {
     display: none;
   }
@@ -173,3 +173,7 @@
   .period-list td.mobile-value { text-align: left; margin-left: 0; }
   .period-list td.period-cost { border-top: 0; padding-top: 0; }
 }
+
+/* Use the same value hierarchy throughout the workspace. */
+.report-primary-metrics strong, .report-secondary-metrics strong { font-size: var(--data-summary-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }
+.period-list td.period-margin, .best-products .mobile-list-table td.mobile-value, .category-card .mobile-list-table td.mobile-value { font-size: var(--data-detail-size); font-weight: var(--data-value-weight); line-height: 1.25; overflow-wrap: anywhere; }

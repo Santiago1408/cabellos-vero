@@ -385,7 +385,9 @@ tr:last-child td {
   height: 41px;
   border: 1px solid #dedede;
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 10px 12px;
+  line-height: 1.4;
+  box-sizing: border-box;
   background: #fff;
   color: #333;
   font-size: 12px;
@@ -429,7 +431,7 @@ tr:last-child td {
     padding-inline: 14px;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   .download-button { display: none; }
   .page-header .eyebrow, .page-header p { display: none; }
   .summary-item span, .summary-item small { font-size: 13px; }
@@ -565,4 +567,43 @@ tr:last-child td {
   font-size: 14px;
   font-weight: 850;
   letter-spacing: -1.5px;
+}
+
+/* Tablet cards retain touch targets without stretching every record across the screen. */
+@media (min-width: 721px) and (max-width: 1200px) {
+  .mobile-card-list tbody { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  .mobile-card-list tr { align-content: start; }
+  .mobile-card-list tr:has(.empty-table) { grid-column: 1 / -1; }
+  .mobile-card-list td.mobile-title .table-primary { font-size: 16px; }
+  .mobile-card-list td.mobile-value { font-size: 20px; }
+}
+
+/* Consistent text entry spacing, including fields without the shared class. */
+input:not([type]), input:is([type="text"],[type="search"],[type="password"],[type="email"],[type="tel"],[type="url"]), textarea {
+  box-sizing: border-box;
+  padding-block: 10px;
+  padding-left: 12px;
+  line-height: 1.4;
+}
+textarea.field-input { height: auto; min-height: 88px; padding: 12px; resize: vertical; }
+
+/* Shared scale for the values in the management workspace. */
+:root {
+  --data-summary-size: 24px;
+  --data-detail-size: 18px;
+  --data-value-weight: 650;
+}
+@media (max-width: 650px) { :root { --data-summary-size: 21px; } }
+.app-frame .summary-item strong {
+  font-size: var(--data-summary-size);
+  font-weight: var(--data-value-weight);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.app-frame td { font-size: 14px; }
+.app-frame td.mobile-value {
+  font-size: var(--data-detail-size);
+  font-weight: var(--data-value-weight);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }

@@ -7,4 +7,3 @@ export type EmployeeHistory = {
   actorUserId: string; reason: string | null; oldValues: unknown; newValues: unknown;
 };
 export type EmployeeDetail = { employee: EmployeeSummary; history: EmployeeHistory[] };
-export type TemporaryPassword = { employee: EmployeeSummary; temporaryPassword: string };

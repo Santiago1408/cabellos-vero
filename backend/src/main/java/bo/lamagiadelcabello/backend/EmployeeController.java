@@ -51,10 +51,10 @@ class EmployeeController {
     }
 
     @PostMapping
-    ResponseEntity<TemporaryPasswordView> create(@RequestBody EmployeeInput input, Authentication authentication) {
-        EmployeeService.Created created = employees.create(input.data(), actorId(authentication));
+    ResponseEntity<EmployeeView> create(@RequestBody EmployeeInput input, Authentication authentication) {
+        EmployeeService.Created created = employees.create(input.data(), input.password(), actorId(authentication));
         return ResponseEntity.created(URI.create("/api/employees/" + created.employee().id()))
-            .body(new TemporaryPasswordView(EmployeeView.from(created.employee()), created.temporaryPassword()));
+            .body(EmployeeView.from(created.employee()));
     }
 
     @PutMapping("/{id}")
@@ -73,10 +73,12 @@ class EmployeeController {
     }
 
     @PostMapping("/{id}/reset-password")
-    TemporaryPasswordView resetPassword(@PathVariable UUID id, @RequestBody ReasonInput input,
-                                        Authentication authentication) {
-        EmployeeService.Reset reset = employees.resetPassword(id, input.reason(), actorId(authentication));
-        return new TemporaryPasswordView(EmployeeView.from(reset.employee()), reset.temporaryPassword());
+    EmployeeView resetPassword(@PathVariable UUID id, @RequestBody PasswordInput input, Authentication authentication) {
+        return EmployeeView.from(employees.resetPassword(id,input.password(),input.reason(),actorId(authentication)));
+    }
+    @PostMapping("/{id}/delete")
+    void delete(@PathVariable UUID id, @RequestBody ReasonInput input, Authentication authentication) {
+        employees.delete(id,input.reason(),actorId(authentication));
     }
 
     @ExceptionHandler(EmployeeProblem.class)
@@ -97,7 +99,7 @@ class EmployeeController {
         return ((AccountPrincipal) authentication.getPrincipal()).id();
     }
 
-    record EmployeeInput(String username, String fullName, String ci, LocalDate birthDate, String phone) {
+    record EmployeeInput(String username, String fullName, String ci, LocalDate birthDate, String phone, String password) {
         EmployeeData data() { return new EmployeeData(username, fullName, ci, birthDate, phone); }
     }
 
@@ -107,6 +109,7 @@ class EmployeeController {
     }
 
     record ReasonInput(String reason) {}
+    record PasswordInput(String password,String reason) {}
 
     record EmployeeView(UUID id, String username, String fullName, String ci, LocalDate birthDate,
                         String phone, boolean active, boolean mustChangePassword,
@@ -119,7 +122,6 @@ class EmployeeController {
     }
 
     record EmployeeDetail(EmployeeView employee, List<HistoryView> history) {}
-    record TemporaryPasswordView(EmployeeView employee, String temporaryPassword) {}
     record HistoryView(long id, Instant changedAt, String eventType, String source,
                        UUID actorUserId, String reason, JsonNode oldValues, JsonNode newValues) {}
 }

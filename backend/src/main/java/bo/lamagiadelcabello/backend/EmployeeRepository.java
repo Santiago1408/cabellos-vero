@@ -27,21 +27,21 @@ class EmployeeRepository {
 
     List<Employee> findAll() {
         return jdbc.query(
-            "SELECT " + COLUMNS + " FROM app_user WHERE role = 'EMPLOYEE' ORDER BY created_at DESC, id DESC",
+            "SELECT " + COLUMNS + " FROM app_user WHERE role = 'EMPLOYEE' AND deleted_at IS NULL ORDER BY created_at DESC, id DESC",
             EmployeeRepository::mapEmployee
         );
     }
 
     Optional<Employee> findById(UUID id) {
         return jdbc.query(
-            "SELECT " + COLUMNS + " FROM app_user WHERE id = ? AND role = 'EMPLOYEE'",
+            "SELECT " + COLUMNS + " FROM app_user WHERE id = ? AND role = 'EMPLOYEE' AND deleted_at IS NULL",
             EmployeeRepository::mapEmployee, id
         ).stream().findFirst();
     }
 
     Optional<Employee> findByIdForUpdate(UUID id) {
         return jdbc.query(
-            "SELECT " + COLUMNS + " FROM app_user WHERE id = ? AND role = 'EMPLOYEE' FOR UPDATE",
+            "SELECT " + COLUMNS + " FROM app_user WHERE id = ? AND role = 'EMPLOYEE' AND deleted_at IS NULL FOR UPDATE",
             EmployeeRepository::mapEmployee, id
         ).stream().findFirst();
     }
@@ -66,7 +66,7 @@ class EmployeeRepository {
             INSERT INTO app_user
                 (id, username, username_normalized, password_hash, role,
                  full_name, ci, birth_date, phone, active, must_change_password)
-            VALUES (?, ?, ?, ?, 'EMPLOYEE', ?, ?, ?, ?, TRUE, TRUE)
+            VALUES (?, ?, ?, ?, 'EMPLOYEE', ?, ?, ?, ?, TRUE, FALSE)
             """, id, username, normalized, passwordHash, fullName, ci, birthDate, phone);
     }
 
@@ -91,7 +91,7 @@ class EmployeeRepository {
 
     void resetPassword(UUID id, String hash) {
         jdbc.update("""
-            UPDATE app_user SET password_hash = ?, must_change_password = TRUE,
+            UPDATE app_user SET password_hash = ?, must_change_password = FALSE,
                 password_changed_at = now(), updated_at = now(),
                 session_version = session_version + 1,
                 failed_login_count = 0, next_login_at = NULL
@@ -99,6 +99,9 @@ class EmployeeRepository {
             """, hash, id);
     }
 
+    void delete(UUID id) {
+        jdbc.update("UPDATE app_user SET deleted_at=now(),active=FALSE,session_version=session_version+1,updated_at=now() WHERE id=? AND role='EMPLOYEE' AND deleted_at IS NULL",id);
+    }
     void closeAllSessions(UUID id) {
         jdbc.update("DELETE FROM spring_session WHERE principal_name = ?", id.toString());
     }
